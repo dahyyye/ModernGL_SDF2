@@ -22,9 +22,13 @@ public:
 	DgPos mMax;
 
 	/*! \brief 격자 간격(해상도) */
-	double mSpacing[3] = { 0.0, 0.0, 0.0 };
+	double mSpacing[3] = { 64.0, 64.0, 64.0 };
 
 	std::vector<float> mData;
 public:
+	/*! #brief 입력 메쉬의 bounding box(AABB) 계산 */
+	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
+	/*! #brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
+	void computeSDF();
 };

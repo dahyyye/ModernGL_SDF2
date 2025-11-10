@@ -31,3 +31,5 @@
 #include "DgMesh.h"
 #include "DgScene.h"
 #include "DgVolume.h"
+#include "DgDeform.h"
+#include "DgSweep.h"
