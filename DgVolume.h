@@ -24,9 +24,10 @@ public:
 	/*! \brief 격자 간격(해상도) */
 	double mSpacing[3] = { 64.0, 64.0, 64.0 };
 
+	/* !\brief 부호거리장 데이터(격자 샘플별 부호거리 값) */
 	std::vector<float> mData;
 public:
-	/*! #brief 입력 메쉬의 bounding box(AABB) 계산 */
+	/*! #brief 입력 메쉬의 격자 공간을 정의(AABB) */
 	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
 	/*! #brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
