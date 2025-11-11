@@ -33,3 +33,14 @@
 #include "DgVolume.h"
 #include "DgDeform.h"
 #include "DgSweep.h"
+#include "DgBoolean.h"
+
+//Window관련 cpp에서 구현된 함수
+void ShowWindowToolBar(bool* p_open);
+void ShowWindowSceneLayer(bool* p_open);
+void ShowWindowModelProperty(bool* p_open);
+
+// 전역 변수 선언
+extern bool show_window_tool_bar;
+extern bool show_window_scene_layer;
+extern bool show_window_model_property;

@@ -60,6 +60,18 @@
     <ClCompile Include="DgVolume.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="DgBoolean.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowToolbar.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowSceneLayer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="WindowProperty.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DgMesh.h">
@@ -75,6 +87,9 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="DgVolume.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DgBoolean.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

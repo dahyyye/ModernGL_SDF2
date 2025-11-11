@@ -71,8 +71,10 @@ int main(int argc, char **argv)
                 }
                 ImGui::EndMainMenuBar();
             }
-            // SceneGL 윈도우 출력
-            DgScene::instance().showWindow();
+            ShowWindowSceneLayer(&show_window_scene_layer);         // 씬 레이어 윈도우 출력
+            ShowWindowToolBar(&show_window_tool_bar);               // 툴바 윈도우 출력
+            DgScene::instance().showWindow();                       // SceneGL 윈도우 출력
+			ShowWindowModelProperty(&show_window_model_property);   // 모델 속성 윈도우 출력
         }
         ImGuiManager::instance().end();        
     }
