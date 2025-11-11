@@ -31,7 +31,7 @@ void DgSDF::setGridSpace(const DgMesh& mesh, float padding)
 
 	// 격자 해상도에 따라 격자 간격 계산
 	mSpacing[0] = (mMax.mPos[0] - mMin.mPos[0]) / (mDim[0] - 1);
-	mSpacing[1] = (mMax.mPos[1] - mMin.mPos[1]) / (mDim[1] - 1);
+	mSpacing[1] = (mMax.mPos[1] - mMin.mPos[1]) / (mDim[1] - 1); 
 	mSpacing[2] = (mMax.mPos[2] - mMin.mPos[2]) / (mDim[2] - 1);
 }
 
@@ -41,10 +41,10 @@ void DgSDF::setGridSpace(const DgMesh& mesh, float padding)
 */
 void DgSDF::computeSDF() {
 
-	// mData 벡터 크기 설정
+	// 1) mData 벡터 크기 설정
 	mData.resize(mDim[0] * mDim[1] * mDim[2], std::numeric_limits<float>::max());
 
-	// 격자 샘플의 실제 좌표 계산
-	// 메쉬와 샘플좌표의 부호거리 계산
-	// mData에 부호거리 저장
+	// 2) 격자 샘플의 실제 좌표 계산
+	// 3) 메쉬와 샘플좌표의 부호거리 계산
+	// 4) mData에 부호거리 저장
 }
