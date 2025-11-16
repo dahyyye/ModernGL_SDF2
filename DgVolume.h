@@ -6,7 +6,7 @@
  *	\class	DgSDF
  *	\brief	메쉬의 부호거리장을 표현하는 클래스
  */
-class DgSDF
+class DgVolume
 {
 public:
 	/*! \brief SDF의 기본 메쉬 */
@@ -32,4 +32,8 @@ public:
 
 	/*! #brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
 	void computeSDF();
+
+private:
+	//float findClosestDistanceToMesh(const glm::vec3& p);
+	//float getSign(const glm::vec3& p);
 };

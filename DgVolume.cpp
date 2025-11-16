@@ -7,7 +7,7 @@
 *	@param	padding[in]		격자 공간에 추가할 패딩 비율 (기본값: 0.1f)
 *
 */
-void DgSDF::setGridSpace(const DgMesh& mesh, float padding)
+void DgVolume::setGridSpace(const DgMesh& mesh, float padding)
 {
 	// 입력 메쉬의 AABB 계산
 	DgPos minPos(mesh.mVerts[0].mPos[0], mesh.mVerts[0].mPos[1], mesh.mVerts[0].mPos[2]);
@@ -39,12 +39,39 @@ void DgSDF::setGridSpace(const DgMesh& mesh, float padding)
 *	@brief	격자 샘플에 대하여 부호거리 값을 mData에 저장
 *
 */
-void DgSDF::computeSDF() {
-
-	// 1) mData 벡터 크기 설정
-	mData.resize(mDim[0] * mDim[1] * mDim[2], std::numeric_limits<float>::max());
-
-	// 2) 격자 샘플의 실제 좌표 계산
-	// 3) 메쉬와 샘플좌표의 부호거리 계산
-	// 4) mData에 부호거리 저장
-}
+//void DgVolume::computeSDF() {
+//
+//	int N_X = mDim[0];
+//	int N_Y = mDim[1];
+//	int N_Z = mDim[2];
+//
+//	// 1) mData 벡터 크기 설정
+//	mData.resize(mDim[0] * mDim[1] * mDim[2], std::numeric_limits<float>::max());
+//
+//	for (int k = 0; k < N_Z; k++) {
+//		for (int j = 0; j < N_Y; j++) {
+//			for (int i = 0; i < N_X; i++) {
+//				// 2) 격자 샘플의 실제 좌표 계산
+//				glm::vec3 p;
+//				p.x = mMin.mPos[0] + i * mSpacing[0];
+//				p.y = mMin.mPos[1] + j * mSpacing[1];
+//				p.z = mMin.mPos[2] + k * mSpacing[2];
+//
+//				// 3) 메쉬와 샘플좌표의 부호거리 계산
+//				float distance = findClosestDistanceToMesh(p);
+//				float sign = getSign(p);
+//
+//				// 4) mData에 부호거리 저장
+//				int index = i + j * N_X + k * N_X * N_Y;
+//				mData[index] = sign * distance;
+//			}
+//		}
+//	}
+//}
+//float DgVolume::findClosestDistanceToMesh(const glm::vec3& p) {
+//
+//}
+//
+//float DgVolume::getSign(const glm::vec3& p) {
+//
+//}

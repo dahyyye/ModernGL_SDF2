@@ -39,13 +39,14 @@ int main(int argc, char **argv)
     // 바닥 평면 메쉬를 생성
     scene.createGroundMesh();
 
+    /*
     // 메쉬를 임포트하여 장면에 추가
-    /*DgMesh *pMesh1 = ::import_mesh_obj(".\\model\\bunny_8327v.obj");
+    DgMesh *pMesh1 = ::import_mesh_obj(".\\model\\bunny_8327v.obj");
     scene.mMeshList.push_back(pMesh1);
     pMesh1->mName = "Bunny";
     pMesh1->computeNormal(0);
     pMesh1->mShaderId = scene.mShaders[2];
-
+    
     DgMesh *pMesh2 = ::import_mesh_obj(".\\model\\camel.obj");
     scene.mMeshList.push_back(pMesh2);
     pMesh2->mName = "Camel";

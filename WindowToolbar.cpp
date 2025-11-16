@@ -104,7 +104,9 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-
+		//SdfItem item = makeDefaultItem(0);
+		//item.sphere = 2.0f; // ¹ÝÁö¸§ 2.0
+		//DgScene::instance().bakeSdfToVolume(item, 128);
 	}
 	ImGui::SameLine();
 
