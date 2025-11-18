@@ -72,7 +72,7 @@ void ShowWindowToolBar(bool* p_open) {
 }
 
 void CreateMesh() {
-	const int NumIcons = 12;
+	const int NumIcons = 13;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\new_scene.png",
@@ -85,6 +85,7 @@ void CreateMesh() {
 		".\\res\\icons\\link.png",
 		".\\res\\icons\\cylinder.png",
 		".\\res\\icons\\cone.png",
+		".\\res\\icons\\bunny.png",
 		".\\res\\icons\\cylinder.png",
 		".\\res\\icons\\cone.png"
 	};
@@ -158,13 +159,19 @@ void CreateMesh() {
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("cylinder", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("bunny", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("cone", ToImTex(icon_tex_id[11]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("cylinder", ToImTex(icon_tex_id[11]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	{
+
+	}
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("cone", ToImTex(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
