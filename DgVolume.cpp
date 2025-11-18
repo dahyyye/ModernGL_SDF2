@@ -1,5 +1,59 @@
 #include "DgViewer.h"
 
+DgVolume::DgVolume()
+{
+	mMesh = nullptr;
+	
+	mDim[0] = 0;
+	mDim[1] = 0;
+	mDim[2] = 0;
+
+	mMin.mPos[0] = 0;
+	mMin.mPos[1] = 0;
+	mMin.mPos[2] = 0;
+
+	mMax.mPos[0] = 0;
+	mMax.mPos[1] = 0;
+	mMax.mPos[2] = 0;
+
+	mSpacing[0] = 0;
+	mSpacing[1] = 0;
+	mSpacing[2] = 0;
+}
+
+DgVolume::DgVolume(DgMesh* mesh)
+{
+	mMesh = mesh;
+}
+
+DgVolume::DgVolume(DgVolume& cpy)
+{
+	mMesh = cpy.mMesh;
+
+	mDim[0] = cpy.mDim[0];
+	mDim[1] = cpy.mDim[1];
+	mDim[2] = cpy.mDim[2];
+
+	mMin.mPos[0] = cpy.mMin.mPos[0];
+	mMin.mPos[1] = cpy.mMin.mPos[1];
+	mMin.mPos[2] = cpy.mMin.mPos[2];
+
+	mMax.mPos[0] = cpy.mMax.mPos[0];
+	mMax.mPos[1] = cpy.mMax.mPos[1];
+	mMax.mPos[2] = cpy.mMax.mPos[2];
+
+	mSpacing[0] = cpy.mSpacing[0];
+	mSpacing[1] = cpy.mSpacing[1];
+	mSpacing[2] = cpy.mSpacing[2];
+}
+
+void DgVolume::setDimensions(int dimX, int dimY, int dimZ)
+{
+	mDim[0] = dimX;
+	mDim[1] = dimY;
+	mDim[2] = dimZ;
+}
+
 /*!
 *	@brief	입력 메쉬의 격자 공간을 정의(AABB)
 *
@@ -39,39 +93,90 @@ void DgVolume::setGridSpace(const DgMesh& mesh, float padding)
 *	@brief	격자 샘플에 대하여 부호거리 값을 mData에 저장
 *
 */
-//void DgVolume::computeSDF() {
-//
-//	int N_X = mDim[0];
-//	int N_Y = mDim[1];
-//	int N_Z = mDim[2];
-//
-//	// 1) mData 벡터 크기 설정
-//	mData.resize(mDim[0] * mDim[1] * mDim[2], std::numeric_limits<float>::max());
-//
-//	for (int k = 0; k < N_Z; k++) {
-//		for (int j = 0; j < N_Y; j++) {
-//			for (int i = 0; i < N_X; i++) {
-//				// 2) 격자 샘플의 실제 좌표 계산
-//				glm::vec3 p;
-//				p.x = mMin.mPos[0] + i * mSpacing[0];
-//				p.y = mMin.mPos[1] + j * mSpacing[1];
-//				p.z = mMin.mPos[2] + k * mSpacing[2];
-//
-//				// 3) 메쉬와 샘플좌표의 부호거리 계산
-//				float distance = findClosestDistanceToMesh(p);
-//				float sign = getSign(p);
-//
-//				// 4) mData에 부호거리 저장
-//				int index = i + j * N_X + k * N_X * N_Y;
-//				mData[index] = sign * distance;
-//			}
-//		}
-//	}
-//}
-//float DgVolume::findClosestDistanceToMesh(const glm::vec3& p) {
-//
-//}
-//
-//float DgVolume::getSign(const glm::vec3& p) {
-//
-//}
+void DgVolume::computeSDF()
+{
+
+	int N_X = mDim[0];
+	int N_Y = mDim[1];
+	int N_Z = mDim[2];
+
+	// 1) mData 벡터 크기 설정
+	mData.resize(mDim[0] * mDim[1] * mDim[2], std::numeric_limits<float>::max());
+
+	for (int k = 0; k < N_Z; k++)
+	{
+		for (int j = 0; j < N_Y; j++)
+		{
+			for (int i = 0; i < N_X; i++) 
+			{
+				// 2) 격자 샘플의 실제 좌표 계산
+				glm::vec3 p;
+				p.x = mMin.mPos[0] + i * mSpacing[0];
+				p.y = mMin.mPos[1] + j * mSpacing[1];
+				p.z = mMin.mPos[2] + k * mSpacing[2];
+
+				// 3) 메쉬와 샘플좌표의 부호거리 계산
+				auto distance = findClosestDistanceToMesh(mMesh, p);
+
+				// 4) mData에 부호거리 저장
+				int index = i + j * N_X + k * N_X * N_Y;
+				mData[index] = distance.second;
+			}
+		}
+	}
+
+	// 디버그 출력
+	for (int k = 0; k < N_Z; k++) {
+		for (int j = 0; j < N_Y; j++) {
+			for (int i = 0; i < N_X; i++) {
+
+				// 4) mData에 부호거리 저장
+				int index = i + j * N_X + k * N_X * N_Y;
+
+				std::cout << mData[index] << " ";
+			}
+			std::cout << std::endl;
+		}
+		std::cout << std::endl;
+	}
+
+}
+
+std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh *mesh, const glm::vec3& p)
+{
+	//1. 메쉬의 모든 삼각형에 대해서 거리를 구하고 가장 짧은 거리의 삼각혀을 반환.
+
+	std::vector<float> distances;
+	std::vector<int> faceIndices;
+	std::vector<bool> isInside;
+	for (int i = 0; i < mesh->mFaces.size(); ++i)
+	{
+		glm::vec3 v0(mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[0], mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[1], mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[2]);
+		glm::vec3 v1(mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[0], mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[1], mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[2]);
+		glm::vec3 v2(mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[0], mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[1], mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[2]);
+
+		glm::vec3 n = glm::cross(v1 - v0, v2 - v0);
+		n = glm::normalize(n);
+
+		double d = glm::dot(n * -1.0f, v0);
+
+		double dist = n[0] * (p.x - v0.x) + n[1] * (p.y - v0.y) + n[2] * (p.z - v0.z) + d;
+
+		if(dist < 0)
+			isInside.push_back(true);
+		else
+			isInside.push_back(false);
+
+		dist = std::abs(dist);
+		double denom = glm::length(n);
+		dist = dist / denom;
+		distances.push_back(static_cast<float>(dist));
+		faceIndices.push_back(i);
+	}
+
+	int minIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
+
+	return std::make_pair(&mesh->mFaces[minIndex], isInside[minIndex] ? distances[minIndex] * -1.0 : distances[minIndex]);
+	
+	// (추후) BVH를 활용
+}

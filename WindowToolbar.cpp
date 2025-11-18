@@ -99,20 +99,34 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("NewScene", ToImTex(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		
 	}
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		//SdfItem item = makeDefaultItem(0);
-		//item.sphere = 2.0f; // ¹ÝÁö¸§ 2.0
-		//DgScene::instance().bakeSdfToVolume(item, 128);
+		
+		DgVolume* volume = new DgVolume();
+		volume->mMesh = import_mesh_obj(".\\res\\object\\sphere.obj");
+		volume->setDimensions(16, 16, 16);
+		volume->setGridSpace(*volume->mMesh, 0.5);
+		volume->mDim[0] = 16;
+		volume->mDim[1] = 16;
+		volume->mDim[2] = 16;
+		volume->computeSDF();
+
 	}
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Box", ToImTex(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
+		DgVolume* volume = new DgVolume();
+		volume->mMesh = import_mesh_obj(".\\res\\object\\box.obj");
+		volume->setDimensions(16, 16, 16);
+		volume->setGridSpace(*volume->mMesh, 0.5);
+		volume->mDim[0] = 16;
+		volume->mDim[1] = 16;
+		volume->mDim[2] = 16;
+		volume->computeSDF();
 
 	}
 	ImGui::SameLine();

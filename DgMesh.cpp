@@ -613,3 +613,14 @@ GLuint load_shaders(const char* vertexPath, const char* fragmentPath)
 	return programID;
 }
 
+double& DgPos::operator[](const int& idx)
+{
+	assert(idx >= 0 && idx < 3);
+	return mPos[idx];
+}
+
+const double& DgPos::operator[](const int& idx) const
+{
+	assert(idx >= 0 && idx < 3);
+	return mPos[idx];
+}

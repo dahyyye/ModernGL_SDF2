@@ -11,12 +11,36 @@ public:
 	double mPos[3];
 
 public:
+	DgPos() {
+		mPos[0] = 0.0;
+		mPos[1] = 0.0;
+		mPos[2] = 0.0;
+	}
 	DgPos(double x, double y, double z) {
 		mPos[0] = x;
 		mPos[1] = y;
 		mPos[2] = z;
 	}
 	~DgPos() {}
+
+	/*!
+	*	\brief	인덱스 연산자([])
+	*
+	*	\param[in]	idx 인덱스
+	*
+	*	\return 포인트의 idx 번째 원소의 레퍼런스를 반환한다.
+	*/
+	double& operator [](const int& idx);
+
+	/*!
+	*	\brief	상수 객체의 인덱스 연산자([])
+	*
+	*	\param[in]	idx 인덱스
+	*
+	*	\return 포인트의 idx 번째 원소의 레퍼런스를 반환한다.
+	*/
+	const double& operator [](const int& idx) const;
+
 };
 
 /*!
@@ -101,6 +125,8 @@ public:
 		mMtlIdx = mtlIdx;
 	}
 	~DgFace() {}
+
+	DgPos getVertexPos(int vidx);
 };
 
 /*!
@@ -184,6 +210,3 @@ DgMesh* import_mesh_obj(const char* fname);
  *	\return	생성된 프로그램의 핸들을 반환한다.
  */
 GLuint load_shaders(const char* vertexPath, const char* fragmentPath);
-
-
-
