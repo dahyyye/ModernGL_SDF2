@@ -103,7 +103,7 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		load_shaders(".\\res\\shader\\fullscreen.vert", ".\\res\\shader\\raymarching.frag");
+	
 	}
 	ImGui::SameLine();
 

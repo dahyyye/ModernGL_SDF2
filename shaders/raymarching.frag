@@ -2,35 +2,40 @@
 
 out vec4 outColor; //최종 프래그먼트 색상
 
+const int MAX_SDF = 64;
 
-// ---- SDF 도형 함수 ---- // p: 샘플링 점의 위치
+uniform int   uSdfCount;
+uniform int   uSdfType[MAX_SDF];   // 0=sphere,1=box,...
 
-//구
+uniform vec3  uSdfPos[MAX_SDF];    // world position
+uniform vec4  uSdfParam0[MAX_SDF]; // type별 파라미터
+uniform vec3  uSdfColor[MAX_SDF];
+
+
+//============================================도형 함수============================================
+
 float Sphere(vec3 p, float radius){ return length(p) - radius; }
 
-//박스
 float Box(vec3 p, vec3 halfExtent)
 {
     vec3 q = abs(p) - halfExtent;
     return length(max(q,0.0)) + min(max(q.x, max(q.y,q.z)), 0.0);
 }
 
-//도넛 // t.x: 중심 원의 반지름, t.y: 관 단면 반지름
-float Torus(vec3 p, vec2 t)
+float Torus(vec3 p, vec2 t)                                 //도넛 // t.x: 중심 원의 반지름, t.y: 관 단면 반지름
 {
     vec2 q = vec2(length(p.xz) - t.x, p.y);
     return length(q) - t.y;
 }
 
-//모서리 둥근 박스 
-float RoundBox( vec3 p, vec3 halfExtent, float radius )
+float RoundBox( vec3 p, vec3 halfExtent, float radius )     //모서리 둥근 박스 
 {
   vec3 q = abs(p) - halfExtent + radius;
   return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - radius;
 }
 
-//프레임 박스 // e: 프레임 두께
-float BoxFrame( vec3 p, vec3 halfExtent, float e )
+
+float BoxFrame( vec3 p, vec3 halfExtent, float e )          //프레임 박스 // e: 프레임 두께
 {
        p = abs(p) - halfExtent;
   vec3 q = abs(p+e) - e;
@@ -75,9 +80,11 @@ float Cone( vec3 p, vec2 c, float h )
   return sqrt(d)*sign(s);
 }
 
+//============================================CSG 연산================================================
 
 
-//====================================================================================================
+
+//===========================================카메라 조작==============================================
 
 uniform mat4 uView, uProj, uInvView, uInvProj; //카메라 뷰/투영 행렬 및 역행렬
 uniform vec2 uResolution; //화면 해상도
@@ -106,7 +113,7 @@ vec3 calcNormal(vec3 p){
     );
 }
 
-//====================================================================================================
+//============================================레이마칭================================================
 
 struct Hit{ 
     bool hit;                                           // 히트 여부
@@ -137,7 +144,7 @@ Hit raymarch(vec3 rayOrigin, vec3 rayDir){                // rayOrigin: 광선 시�
     return Hit(false, vec3(0.0), vec3(0.0), vec3(0.0));
 }
 
-//====================================================================================================
+//=========================================메인 함수====================================================
 
 void main(){
     vec3 rayOrigin = getCamPos();
