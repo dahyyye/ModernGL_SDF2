@@ -148,62 +148,47 @@ void DgVolume::computeSDF()
 *	@param	vec3& p			입력 받은 점의 좌표
 *
 */
-double DgVolume::findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p)
+std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p)
 {
-	//std::vector<float>	distances;
-	//std::vector<int>	faceIndices;
-	//std::vector<bool>	isInside;
+	std::vector<float>	distances;
+	std::vector<int>	faceIndices;
+	std::vector<bool>	isInside;
 
-	//for (int i = 0; i < mesh->mFaces.size(); ++i)
-	//{
-	//	// 각 삼각형의 정점 인덱스를 통해 실제 좌표를 가져와야 함
-	//	const DgFace& face = mesh->mFaces[i];
-	//	const DgVertex& v0 = mesh->mVerts[face.mVertIdxs[0]];
-	//	const DgVertex& v1 = mesh->mVerts[face.mVertIdxs[1]];
-	//	const DgVertex& v2 = mesh->mVerts[face.mVertIdxs[2]];
+	for (int i = 0; i < mesh->mFaces.size(); ++i)
+	{
+		// 삼각형의 세 정점 좌표
+		glm::vec3 v0(mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[0],	
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[1],
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[2]);
+		glm::vec3 v1(mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[0],
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[1],
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[1]].mPos[2]);
+		glm::vec3 v2(mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[0],
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[1],
+					 mesh->mVerts[mesh->mFaces[i].mVertIdxs[2]].mPos[2]);
+		
+		glm::vec3 n = glm::cross(v1 - v0, v2 - v0);						// 삼각형 법선 벡터
+		n = glm::normalize(n);
 
-	//	glm::vec3 p0(v0.mPos[0], v0.mPos[1], v0.mPos[2]);
-	//	glm::vec3 p1(v1.mPos[0], v1.mPos[1], v1.mPos[2]);
-	//	glm::vec3 p2(v2.mPos[0], v2.mPos[1], v2.mPos[2]);
+		double d = glm::dot(n * -1.0f, v0);								// 평면 방정식의 d 값 계산
 
-	//	glm::vec3 v01 = normalize(p1 - p0);
-	//	glm::vec3 v12 = normalize(p2 - p1);
-	//	glm::vec3 v20 = normalize(p0 - p2);
+		double dist = n[0] * (p.x) + n[1] * (p.y) + n[2] * (p.z) + d;	// 점 p에서 평면까지의 거리 계산
 
-	//	// Case 1: 정점에서 최단 거리가 생기는 경우
-	//	bool p01q, p02q, p12q, p10q, p20q, p21q;
-	//	// true if order of points is q -> p0 -> p1 (about the axis v01)
-	//	p01q = (v01 * (p - p0) < 0.0);
-	//	// true if order of points is q -> p0 -> p2 (about the axis p13)
-	//	p02q = (v20 * (p - p0) > 0.0);
-	//	// true if order of points is q -> p1 -> p2 (about the axis v12)
-	//	p12q = (v12 * (p - p1) < 0.0);
-	//	// true if order of points is q -> p1 -> p0 (about the axis p21)
-	//	p10q = (v01 * (p - p1) > 0.0);
-	//	// true if order of points is q -> p2 -> p0 (about the axis v20)
-	//	p20q = (v20 * (p - p2) < 0.0);
-	//	// true if order of points is q -> p2 -> p1 (about the axis p32)
-	//	p21q = (v12 * (p - p2) > 0.0);
+		if(dist < 0)
+			isInside.push_back(true);
+		else
+			isInside.push_back(false);
 
-	//	
+		dist = std::abs(dist);
+		double denom = glm::length(n);
+		dist = dist / denom;
+		distances.push_back(static_cast<float>(dist));
+		faceIndices.push_back(i);
+	}
 
-	//	double dist;
+	int minIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
 
-	//	if(dist < 0)
-	//		isInside.push_back(true);
-	//	else
-	//		isInside.push_back(false);
-
-	//	dist = std::abs(dist);
-	//	double denom = glm::length(n);
-	//	dist = dist / denom;
-	//	distances.push_back(static_cast<float>(dist));
-	//	faceIndices.push_back(i);
-	//}
-
-	//int minIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
-
-	//return isInside[minIndex] ? distances[minIndex] * -1.0 : distances[minIndex];
+	return std::make_pair(&mesh->mFaces[minIndex], isInside[minIndex] ? distances[minIndex] * -1.0 : distances[minIndex]);
 	
 	// (추후) BVH를 활용
 }
