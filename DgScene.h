@@ -40,7 +40,7 @@ private:
 			delete m;
 		
 		for (GLuint id : mShaders)
-			glDeleteProgram(id);		
+			glDeleteProgram(id);	
 	}
 
 public:

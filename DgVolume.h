@@ -3,7 +3,7 @@
 #include <vector>
 
 /*!
- *	\class	DgSDF
+ *	\class	DgVolume
  *	\brief	메쉬의 부호거리장을 표현하는 클래스
  */
 class DgVolume

@@ -155,7 +155,6 @@
     <ClCompile Include="implot.cpp" />
     <ClCompile Include="implot_items.cpp" />
     <ClCompile Include="DgScene.cpp" />
-    <ClCompile Include="SdfUtils.cpp" />
     <ClCompile Include="WindowProperty.cpp" />
     <ClCompile Include="WindowSceneLayer.cpp" />
     <ClCompile Include="WindowToolbar.cpp" />
@@ -163,11 +162,11 @@
   <ItemGroup>
     <ClInclude Include="DgBoolean.h" />
     <ClInclude Include="DgMesh.h" />
+    <ClInclude Include="DgSDF.h" />
     <ClInclude Include="DgViewer.h" />
     <ClInclude Include="DgVolume.h" />
     <ClInclude Include="ImGuiManager.h" />
     <ClInclude Include="DgScene.h" />
-    <ClInclude Include="SdfUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
