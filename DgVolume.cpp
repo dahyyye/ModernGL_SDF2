@@ -61,12 +61,12 @@ void DgVolume::setDimensions(int dimX, int dimY, int dimZ)
 *	@param	padding[in]		격자 공간에 추가할 패딩 비율 (기본값: 0.1f)
 *
 */
-void DgVolume::setGridSpace(const DgMesh& mesh, float padding)
+void DgVolume::setGridSpace(DgMesh* mesh, float padding)
 {
 	// 입력 메쉬의 AABB 계산
-	DgPos minPos(mesh.mVerts[0].mPos[0], mesh.mVerts[0].mPos[1], mesh.mVerts[0].mPos[2]);
-	DgPos maxPos(mesh.mVerts[0].mPos[0], mesh.mVerts[0].mPos[1], mesh.mVerts[0].mPos[2]);
-	for (const DgVertex& v : mesh.mVerts) {
+	DgPos minPos(mesh->mVerts[0].mPos[0], mesh->mVerts[0].mPos[1], mesh->mVerts[0].mPos[2]);
+	DgPos maxPos(mesh->mVerts[0].mPos[0], mesh->mVerts[0].mPos[1], mesh->mVerts[0].mPos[2]);
+	for (const DgVertex& v : mesh->mVerts) {
 		if (v.mPos[0] < minPos.mPos[0]) minPos.mPos[0] = v.mPos[0];
 		if (v.mPos[1] < minPos.mPos[1]) minPos.mPos[1] = v.mPos[1];
 		if (v.mPos[2] < minPos.mPos[2]) minPos.mPos[2] = v.mPos[2];
@@ -139,16 +139,21 @@ void DgVolume::computeSDF()
 		}
 		std::cout << std::endl;
 	}
-
 }
 
-std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh *mesh, const glm::vec3& p)
+/*!
+*	@brief	메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환
+*
+*	@param	DgMesh* mesh	입력 받은 메쉬
+*	@param	vec3& p			입력 받은 점의 좌표
+*
+*/
+std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p)
 {
-	//1. 메쉬의 모든 삼각형에 대해서 거리를 구하고 가장 짧은 거리의 삼각혀을 반환.
-
 	std::vector<float> distances;
 	std::vector<int> faceIndices;
 	std::vector<bool> isInside;
+
 	for (int i = 0; i < mesh->mFaces.size(); ++i)
 	{
 		glm::vec3 v0(mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[0], mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[1], mesh->mVerts[mesh->mFaces[i].mVertIdxs[0]].mPos[2]);
