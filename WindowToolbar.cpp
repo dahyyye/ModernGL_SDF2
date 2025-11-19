@@ -72,7 +72,7 @@ void ShowWindowToolBar(bool* p_open) {
 }
 
 void CreateMesh() {
-	const int NumIcons = 13;
+	const int NumIcons = 11;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\new_scene.png",
@@ -86,8 +86,6 @@ void CreateMesh() {
 		".\\res\\icons\\cylinder.png",
 		".\\res\\icons\\cone.png",
 		".\\res\\icons\\bunny.png",
-		".\\res\\icons\\cylinder.png",
-		".\\res\\icons\\cone.png"
 	};
 
 	static GLuint icon_tex_id[NumIcons] = { 0 };
@@ -104,29 +102,12 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		
-		DgVolume* volume = new DgVolume();
-		volume->mMesh = import_mesh_obj(".\\res\\object\\sphere.obj");
-		volume->setDimensions(16, 16, 16);
-		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->mDim[0] = 16;
-		volume->mDim[1] = 16;
-		volume->mDim[2] = 16;
-		volume->computeSDF();
 
 	}
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Box", ToImTex(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		DgVolume* volume = new DgVolume();
-		volume->mMesh = import_mesh_obj(".\\res\\object\\box.obj");
-		volume->setDimensions(16, 16, 16);
-		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->mDim[0] = 16;
-		volume->mDim[1] = 16;
-		volume->mDim[2] = 16;
-		volume->computeSDF();
 
 	}
 	ImGui::SameLine();
@@ -175,19 +156,14 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("bunny", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-
-	}
-	ImGui::SameLine();
-
-	if (ImGui::ImageButton("cylinder", ToImTex(icon_tex_id[11]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-
-	}
-	ImGui::SameLine();
-
-	if (ImGui::ImageButton("cone", ToImTex(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-
+		DgVolume* volume = new DgVolume();
+		volume->mMesh = import_mesh_obj(".\\res\\object\\bunny.obj");
+		volume->setDimensions(16, 16, 16);
+		volume->setGridSpace(*volume->mMesh, 0.5);
+		volume->mDim[0] = 16;
+		volume->mDim[1] = 16;
+		volume->mDim[2] = 16;
+		volume->computeSDF();
 	}
 	ImGui::SameLine();
 }
