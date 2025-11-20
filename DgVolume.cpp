@@ -46,7 +46,12 @@ DgVolume::DgVolume(DgVolume& cpy)
 	mSpacing[1] = cpy.mSpacing[1];
 	mSpacing[2] = cpy.mSpacing[2];
 }
-
+DgVolume::~DgVolume()
+{
+	if (mMesh != nullptr) {
+		delete mMesh;
+	}
+}
 void DgVolume::setDimensions(int dimX, int dimY, int dimZ)
 {
 	mDim[0] = dimX;

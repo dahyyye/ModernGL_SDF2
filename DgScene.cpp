@@ -272,6 +272,39 @@ void DgScene::renderScene()
 			pMesh->render();
 			glUseProgram(0);
 		}
+		for (DgVolume* pVolume : mSDFList)
+		{
+			if(pVolume==nullptr ||mSDFID ==0) continue;
+			glm::mat4 modelMat(1.0f);
+
+			GLuint shaderProgram = mShaders[4];
+			glUseProgram(shaderProgram);
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
+
+			glm::vec3 viewPos = glm::vec3(glm::inverse(viewMat)[3]);
+			glm::vec3 lightPos = glm::vec3(glm::inverse(viewMat)[3]);
+			glUniform3fv(glGetUniformLocation(shaderProgram, "uViewPos"), 1, glm::value_ptr(viewPos));
+			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightPos"), 1, glm::value_ptr(lightPos));
+			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightColor"), 1, glm::value_ptr(glm::vec3(1.0f)));
+
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(viewMat)));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projMat)));
+			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_3D, mSDFID);
+			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
+
+			// 볼륨 경계 유니폼 전달
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"), (float)pVolume->mMin.mPos[0], (float)pVolume->mMin.mPos[1], (float)pVolume->mMin.mPos[2]);
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"), (float)pVolume->mMax.mPos[0], (float)pVolume->mMax.mPos[1], (float)pVolume->mMax.mPos[2]);
+
+			pVolume->mMesh->render();
+
+			glBindTexture(GL_TEXTURE_3D, 0);
+			glUseProgram(0);
+		}
 
 		// FPS 렌더링
 		renderFps();					
@@ -407,4 +440,27 @@ void DgScene::renderContextPopup()
 	}
 }
 
+void DgScene::createSDF(const DgVolume& volume)
+{
+	//SDF 텍스처 ID 생성
+	if (mSDFID == 0)
+		glGenTextures(1, &mSDFID);
 
+	glBindTexture(GL_TEXTURE_3D, mSDFID);
+
+	//GPU 업로드
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,	volume.mDim[0], volume.mDim[1], volume.mDim[2], 0, GL_RED, GL_FLOAT, volume.mData.data());
+
+	//텍스처 파라미터 설정
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+
+	glBindTexture(GL_TEXTURE_3D, 0);
+}
+void DgScene::addSDFVolume(DgVolume* volume)
+{
+	mSDFList.push_back(volume);
+}

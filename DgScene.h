@@ -1,5 +1,6 @@
 #pragma once
-
+#include "DgViewer.h"
+#include "DgVolume.h"
 class DgScene
 {
 public:
@@ -21,6 +22,8 @@ public:
 	glm::vec3 mPan;
 
 private:
+	GLuint mSDFID = 0; //볼륨 텍스처 ID
+	std::vector<DgVolume*> mSDFList; //DgVolume 객체 관리 리스트
 	DgScene()
 	{
 		mOpen = true;
@@ -33,6 +36,11 @@ private:
 	}
 	~DgScene()
 	{
+		if (mSDFID != 0)
+			glDeleteTextures(1, &mSDFID);
+		for (DgVolume* v : mSDFList)
+			delete v;
+
 		glDeleteVertexArrays(1, &mGroundVAO);
 		glDeleteBuffers(1, &mGroundVBO);
 
@@ -40,8 +48,9 @@ private:
 			delete m;
 		
 		for (GLuint id : mShaders)
-			glDeleteProgram(id);	
+			glDeleteProgram(id);
 	}
+	
 
 public:
 	static DgScene& instance() {
@@ -70,5 +79,7 @@ public:
 	void renderFps();																// FPS 렌더링
 	void renderContextPopup();														// 컨텍스트 팝업 렌더링
 	void processMouseEvent();														// 마우스 이벤트 처리
-	void processKeyboardEvent();													// 키보드 이벤트 처리
+	void processKeyboardEvent();	// 키보드 이벤트 처리
+	void createSDF(const DgVolume& volume);
+	void addSDFVolume(DgVolume* volume);
 };

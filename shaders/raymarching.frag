@@ -2,17 +2,46 @@
 
 out vec4 outColor; //최종 프래그먼트 색상
 
+//=========================================== SDF 볼륨 유니폼 ===============================================
+uniform sampler3D uSDFVolume;
+uniform vec3 uVolumeMin;
+uniform vec3 uVolumeMax;
+
+
 //===========================================카메라 조작==============================================
 
 uniform mat4 uView, uProj, uInvView, uInvProj; //카메라 뷰/투영 행렬 및 역행렬
 uniform vec2 uResolution; //화면 해상도
 
+float mapSDFd(vec3 p) {
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 uvw = (p - uVolumeMin) / volumeRange;
+    
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
+        return 500.0;
+    }
+    return texture(uSDFVolume, uvw).r; 
+}
+
+vec3 mapColor(vec3 p) {
+    return vec3(0.1, 0.4, 0.8);
+}
+
 // 화면 좌표에서 월드 공간의 광선 방향 얻기
 vec3 getRayDir(vec2 fragCoord){
-    vec2 ndc = (fragCoord / uResolution) * 2.0 - 1.0;
+    // 화면 좌표 (fragCoord)를 NDC (Normalized Device Coordinates) [-1, 1]로 변환
+    vec2 ndc = (fragCoord / uResolution) * 2.0 - 1.0; 
+    
+    // NDC를 클립 공간 좌표로 변환 (z=-1, w=1)
     vec4 clip = vec4(ndc, -1.0, 1.0);
-    vec4 eye  = uInvProj * clip;
+    
+    // 클립 좌표를 Eye(View) 공간 좌표로 변환 (역투영 행렬 사용)
+    vec4 eye = uInvProj * clip;
+    
+    // Ray Direction을 계산하기 위해 z=-1, w=0 (무한대의 점)으로 설정
     eye = vec4(eye.xy, -1.0, 0.0);
+    
+    // Eye 공간에서 World 공간으로 변환하고 정규화
     return normalize((uInvView * eye).xyz);
 }
 
@@ -30,6 +59,10 @@ vec3 calcNormal(vec3 p){
         k.xxx * mapSDFd(p + k.xxx*e)
     );
 }
+
+
+
+
 
 //============================================레이마칭================================================
 
@@ -61,6 +94,18 @@ Hit raymarch(vec3 rayOrigin, vec3 rayDir){                // rayOrigin: 광선 시�
     }
     return Hit(false, vec3(0.0), vec3(0.0), vec3(0.0));
 }
+float depthFromWorld(vec3 worldPos) {
+    // 월드 좌표를 클립 공간 좌표로 변환: ClipPos = uProj * uView * WorldPos
+    //    (uView, uProj 유니폼은 DgScene.cpp에서 전달됩니다.)
+    vec4 clipPos = uProj * uView * vec4(worldPos, 1.0);
+    
+    // 클립 좌표를 NDC (Normalized Device Coordinates)로 변환: z/w
+    //    NDC z 값은 [-1, 1] 범위입니다.
+    float ndcZ = clipPos.z / clipPos.w;
+    
+    // NDC z 값을 [0, 1] 범위의 최종 깊이 값으로 변환하여 반환
+    return (ndcZ * 0.5) + 0.5;
+}
 
 //=========================================메인 함수====================================================
 
@@ -83,6 +128,7 @@ void main(){
 
     vec3 ambient = 0.20 * hit.color;
     vec3 color   = ambient + diff * hit.color + spec * vec3(1.0);
+
 
     outColor = vec4(color, 1.0);
 }

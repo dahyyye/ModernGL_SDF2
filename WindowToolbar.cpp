@@ -111,6 +111,9 @@ void CreateMesh() {
 		volume->mDim[1] = 16;
 		volume->mDim[2] = 16;
 		volume->computeSDF();
+
+		DgScene::instance().addSDFVolume(volume);
+		DgScene::instance().createSDF(*volume);
 	}
 	ImGui::SameLine();
 

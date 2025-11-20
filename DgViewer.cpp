@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     scene.mShaders.push_back(load_shaders(".\\shaders\\phong.vert", ".\\shaders\\effect-4.frag"));     // 7 전반사 RGB
     scene.mShaders.push_back(load_shaders(".\\shaders\\phong.vert", ".\\shaders\\effect-5.frag"));     // 8 
     scene.mShaders.push_back(load_shaders(".\\shaders\\phong.vert", ".\\shaders\\effect-6.frag"));     // 9 
-    
+    scene.mShaders.push_back(load_shaders(".\\shaders\\phong.vert", ".\\shaders\\raymarching.frag"));  // 4
     // 바닥 평면 메쉬를 생성
     scene.createGroundMesh();
 
