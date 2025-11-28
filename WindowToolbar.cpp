@@ -107,9 +107,6 @@ void CreateMesh() {
 		volume->mMesh = import_mesh_obj(".\\res\\object\\sphere.obj");
 		volume->setDimensions(16, 16, 16);
 		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->mDim[0] = 16;
-		volume->mDim[1] = 16;
-		volume->mDim[2] = 16;
 		volume->computeSDF();
 
 		DgScene::instance().addSDFVolume(volume);
@@ -123,9 +120,6 @@ void CreateMesh() {
 		volume->mMesh = import_mesh_obj(".\\res\\object\\box.obj");
 		volume->setDimensions(16, 16, 16);
 		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->mDim[0] = 16;
-		volume->mDim[1] = 16;
-		volume->mDim[2] = 16;
 		volume->computeSDF();
 	}
 	ImGui::SameLine();
@@ -178,9 +172,6 @@ void CreateMesh() {
 		volume->mMesh = import_mesh_obj(".\\res\\object\\bunny.obj");
 		volume->setDimensions(16, 16, 16);
 		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->mDim[0] = 16;
-		volume->mDim[1] = 16;
-		volume->mDim[2] = 16;
 		volume->computeSDF();
 	}
 	ImGui::SameLine();
