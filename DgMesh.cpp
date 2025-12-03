@@ -624,3 +624,387 @@ const double& DgPos::operator[](const int& idx) const
 	assert(idx >= 0 && idx < 3);
 	return mPos[idx];
 }
+
+DgPos lerp(const DgPos& p, const DgPos& q, double t)
+{
+	double x = (1.0 - t) * p[0] + t * q[0];
+	double y = (1.0 - t) * p[1] + t * q[1];
+	double z = (1.0 - t) * p[2] + t * q[2];
+	return DgPos(x, y, z);
+}
+
+/**********************/
+/* DgFace 클래스 구현 */
+/**********************/
+DgMesh* DgFace::getMesh()
+{
+	return mEdge->mVert->mMesh;
+}
+
+DgPos DgFace::getVertexPos(int vidx)
+{
+	switch (vidx)
+	{
+	case 0:
+		return DgPos(mEdge->mVert->mPos[0], mEdge->mVert->mPos[1], mEdge->mVert->mPos[2]);
+	case 1:
+		return DgPos(mEdge->mNext->mVert->mPos[0], mEdge->mNext->mVert->mPos[1], mEdge->mNext->mVert->mPos[2]);
+	case 2:
+		return DgPos(mEdge->mNext->mNext->mVert->mPos[0], mEdge->mNext->mNext->mVert->mPos[1], mEdge->mNext->mNext->mVert->mPos[2]);
+	}
+	throw std::runtime_error("Invalide index...");
+}
+
+DgVertex* DgFace::getVertex(int vIdx)
+{
+	return getEdge(vIdx)->mVert;
+}
+
+DgEdge* DgFace::getEdge(int eIdx)
+{
+	switch (eIdx)
+	{
+	case 0:
+		return mEdge;
+	case 1:
+		return mEdge->mNext;
+	case 2:
+		return mEdge->mNext->mNext;
+	}
+	return NULL;
+}
+
+double DgFace::getArea()
+{
+	DgVec3 a = getVertex(1)->mPos - getVertex(0)->mPos;
+	DgVec3 b = getVertex(2)->mPos - getVertex(0)->mPos;
+	return norm(a ^ b) * 0.5;
+}
+
+
+
+/**********************/
+/* DgEdge 클래스 구현 */
+/**********************/
+DgEdge::DgEdge(DgVertex* pVert, DgTexel* pTexel, DgNormal* pNormal)
+{
+	// 정점, 텍셀, 법선 정보를 에지의 시작점에 할당한다.
+	mVert = pVert;
+	mTexel = pTexel;
+	mNormal = pNormal;
+
+	// 다음 에지, 반대편 에지, 에지가 속한 삼각형에 대한 포인터를 초기화한다.
+	mNext = NULL;
+	mMate = NULL;
+	mFace = NULL;
+
+	// 시작점의 정점에 현재 에지를 추가한다.
+	mVert->mEdges.push_back(this);
+
+	// 에지 비용을 초기화 한다.
+	mCostOrLen = 0.0;
+}
+
+DgEdge::~DgEdge()
+{
+}
+
+std::vector<DgFace*> DgEdge::getFaces()
+{
+	return (mMate == nullptr)
+		? std::vector<DgFace*>{ mFace }
+	: std::vector<DgFace*>{ mFace, mMate->mFace };
+}
+
+bool DgEdge::isBndry()
+{
+	return (mMate == NULL);
+}
+
+
+/**********************/
+/* DgVec3 클래스 구현 */
+/**********************/
+
+DgVec3::DgVec3(double x, double y, double z)
+{
+	mCoords[0] = x;
+	mCoords[1] = y;
+	mCoords[2] = z;
+}
+
+DgVec3::DgVec3(std::initializer_list<double> coords)
+{
+	auto it = coords.begin();
+	mCoords[0] = *it;
+	mCoords[1] = *(it + 1);
+	mCoords[2] = *(it + 2);
+}
+
+DgVec3::DgVec3(const DgVec3& cpy)
+{
+	mCoords[0] = cpy.mCoords[0];
+	mCoords[1] = cpy.mCoords[1];
+	mCoords[2] = cpy.mCoords[2];
+}
+
+DgVec3::~DgVec3()
+{
+}
+
+DgVec3& DgVec3::setCoords(double x, double y, double z)
+{
+	mCoords[0] = x;
+	mCoords[1] = y;
+	mCoords[2] = z;
+	return *this;
+}
+
+bool DgVec3::isZero(double eps) const
+{
+	return EQ_ZERO(mCoords[0], eps) && EQ_ZERO(mCoords[1], eps) && EQ_ZERO(mCoords[2], eps);
+}
+
+DgVec3& DgVec3::normalize(double eps)
+{
+	if (isZero(eps))
+	{
+		throw std::runtime_error("DgVec3::normalize()...\n");
+	}
+	double len = norm(*this);
+	mCoords[0] /= len;
+	mCoords[1] /= len;
+	mCoords[2] /= len;
+	return *this;
+}
+
+DgVec3& DgVec3::operator =(const DgVec3& rhs)
+{
+	mCoords[0] = rhs.mCoords[0];
+	mCoords[1] = rhs.mCoords[1];
+	mCoords[2] = rhs.mCoords[2];
+	return *this;
+}
+
+DgVec3& DgVec3::operator +=(const DgVec3& rhs)
+{
+	mCoords[0] += rhs.mCoords[0];
+	mCoords[1] += rhs.mCoords[1];
+	mCoords[2] += rhs.mCoords[2];
+	return *this;
+}
+
+DgVec3& DgVec3::operator -=(const DgVec3& rhs)
+{
+	mCoords[0] -= rhs.mCoords[0];
+	mCoords[1] -= rhs.mCoords[1];
+	mCoords[2] -= rhs.mCoords[2];
+	return *this;
+}
+
+DgVec3& DgVec3::operator *=(const double& s)
+{
+	mCoords[0] *= s;
+	mCoords[1] *= s;
+	mCoords[2] *= s;
+	return *this;
+}
+
+DgVec3& DgVec3::operator /=(const double& s)
+{
+	if (EQ_ZERO(s, MTYPE_EPS))
+	{
+		throw std::runtime_error("DgVec3::operator /=(const double &s)...\n");
+	}
+	mCoords[0] /= s;
+	mCoords[1] /= s;
+	mCoords[2] /= s;
+	return *this;
+}
+
+DgVec3& DgVec3::operator ^=(const DgVec3& rhs)
+{
+	double x = mCoords[0], y = mCoords[1], z = mCoords[2];
+	mCoords[0] = y * rhs.mCoords[2] - z * rhs.mCoords[1];
+	mCoords[1] = z * rhs.mCoords[0] - x * rhs.mCoords[2];
+	mCoords[2] = x * rhs.mCoords[1] - y * rhs.mCoords[0];
+	return *this;
+}
+
+DgVec3 DgVec3::operator +() const
+{
+	return *this;
+}
+
+DgVec3 DgVec3::operator -() const
+{
+	return DgVec3(-mCoords[0], -mCoords[1], -mCoords[2]);
+}
+
+double& DgVec3::operator [](const int& idx)
+{
+	assert(idx >= 0 && idx < 3);
+	return mCoords[idx];
+}
+
+const double& DgVec3::operator [](const int& idx) const
+{
+	assert(idx >= 0 && idx < 3);
+	return mCoords[idx];
+}
+
+DgVec3 operator +(const DgVec3& v, const DgVec3& w)
+{
+	return DgVec3(v.mCoords[0] + w.mCoords[0], v.mCoords[1] + w.mCoords[1], v.mCoords[2] + w.mCoords[2]);
+}
+
+DgVec3 operator -(const DgVec3& v, const DgVec3& w)
+{
+	return DgVec3(v.mCoords[0] - w.mCoords[0], v.mCoords[1] - w.mCoords[1], v.mCoords[2] - w.mCoords[2]);
+}
+
+DgVec3 operator *(const DgVec3& v, const double& s)
+{
+	return DgVec3(v.mCoords[0] * s, v.mCoords[1] * s, v.mCoords[2] * s);
+}
+
+DgVec3 operator *(const double& s, const DgVec3& v)
+{
+	return DgVec3(v.mCoords[0] * s, v.mCoords[1] * s, v.mCoords[2] * s);
+}
+
+double operator *(const DgVec3& v, const DgVec3& w)
+{
+	return (v.mCoords[0] * w.mCoords[0] + v.mCoords[1] * w.mCoords[1] + v.mCoords[2] * w.mCoords[2]);
+}
+
+DgVec3 operator /(const double& s, const DgVec3& v)
+{
+	return DgVec3(s / v.mCoords[0], s / v.mCoords[1], s / v.mCoords[2]);
+}
+
+DgVec3 operator /(const DgVec3& v, const double& s)
+{
+	if (EQ_ZERO(s, 1e-10))
+	{
+		throw std::runtime_error("DgVec3 operator /(const DgVec3 &v, double s)...\n");
+	}
+	return DgVec3(v.mCoords[0] / s, v.mCoords[1] / s, v.mCoords[2] / s);
+}
+
+DgVec3 operator ^(const DgVec3& v, const DgVec3& w)
+{
+	return DgVec3(
+		v.mCoords[1] * w.mCoords[2] - v.mCoords[2] * w.mCoords[1],
+		v.mCoords[2] * w.mCoords[0] - v.mCoords[0] * w.mCoords[2],
+		v.mCoords[0] * w.mCoords[1] - v.mCoords[1] * w.mCoords[0]);
+}
+
+bool operator ==(const DgVec3& v, const DgVec3& w)
+{
+	return EQ(v.mCoords[0], w.mCoords[0], MTYPE_EPS) && EQ(v.mCoords[1], w.mCoords[1], MTYPE_EPS) && EQ(v.mCoords[2], w.mCoords[2], MTYPE_EPS);
+}
+
+bool operator !=(const DgVec3& v, const DgVec3& w)
+{
+	return !(v == w);
+}
+
+std::ostream& operator <<(std::ostream& os, const DgVec3& v)
+{
+	os << "(" << v.mCoords[0] << ", " << v.mCoords[1] << ", " << v.mCoords[2] << ")";
+	return os;
+}
+
+std::istream& operator >>(std::istream& is, DgVec3& v)
+{
+	is >> v.mCoords[0] >> v.mCoords[1] >> v.mCoords[2];
+	return is;
+}
+
+/**********************/
+/* DgVec3 클래스 구현 */
+/**********************/
+
+DgVec3 proj(const DgVec3& u, const DgVec3& v)
+{
+	double v_norm_sq = norm_sq(v);
+	if (EQ_ZERO(v_norm_sq, MTYPE_EPS))
+	{
+		throw std::runtime_error("DgVec3 proj(const DgVec3 &u, const DgVec3 &v)\n");
+	}
+	return (u * v / v_norm_sq) * v;
+}
+
+DgVec3 ortho(const DgVec3& v)
+{
+	// 가장 작은 값을 찾기 위해 std::min 사용
+	double min_val = std::min({ v.mCoords[0], v.mCoords[1], v.mCoords[2] });
+
+	// 가장 작은 값을 기준으로 ret 설정
+	DgVec3 ret;
+	if (min_val == v[0])
+		ret.setCoords(0.0, -v[2], v[1]);
+	else if (min_val == v[1])
+		ret.setCoords(v[2], 0.0, -v[0]);
+	else
+		ret.setCoords(-v[1], v[0], 0.0);
+
+	if (ret.isZero())
+	{
+		throw std::runtime_error("DgVec3 ortho(const DgVec3 &v)\n");
+	}
+	return ret.normalize();
+}
+
+double det(const DgVec3& u, const DgVec3& v, const DgVec3& w)
+{
+	// det (u, v, w) =  u * ( v ^ w) 와 같음
+	return (
+		u.mCoords[0] * (v.mCoords[1] * w.mCoords[2] - v.mCoords[2] * w.mCoords[1]) -
+		u.mCoords[1] * (v.mCoords[0] * w.mCoords[2] - v.mCoords[2] * w.mCoords[0]) +
+		u.mCoords[2] * (v.mCoords[0] * w.mCoords[1] - v.mCoords[1] * w.mCoords[0]));
+}
+
+double norm(const DgVec3& v)
+{
+	return SQRT(norm_sq(v));
+}
+
+double norm_sq(const DgVec3& v)
+{
+	return SQR(v.mCoords[0]) + SQR(v.mCoords[1]) + SQR(v.mCoords[2]);
+}
+
+double angle(const DgVec3& u, const DgVec3& v, bool radian)
+{
+	if (u.isZero() || v.isZero())
+		throw std::runtime_error("Zero vector in angle()...\n");
+	DgVec3 p(u);
+	DgVec3 q(v);
+	p.normalize();
+	q.normalize();
+	double cs = p * q;
+	double sn = norm(p ^ q);
+	return (radian) ? atan2(sn, cs) : RAD2DEG(atan2(sn, cs));
+}
+
+double angle(const DgVec3& u, const DgVec3& v, const DgVec3& axis, bool radian)
+{
+	if (u.isZero() || v.isZero() || axis.isZero())
+		throw std::runtime_error("Zero vector in angle()...\n");
+	DgVec3 p(u);
+	DgVec3 q(v);
+	p.normalize();
+	q.normalize();
+	DgVec3 r = p ^ q;
+
+	double cs = p * q;
+	double sn = norm(r);
+	double theta = atan2(sn, cs);
+	if (r * axis < 0.0)
+		theta = 2 * M_PI - theta;
+
+	theta = radian ? theta : RAD2DEG(theta);
+	return theta;
+}

@@ -1,6 +1,6 @@
 #pragma once
 #include "DgViewer.h"
-#include "DgVolume.h"
+
 class DgScene
 {
 public:
