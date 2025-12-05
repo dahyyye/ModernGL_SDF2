@@ -1,5 +1,15 @@
 #pragma once
 
+// 전방 선언
+class DgMesh;
+class DgEdge;
+class DgVertex;
+class DgTexel;
+class DgNormal;
+class DgFace;
+class DgMaterial;
+class DgVec3;
+
 /*!
  *	\class	DgPos
  *	\brief	3차원 위치를 나타내는 클래스
@@ -11,18 +21,101 @@ public:
 	double mPos[3];
 
 public:
-	DgPos() {
-		mPos[0] = 0.0;
-		mPos[1] = 0.0;
-		mPos[2] = 0.0;
-	}
-	DgPos(double x, double y, double z) {
-		mPos[0] = x;
-		mPos[1] = y;
-		mPos[2] = z;
-	}
-	~DgPos() {}
-	
+	/*!
+	*	\brief	생성자
+	*
+	*	\param[in]	x	x 좌표
+	*	\param[in]	y	y 좌표
+	*	\param[in]	z	z 좌표
+	*/
+	DgPos(double x = 0.0, double y = 0.0, double z = 0.0);
+
+	/*!
+	*	\brief	생성자
+	*
+	*	\param[in]	Coords	3차원 좌표(x, y, z)
+	*/
+	DgPos(double* Pos);
+
+	/*!
+	*	\brief	생성자
+	*
+	*	\param[in]	Coords	3차원 좌표(x, y, z)
+	*/
+	DgPos(float* Pos);
+
+	/*!
+	*	\brief	복사 생성자
+	*
+	*	\param[in]	cpy 복사될 객체
+	*
+	*	\return 복사된 자신을 반환한다.
+	*/
+	DgPos(const DgPos& cpy);
+
+	/*!
+	*	\brief  소멸자
+	*/
+	~DgPos();
+
+	/*!
+	*	\brief	포인트의 좌표를 설정한다.
+	*
+	*	\param[in]	x x 좌표
+	*	\param[in]	y y 좌표
+	*	\param[in]	z z 좌표
+	*
+	*	\return 설정된 자신을 반환한다.
+	*/
+	DgPos& setCoords(double x, double y, double z);
+
+	/*!
+	 * \brief 점 \a p에서 점 \a q까지의 거리 제곱을 구한다.
+	 *
+	 * \param[in] p 첫 번째 점
+	 * \param[in] q 두 번째 점
+	 *
+	 * \return 점 \a p에서 점 \a q까지의 거리 제곱을 반환한다.
+	 */
+	double distance_sq(const DgPos& p, const DgPos& q);
+
+	/*!
+	 * \brief 점 \a p에서 점 \a q까지의 거리를 구한다.
+	 *
+	 * \param[in] p 첫 번째 점
+	 * \param[in] q 두 번째 점
+	 *
+	 * \return 점 \a p에서 점 \a q까지의 거리를 반환한다.
+	 */
+	double dist(const DgPos& p, const DgPos& q);
+
+	/*!
+	*	\brief	대입 연산자
+	*
+	*	\param[in]	rhs		오른쪽 피연산자
+	*
+	*	\return 대입된 자신을 반환한다.
+	*/
+	DgPos& operator =(const DgPos& rhs);
+
+	/*!
+	*	\brief	벡터를 더한다.
+	*
+	*	\param[in]	v	더할 벡터
+	*
+	*	\return 변경된 자신을 반환한다.
+	*/
+	DgPos& operator +=(const DgVec3& v);
+
+	/*!
+	*	\brief	벡터를 뺀다.
+	*
+	*	\param[in]	v	뺄 벡터
+	*
+	*	\return 변경된 자신을 반환한다.
+	*/
+	DgPos& operator -=(const DgVec3& v);
+
 	/*!
 	*	\brief	인덱스 연산자([])
 	*
@@ -40,6 +133,96 @@ public:
 	*	\return 포인트의 idx 번째 원소의 레퍼런스를 반환한다.
 	*/
 	const double& operator [](const int& idx) const;
+
+	/*!
+	*	\brief	두 위치의 차이 벡터를 구한다.
+	*
+	*	\param[in]	p	첫 번째 위치
+	*	\param[in]	q	두 번째 위치
+	*
+	*	\return q에서 p로 향하는 벡터를 반환한다.
+	*/
+	friend DgVec3 operator -(const DgPos& p, const DgPos& q);
+
+	/*!
+	*	\brief	위치에서 벡터를 뺀다.
+	*
+	*	\param[in]	p	위치
+	*	\param[in]	v	벡터
+	*
+	*	\return 새로운 위치를 반환한다.
+	*/
+	friend DgPos operator -(const DgPos& p, const DgVec3& v);
+
+	/*!
+	*	\brief	위치에서 벡터를 더한다.
+	*
+	*	\param[in]	p	위치
+	*	\param[in]	v	벡터
+	*
+	*	\return 새로운 위치를 반환한다.
+	*/
+	friend DgPos operator +(const DgPos& p, const DgVec3& v);
+
+	/*!
+	*	\brief	위치에서 벡터를 더한다.
+	*
+	*	\param[in]	v	벡터
+	*	\param[in]	p	위치
+	*
+	*	\return 새로운 위치를 반환한다.
+	*/
+	friend DgPos operator +(const DgVec3& v, const DgPos& p);
+
+	/*!
+	*	\brief	두 위치가 같은지 조사한다.
+	*
+	*	\param[in]	p	첫 번째 위치
+	*	\param[in]	q	두 번재 위치
+	*
+	*	\return 두 위치가 같으면 true, 다르면 false를 반환한다.
+	*/
+	friend bool operator ==(const DgPos& p, const DgPos& q);
+
+	/*!
+	*	\brief	두 위치가 다른지 조사한다.
+	*
+	*	\param[in]	p	첫 번째 위치
+	*	\param[in]	q	두 번재 위치
+	*
+	*	\return 두 위치가 다르면 true, 같으면 false를 반환한다.
+	*/
+	friend bool operator !=(const DgPos& p, const DgPos& q);
+
+	/*!
+	 *	\brief	두 위치의 좌표 순서 크기를 비교한다.
+	 *
+	 *	\param[in]	p	첫 번째 위치
+	 *	\param[in]	q	두 번재 위치
+	 *
+	 *	\return p의 위치가 q의 위치보다 앞이면 true, 아니면 false를 반환한다.
+	 */
+	friend bool operator <(const DgPos& p, const DgPos& q);
+
+	/*!
+	*	\brief	출력 연산자(<<)
+	*
+	*	\param[out]	os		출력 스트림
+	*	\param[in]	p		출력할 객체
+	*
+	*	\return 출력된 스트림 객체를 반환한다.
+	*/
+	friend std::ostream& operator <<(std::ostream& os, const DgPos& p);
+
+	/*!
+	*	\brief	입력 연산자(>>)
+	*
+	*	\param[in]	is	입력 스트림
+	*	\param[out]	v	입력값이 저장될 벡터
+	*
+	*	\return 입력값이 제거된 입력 스트림을 반환한다.
+	*/
+	friend std::istream& operator >>(std::istream& is, DgPos& p);
 
 };
 
@@ -71,6 +254,42 @@ public:
 		mPos[2] = z;
 	}
 	~DgVertex() {}
+
+	/*!
+	 *	\brief	정점에서 시작하는 에지 배열을 반환한다.
+	 *
+	 *	\param[in]	bCCW	반시계 방향으로 정렬하려면 true, 아니면 false
+	 *
+	 *	\return 정점에서 시작하는 에지 배열을 반환한다.
+	 */
+	std::vector<DgEdge*> getEdges(bool bCCW = false);
+
+	/*!
+	 *	\brief	정점의 1링 이웃 정점을 구한다.
+	 *
+	 *	\param[in]	bCCW	반시계 방향으로 정렬하려면 true, 아니면 false
+	 *
+	 *	\return 1링을 이웃 정점의 리스트를 반환한다.
+	 */
+	std::vector<DgVertex*> getOneRingVerts(bool bCCW);
+
+	/*!
+	 *	\brief	정점의 평균 단위 법선을 구한다.
+	 *	\note	(*)주변 정점의 위치가 변경되는 경우, 변경된 위치를 반영하여 법선을 계산하므로 매우 주의해야 한다.
+	 *
+	 *	\param	bWgt[in]	각도 가중치 적용 여부
+	 *
+	 *	\return 정점의 평균 단위 법선을 반환한다.
+	 */
+	DgVec3 getAvgNormal(bool bWgt = false);
+
+	/* !
+	 *	\brief	경계 정점 여부를 조사한다.
+	 *
+	 *	\return 경계 정점이면 true, 아니면 false를 반환한다.
+	 */
+	bool isBndry();
+
 };
 
 /*!
@@ -160,6 +379,15 @@ public:
 	 *	\return 경계 에지이면 true, 아니면 false를 반환한다.
 	 */
 	bool isBndry();
+
+	/*!
+	 *	\brief	삼각형에서 에지가 마주보고 있는 각도(0 ~ 180)를 계산한다.
+	 *
+	 *	\param[in]	bRadian	반환값이 라디안 이면 true, 아니면 false
+	 *
+	 *	\return 삼각형에서 에지가 마주보고 있는 각도를 반환한다.
+	 */
+	double getAngle(bool bRadian);
 };
 
 /*!
@@ -187,6 +415,10 @@ public:
 class DgNormal
 {
 public:
+
+	/*! \brief 법선의 인덱스 */
+	int mIdx;
+
 	/*! \brief 법선의 방향 */
 	double mDir[3];
 
@@ -195,6 +427,13 @@ public:
 		mDir[0] = x;
 		mDir[1] = y;
 		mDir[2] = z;
+		mIdx = -1;
+	}
+	DgNormal(const DgVec3& v) {
+		mDir[0] = v.mPos[0];
+		mDir[1] = v.mPos[1];
+		mDir[2] = v.mPos[2];
+		mIdx = -1;
 	}
 	~DgNormal() {}
 };
@@ -233,6 +472,13 @@ public:
 	~DgFace() {}
 
 	/*!
+	 *	\brief	삼각형의 에지 리스트를 반환한다.
+	 *
+	 *	\return 삼각형의 에지 리스트를 반환한다.
+	 */
+	std::vector<DgEdge*> getEdges() { return { mEdge, mEdge->mNext, mEdge->mNext->mNext }; }
+
+	/*!
 	 *	\brief	삼각형에서 정점의 좌표를 반환한다.
 	 *
 	 *	\param[in]	vidx	삼각형을 구성하는 정점 인덱스(0, 1, 2)
@@ -250,6 +496,7 @@ public:
 	 */
 	DgVertex* getVertex(int vIdx);
 
+
 	/*!
 	 *	\brief	삼각형의 에지 포인터를 반환한다.
 	 *
@@ -265,6 +512,22 @@ public:
 	 *	\return 계산된 면적을 반환한다.
 	 */
 	double getArea();
+
+	/*!
+	 *	\brief	삼각형의 단위 법선벡터를 계산한다.
+	 *
+	 *	\param[in]	bLocal	객체의 모델링 좌표계에서 표현된 법선일 경우 true, 월드 좌표계에서 표현될 경우 false
+	 *
+	 *	\return 삼각형의 단위 법선벡터를 반환한다.
+	 */
+	DgVec3 getFaceNormal(bool bLocal);
+
+	/*!
+	 *	\brief	삼각형이 경계 삼각형인지 조사한다.
+	 *
+	 *	\return	경계 삼각형이면 true, 아니면 false를 반환한다.
+	 */
+	bool isBndryFace();
 
 	/*!
 	*	\brief	삼각형이 포함된 메쉬의 포인터를 반환한다.
@@ -320,6 +583,9 @@ public:
 	GLuint mEBO;	
 	bool mBuffersInitialized;
 
+	/*! \brief 메쉬 로컬 좌표계 */
+	EgTransf mMC;
+
 public:
 	DgMesh() {
 		mVAO = 0;
@@ -337,6 +603,64 @@ public:
 	void setupBuffers();
 	void computeNormal(int normalType);
 	void render();
+
+	/*! \brief 메쉬의 경계 상자의 최소점(mBndBox[0])과 최대점(mBndBox[1]) */
+	DgPos mBndBox[2];
+
+	/*! \brief 메쉬의 법선 타입: NORMAL_FACE 또는 NORMAL_VERTEX */
+	enum TypeNormal {
+		NORMAL_ASIS = 0,
+		NORMAL_FACE = 1,
+		NORMAL_VERTEX = 2,
+	};
+
+	TypeNormal mNormalType;
+
+	/*! \brief 고속 렌더링을 위한 법선 버퍼: (재질명, 법선의 좌표 배열)로 구성됨 */
+	std::map<std::string, std::vector<float>> mNormalBuffer;
+
+	/*!
+	 *	\brief	메쉬에 삼각형을 추가한다.
+	 *
+	 *	\param[in]	pFace	추가할 삼각형에 대한 포인터
+	 */
+	void addFace(DgFace* pFace);
+
+	/*!
+	 *	\brief	메쉬에 정점을 추가한다.
+	 *
+	 *	\param[in]	pVert	추가할 정점에 대한 포인터
+	 */
+	void addVertex(DgVertex* pVert);
+
+	/*!
+	 *	\brief	에지의 반대편 에지 정보를 갱신한다.
+	 *
+	 *	\param[in]	pVert	정점의 포인터
+	 *	\param[in]	date	선택할 알고리즘의 날짜
+	 */
+	void updateEdgeMate(DgVertex* pVert = NULL);
+
+	/*!
+	 *	\brief	기존의 법선 리스트를 무조건 제거하고, 새로운 mNormals을 구성한다.
+	 *	\note	마지막 수정일: 2021-04-16
+	 *
+	 *	\param[in]	normalType	법선의 형태(NORMAL_ASIS: 기존, NORMAL_FACE: 삼각형 법선, NORMAL_VERTEX: 정점 법선)
+	 */
+	void updateNormal(TypeNormal normalType);
+
+	/*!
+	 *	\brief	메쉬를 둘러싸는 경계 상자를 갱신한다.
+	 */
+	void updateBndBox();
+
+	/*!
+	 *	\brief	메쉬의 정점의 개수를 반환한다.
+	 *
+	 *	\return 메쉬의 정점의 개수를 반환한다.
+	 */
+	int getNumVerts();
+
 };
 
 /*!
@@ -383,7 +707,7 @@ class DgVec3
 {
 public:
 	/*! \brief 3차원 벡터의 좌표 배열 */
-	double mCoords[3];
+	double mPos[3];
 
 public:
 	/*!
@@ -724,3 +1048,109 @@ double angle(const DgVec3& u, const DgVec3& v, bool radian = false);
  * \return  벡터 \a u에서 벡터 \a v까지의 사이각(axis 벡터 기준 반시계 방향)
  */
 double angle(const DgVec3& u, const DgVec3& v, const DgVec3& axis, bool radian = false);
+
+
+/**********************/
+/*    교차 확인 함수  */
+/**********************/
+
+/*!
+ * \brief   삼각형과 경계 상자의 교차 여부를 검사한다.
+ * \note    참고문헌: Real-time rendering
+ *
+ * \param[in]  u0       삼각형의 첫 번째 정점.
+ * \param[in]  u1       삼각형의 두 번째 정점.
+ * \param[in]  u2       삼각형의 세 번째 정점.
+ * \param[in]  box_min  경계 상자의 최소점.
+ * \param[in]  box_max  경계 상자의 최대점.
+ *
+ * \return true: 교차 성공, false: 교차하지 않는 경우.
+ */
+bool intersect_tri_box(DgPos u0, DgPos u1, DgPos u2, DgPos box_min, DgPos box_max);
+
+/*!
+ *	\brief   3차원 공간에서 삼각형과 삼각형의 교차 여부와 교차 선분(시작점, 끝점)을 계산한다.
+ *	\note    참고문헌: Real-time rendering (ERIT 방법)
+ *
+ *	\param[in]	a0		삼각형 A의 첫 번째 정점
+ *	\param[in]	a1		삼각형 A의 두 번째 정점
+ *	\param[in]	a2		삼각형 A의 세 번째 정점
+ *	\param[in]	b0		삼각형 B의 첫 번째 정점
+ *	\param[in]	b1		삼각형 B의 두 번째 정점
+ *	\param[in]	b2		삼각형 B의 세 번째 정점
+ *	\param[out]	p		교차 선분의 첫 번째 점이 저장됨
+ *	\param[out]	q		교차 선분의 두 번째 점이 저장됨
+ *	\param[in]	eps		허용 오차
+ *
+ *	\return		수치 안정성을 위해서 삼각형 B의 교란이 필요(-1), 비교차(0), 정상 교차(1)
+ */
+int intersect_tri_tri(
+	DgPos a0, DgPos a1, DgPos a2,
+	DgPos b0, DgPos b1, DgPos b2,
+	DgPos& p, DgPos& q,
+	double eps = 1e-9);
+
+/*!
+*	\brief	평면과 경계 상자의 교차 여부를 검사한다.
+*
+*	\param	n[in]			평면의 법선
+*	\param	p[in]			평면 위의 점
+*	\param	halfsize[in]	원점을 중심으로하는 경계 상자의 각 축 길이의 반
+*
+*	\return 평면과 경계 상자가 교차하면 true, 아니면 false를 반환한다.
+*/
+static bool intersect_plane_box(DgVec3 n, DgVec3 p, DgVec3 halfsize)
+{
+	DgVec3 vmin, vmax;
+	for (int i = 0; i < 3; ++i)
+	{
+		if (n[i] > 0.0)
+		{
+			vmin[i] = -halfsize[i] - p[i];	// -NJMP-
+			vmax[i] = halfsize[i] - p[i];	// -NJMP-
+		}
+		else
+		{
+			vmin[i] = halfsize[i] - p[i];	// -NJMP-
+			vmax[i] = -halfsize[i] - p[i];	// -NJMP-
+		}
+	}
+	if (n * vmin > 0.0)
+		return false;	// -NJMP-
+	if (n * vmax >= 0.0)
+		return true;	// -NJMP-
+	return false;
+}
+
+/******************/
+/*   Create 함수  */
+/******************/
+
+/*!
+ *	\biref	메쉬 정점을 생성한다.
+ *
+ *	\param[in]	x	정점의 x 좌표
+ *	\param[in]	y	정점의 y 좌표
+ *	\param[in]	z	정점의 z 좌표
+ *
+ *	\return 생성된 정점의 포인터를 반환한다.
+ */
+DgVertex* create_vertex(double x, double y, double z)
+{
+	return new DgVertex(x, y, z);
+}
+
+/*!
+ *	\brief	메쉬 삼각형을 생성한다.
+ *
+ *	\param[in]	v0			삼각형의 첫 번째 정점
+ *	\param[in]	v1			삼각형의 두 번째 정점
+ *	\param[in]	v2			삼각형의 세 번째 정점
+ *	\param[in]	pMtl		삼각형이 사용하는 재질에 대한 포인터
+ *	\param[in]	groupName	삼각형이 속한 그룹의 이름
+ */
+DgFace* create_face(DgVertex* v0, DgVertex* v1, DgVertex* v2, DgMaterial* pMtl, std::string GroupName)
+{
+	return new DgFace(v0, v1, v2, NULL, NULL, NULL, NULL, NULL, NULL, pMtl, GroupName);
+}
+

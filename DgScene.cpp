@@ -440,7 +440,7 @@ void DgScene::renderContextPopup()
 	}
 }
 
-void DgScene::createSDF(const DgVolume& volume)
+void DgScene::createSDF(DgVolume& volume)
 {
 	//SDF 텍스처 ID 생성
 	if (mSDFID == 0)

@@ -141,7 +141,11 @@ DgBvh::DgBvh(DgMesh* pMesh)
 {
 	clock_t st = clock();
 	mMesh = pMesh;
-	mRoot = new AaBb(pMesh, pMesh->mFaces, 0);
+	//mRoot = new AaBb(pMesh, pMesh->mFaces, 0);
+	std::vector<DgFace*> facePtrs;
+	for (auto& f : pMesh->mFaces)
+		facePtrs.push_back(&f);
+	mRoot = new AaBb(pMesh, facePtrs, 0);
 	mCopy = false;
 	clock_t ed = clock();
 	//printf("BVH construction time = %u ms \n", ed - st);
@@ -158,7 +162,8 @@ DgBvh::DgBvh(std::vector<DgPos>& Verts, std::vector<int>& Faces)
 {
 	// 메쉬를 직접 생성하여
 	mCopy = true;
-	mMesh = new DgMesh("Target Mesh");
+	mMesh = new DgMesh();
+	mMesh->mName = "Target Mesh";
 
 	// 정점을 추가한다.
 	for (DgPos& p : Verts)
@@ -180,7 +185,11 @@ DgBvh::DgBvh(std::vector<DgPos>& Verts, std::vector<int>& Faces)
 
 	// BVH를 생성한다.
 	clock_t st = clock();
-	mRoot = new AaBb(mMesh, mMesh->mFaces, 0);
+	//mRoot = new AaBb(mMesh, mMesh->mFaces, 0);
+	std::vector<DgFace*> facePtrs;
+	for (auto& f : mMesh->mFaces)
+		facePtrs.push_back(&f);
+	mRoot = new AaBb(mMesh, facePtrs, 0);
 	clock_t ed = clock();
 	printf("BVH construction time = %u ms \n", ed - st);
 }
@@ -390,15 +399,15 @@ double dist_sq(const DgPos& q, DgFace* f)
 	// p0 에서 최단 거리 발생
 	if (p01q && p02q)
 	{
-		return dist_sq(q, p0);
+		return distance_sq(q, p0);
 	}
 	else if (p10q && p12q)		// p1 에서 최단 거리 발생
 	{
-		return dist_sq(q, p1);
+		return distance_sq(q, p1);
 	}
 	else if (p20q && p21q)		// p2 에서 최단 거리 발생
 	{
-		return dist_sq(q, p2);
+		return distance_sq(q, p2);
 	}
 
 	// Case 2: 에지에서 최단 거리가 발생하는 경우
@@ -433,86 +442,3 @@ double dist_sq(const DgPos& q, DgFace* f)
 	return (n * (q - p0)) * (n * (q - p0));
 }
 
-double dist_sq(const DgPos& q, DgFace* f, DgPos& r)
-{
-	// 삼각형의 세 점과 차이 벡터를 구한다.
-	DgPos p0 = f->getVertexPos(0);
-	DgPos p1 = f->getVertexPos(1);
-	DgPos p2 = f->getVertexPos(2);
-	DgVec3 v01 = (p1 - p0).normalize();
-	DgVec3 v12 = (p2 - p1).normalize();
-	DgVec3 v20 = (p0 - p2).normalize();
-
-	// Case 1: 정점에서 최단 거리가 생기는 경우
-	bool p01q, p02q, p12q, p10q, p20q, p21q;
-	// true if order of points is q -> p0 -> p1 (about the axis v01)
-	p01q = (v01 * (q - p0) < 0.0);
-	// true if order of points is q -> p0 -> p2 (about the axis p13)
-	p02q = (v20 * (q - p0) > 0.0);
-	// true if order of points is q -> p1 -> p2 (about the axis v12)
-	p12q = (v12 * (q - p1) < 0.0);
-	// true if order of points is q -> p1 -> p0 (about the axis p21)
-	p10q = (v01 * (q - p1) > 0.0);
-	// true if order of points is q -> p2 -> p0 (about the axis v20)
-	p20q = (v20 * (q - p2) < 0.0);
-	// true if order of points is q -> p2 -> p1 (about the axis p32)
-	p21q = (v12 * (q - p2) > 0.0);
-
-	// p0 에서 최단 거리 발생
-	if (p01q && p02q)
-	{
-		r = p0;
-		return dist_sq(q, p0);
-	}
-	else if (p10q && p12q)		// p1 에서 최단 거리 발생
-	{
-		r = p1;
-		return dist_sq(q, p1);
-	}
-	else if (p20q && p21q)		// p2 에서 최단 거리 발생
-	{
-		r = p2;
-		return dist_sq(q, p2);
-	}
-
-	// Case 2: 에지에서 최단 거리가 발생하는 경우
-	DgVec3 tmp = v20 ^ v01;
-	DgVec3 n = tmp.normalize();
-	//DgVec3 n = (v20 ^ v01).normalize();
-	DgVec3 p0q = v01 ^ n; // outward direction of edge(p0, p1)
-	DgVec3 p1q = v12 ^ n; // outward direction of edge(p1, p2)
-	DgVec3 p2q = v20 ^ n; // outward direction of edge(p2, p0)
-
-	// 에지 (p0, p1)에서 최단 거리가 발생하는 경우
-	if (!p01q && !p10q && (p0q * (q - p0) > 0.0))
-	{
-		p0q.normalize();
-		v01.normalize();
-		r = p0 + ((q - p0) * v01) * v01;
-		return ((p0q * (q - p0)) * (p0q * (q - p0)) + (n * (q - p0)) * (n * (q - p0)));
-	}
-	// 에지 (p1, p2)에서 최단 거리가 발생하는 경우
-	else if (!p12q && !p21q && (p1q * (q - p1) > 0.0))
-	{
-		p1q.normalize();
-		v12.normalize();
-		r = p1 + ((q - p1) * v12) * v12;
-		return ((p1q * (q - p1)) * (p1q * (q - p1)) + (n * (q - p1)) * (n * (q - p1)));
-	}
-	// 에지 (p2, p0)에서 최단 거리가 발생하는 경우
-	else if (!p20q && !p02q && (p2q * (q - p2) > 0.0))
-	{
-		p2q.normalize();
-		v20.normalize();
-		r = p2 + ((q - p2) * v20) * v20;
-		return ((p2q * (q - p2)) * (p2q * (q - p2)) + (n * (q - p2)) * (n * (q - p2)));
-	}
-
-	// Case 3: 삼각형 내부에서 최단 거리가 발생하는 경우
-	double d = (n * (q - p0)) * (n * (q - p0));
-	if (n * (q - p0) < 0.0)
-		r = q + SQRT(d) * n;
-	else
-		r = q - SQRT(d) * n;
-	return d;
-}

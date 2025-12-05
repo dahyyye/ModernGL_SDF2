@@ -1,4 +1,5 @@
 #pragma once
+#include "DgViewer.h"
 
 /*!
  *	\class	DgBvh
@@ -209,14 +210,3 @@ double dist_sq_vert(const DgPos& p, DgFace* f);
  *	\return 계산된 최단 거리 제곱을 반환한다.
  */
 double dist_sq(const DgPos& q, DgFace* f);
-
-/*!
- *	\brief	점과 삼각형 사이의 최단 거리 제곱을 계산한다.
- *
- *	\param[in]	p	점의 위치
- *	\param[in]	f	대상 삼각형의 포인터
- *	\param[out]	q	최단 거리가 발생되는 점이 저장된다.
- *
- *	\return 계산된 최단 거리 제곱을 반환한다.
- */
-double dist_sq(const DgPos& p, DgFace* f, DgPos& q);

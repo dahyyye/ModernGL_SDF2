@@ -141,7 +141,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DgBoolean.cpp" />
-    <ClCompile Include="DgBvh.cpp" />
+    <ClCompile Include="DgBvh.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="DgViewer.cpp" />
     <ClCompile Include="DgMesh.cpp" />
     <ClCompile Include="DgVolume.cpp" />
@@ -162,7 +164,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DgBoolean.h" />
-    <ClInclude Include="DgBvh.h" />
+    <ClInclude Include="DgBvh.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="DgMesh.h" />
     <ClInclude Include="DgViewer.h" />
     <ClInclude Include="DgVolume.h" />

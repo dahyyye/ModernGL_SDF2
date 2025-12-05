@@ -1,6 +1,8 @@
 #pragma once
 #include "DgViewer.h"
 
+class DgVolume;
+
 class DgScene
 {
 public:
@@ -80,6 +82,6 @@ public:
 	void renderContextPopup();														// 컨텍스트 팝업 렌더링
 	void processMouseEvent();														// 마우스 이벤트 처리
 	void processKeyboardEvent();	// 키보드 이벤트 처리
-	void createSDF(const DgVolume& volume);
+	void createSDF(DgVolume &volume);
 	void addSDFVolume(DgVolume* volume);
 };
