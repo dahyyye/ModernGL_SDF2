@@ -2,6 +2,13 @@
 #include "DgMesh.h"
 #include <vector>
 
+// VTK 사용
+#include <vtkSmartPointer.h>
+#include <vtkXMLImageDataReader.h>
+#include <vtkImageData.h>
+#include <vtkPointData.h>
+#include <vtkDataArray.h>
+
 /*!
  *	\class	DgVolume
  *	\brief	메쉬의 부호거리장을 표현하는 클래스
