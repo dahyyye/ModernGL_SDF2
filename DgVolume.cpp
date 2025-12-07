@@ -3,6 +3,7 @@
 DgVolume::DgVolume()
 {
 	mMesh = nullptr;
+	mName = "volume";
 	
 	mDim[0] = 0;
 	mDim[1] = 0;
@@ -24,11 +25,13 @@ DgVolume::DgVolume()
 DgVolume::DgVolume(DgMesh* mesh)
 {
 	mMesh = mesh;
+	mName = "volume";
 }
 
 DgVolume::DgVolume(DgVolume& cpy)
 {
 	mMesh = cpy.mMesh;
+	mName = cpy.mName;
 
 	mDim[0] = cpy.mDim[0];
 	mDim[1] = cpy.mDim[1];

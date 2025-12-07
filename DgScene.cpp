@@ -128,7 +128,7 @@ void DgScene::processMouseEvent()
 		ImVec2 pos = ImGui::GetMousePos() - ImGui::GetCursorScreenPos();
 		int x = (int)pos.x, y = (int)pos.y;
 		ImVec2 delta = ImGui::GetIO().MouseDelta;
-		ImGuiIO& io = ImGui::GetIO();								// Ctrl 상태 확인
+		ImGuiIO& io = ImGui::GetIO();											// Ctrl 상태 확인
 
 		if (io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left))			// 왼쪽 버튼을 클릭한 경우
 		{
@@ -212,10 +212,10 @@ void DgScene::renderScene()
 		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize[0] / mSceneSize[1], 1.0f, 1000.0f);
 
 		// 관측 변환 행렬
-		glm::mat4 viewMat(1.0f);                                                // 단위 행렬 초기화, M = I
-		viewMat = glm::translate(viewMat, glm::vec3(0.0, 0.0, mZoom));           // 줌 변환, M = I * T
-		viewMat = viewMat * mRotMat;                                             // 회전 변환, M = I * T * R
-		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));   // Pan 변환, M = I * T * R * Pan
+		glm::mat4 viewMat(1.0f);													// 단위 행렬 초기화, M = I
+		viewMat = glm::translate(viewMat, glm::vec3(0.0, 0.0, mZoom));				// 줌 변환, M = I * T
+		viewMat = viewMat * mRotMat;												// 회전 변환, M = I * T * R
+		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));	// Pan 변환, M = I * T * R * Pan
 
 		// 바닥 렌더링
 		{
@@ -235,7 +235,7 @@ void DgScene::renderScene()
 			glUseProgram(0);
 		}
 
-		// 모델 렌더링
+		// Mesh 렌더링
 		for (DgMesh* pMesh : mMeshList)
 		{
 			// 모델링 변환 행렬(단위 행렬)
@@ -273,6 +273,7 @@ void DgScene::renderScene()
 			glUseProgram(0);
 		}
 
+		// SDF 볼륨 렌더링
 		for (DgVolume* pVolume : mSDFList)
 		{
 			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
@@ -288,6 +289,7 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(viewMat)));
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projMat)));
 			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
+
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
@@ -295,12 +297,12 @@ void DgScene::renderScene()
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
 				(float)pVolume->mMax.mPos[0], (float)pVolume->mMax.mPos[1], (float)pVolume->mMax.mPos[2]);
 
-			// ★ 3D 텍스처 바인딩
+			// 3D 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_3D, pVolume->mTextureID);
 			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
 
-			// ★ Cull Face 비활성화
+			// Cull Face 비활성화
 			glDisable(GL_CULL_FACE);
 
 			pVolume->mMesh->render();

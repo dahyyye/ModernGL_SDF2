@@ -23,6 +23,7 @@ public:
 
 private:
 	std::vector<DgVolume*> mSDFList; //DgVolume 객체 관리 리스트
+
 	DgScene()
 	{
 		mOpen = true;
@@ -63,21 +64,22 @@ public:
 		return mOpen;
 	}
 
-	void initOpenGL() {						// OpenGL 초기 설정
+	std::vector<DgVolume*>& getSDFList() { return mSDFList; }
+
+	void initOpenGL() {				// OpenGL 초기 설정
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_CULL_FACE);
 		glCullFace(GL_BACK);
 	}
 
-	void createGroundMesh();				// 바닥 평면 메쉬 생성
-	void getSphereCoords(double x, double y, float* px, float* py, float* pz);		// 구면 좌표 계산
-	void showWindow();																// SceneGL 윈도우 출력
-	void renderScene();																// 장면 렌더링
-	void renderFps();																// FPS 렌더링
-	void renderContextPopup();														// 컨텍스트 팝업 렌더링
-	void processMouseEvent();														// 마우스 이벤트 처리
-	void processKeyboardEvent();	// 키보드 이벤트 처리
-	void addSDFVolume(DgVolume* volume);
-	void resetScene();																// 장면 초기화
-	std::vector<DgVolume*>& getSDFList() { return mSDFList; }
+	void createGroundMesh();													// 바닥 평면 메쉬 생성
+	void getSphereCoords(double x, double y, float* px, float* py, float* pz);	// 구면 좌표 계산
+	void showWindow();															// SceneGL 윈도우 출력
+	void renderScene();															// 장면 렌더링
+	void renderFps();															// FPS 렌더링
+	void renderContextPopup();													// 컨텍스트 팝업 렌더링
+	void processMouseEvent();													// 마우스 이벤트 처리
+	void processKeyboardEvent();												// 키보드 이벤트 처리
+	void addSDFVolume(DgVolume* volume);										// SDF 볼륨 추가
+	void resetScene();															// 장면 초기화
 };

@@ -653,7 +653,7 @@ DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos)
 	mesh->mNormals.emplace_back(0, -1, 0); // 4: 아래
 	mesh->mNormals.emplace_back(0, 1, 0);  // 5: 위
 
-	// ★★★ 기본 재질 추가 ★★★
+	// 기본 재질 추가
 	mesh->mMaterials.emplace_back();
 
 	// 12개 삼각형 (6면 x 2)
