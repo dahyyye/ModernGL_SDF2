@@ -51,6 +51,10 @@ DgVolume::~DgVolume()
 	if (mMesh != nullptr) {
 		delete mMesh;
 	}
+
+	if (mTextureID != 0) {
+        glDeleteTextures(1, &mTextureID);
+    }
 }
 void DgVolume::setDimensions(int dimX, int dimY, int dimZ)
 {
@@ -304,4 +308,39 @@ bool DgVolume::loadFromVTI(const char* filename)
 	std::cout << std::endl;
 
 	return true;
+}
+
+void DgVolume::createTexture()
+{
+	// 기존 텍스처가 있으면 삭제
+	if (mTextureID != 0) {
+		glDeleteTextures(1, &mTextureID);
+	}
+
+	// 새 텍스처 생성
+	glGenTextures(1, &mTextureID);
+	glBindTexture(GL_TEXTURE_3D, mTextureID);
+
+	// 데이터 업로드
+	glTexImage3D(
+		GL_TEXTURE_3D,
+		0,
+		GL_R32F,
+		mDim[0], mDim[1], mDim[2],
+		0,
+		GL_RED,
+		GL_FLOAT,
+		mData.data()
+	);
+
+	// 텍스처 파라미터 설정
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	glBindTexture(GL_TEXTURE_3D, 0);
+
+	std::cout << "볼륨 텍스처 생성 완료! ID: " << mTextureID << std::endl;
 }

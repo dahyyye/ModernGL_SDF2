@@ -33,6 +33,9 @@ public:
 
 	/* !\brief 부호거리장 데이터(격자 샘플별 부호거리 값) */
 	std::vector<float> mData;
+	
+	/* 볼륨의 텍스쳐 id */
+	GLuint mTextureID = 0;
 
 public:
 
@@ -54,6 +57,9 @@ public:
 
 	/*! #brisf VTI 로드 함수 */
 	bool loadFromVTI(const char* filename);
+
+	/* 텍스쳐 생성 함수 */
+	void createTexture();
 
 private:
 	//float findClosestDistanceToMesh(const glm::vec3& p);

@@ -24,7 +24,7 @@ uniform vec2 uResolution;       // 화면 해상도
 // 상수 정의
 //=============================================================================
 #define MAX_STEPS 256           // 레이마칭 최대 반복 횟수
-#define EPS 0.0001              // 표면 히트 판정 허용 오차
+#define EPS 0.001              // 표면 히트 판정 허용 오차
 
 //=============================================================================
 // 레이-AABB 교차 검사
@@ -55,16 +55,24 @@ vec2 intersectAABB(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax) {
 // 월드 좌표 p에서 SDF 값을 샘플링합니다.
 // 반환값: 해당 위치에서 가장 가까운 표면까지의 부호 있는 거리
 float mapSDFd(vec3 p) {
-    // 월드 좌표를 텍스처 좌표(0~1)로 변환
     vec3 volumeRange = uVolumeMax - uVolumeMin;
     vec3 uvw = (p - uVolumeMin) / volumeRange;
     
-    // 볼륨 범위 밖이면 큰 양수 반환 (표면 없음)
+    // 범위 밖이면 clamp하여 샘플링 (경계 값 사용)
+    uvw = clamp(uvw, vec3(0.001), vec3(0.999));
+    
+    return texture(uSDFVolume, uvw).r;
+}
+
+// 범위 체크 포함 버전 (레이마칭용)
+float mapSDFdWithBoundsCheck(vec3 p) {
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 uvw = (p - uVolumeMin) / volumeRange;
+    
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
         return 1.0;
     }
     
-    // 3D 텍스처에서 SDF 값 샘플링
     return texture(uSDFVolume, uvw).r;
 }
 
@@ -99,16 +107,25 @@ vec3 getCamPos() {
 // SDF의 수치적 그래디언트를 이용하여 표면 법선을 계산합니다.
 // 테트라헤드론 기법 사용 (4번의 샘플링으로 정확한 그래디언트 계산)
 vec3 calcNormal(vec3 p) {
-    float e = 0.01;  // 미분 간격
-    vec2 k = vec2(1, -1);
+    // 볼륨 크기에 비례한 e 값 계산
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    float minRange = min(min(volumeRange.x, volumeRange.y), volumeRange.z);
+    float e = minRange / 128.0;  // 볼륨 크기의 1/128
     
-    // 4방향 샘플링으로 그래디언트 근사
-    return normalize(
-        k.xyy * mapSDFd(p + k.xyy * e) +
-        k.yyx * mapSDFd(p + k.yyx * e) +
-        k.yxy * mapSDFd(p + k.yxy * e) +
-        k.xxx * mapSDFd(p + k.xxx * e)
-    );
+    // 중앙 차분법 사용 (더 안정적)
+    float dx = mapSDFd(p + vec3(e, 0, 0)) - mapSDFd(p - vec3(e, 0, 0));
+    float dy = mapSDFd(p + vec3(0, e, 0)) - mapSDFd(p - vec3(0, e, 0));
+    float dz = mapSDFd(p + vec3(0, 0, e)) - mapSDFd(p - vec3(0, 0, e));
+    
+    vec3 n = vec3(dx, dy, dz);
+    
+    // NaN 방지
+    float len = length(n);
+    if (len < 0.0001) {
+        return vec3(0.0, 1.0, 0.0);  // 기본 법선
+    }
+    
+    return n / len;
 }
 
 //=============================================================================
@@ -117,19 +134,17 @@ vec3 calcNormal(vec3 p) {
 void main() {
 
     // 1. 광선 설정
-    vec3 rayOrigin = getCamPos();                    // 광선 시작점 (카메라 위치)
-    vec3 rayDir = getRayDir(gl_FragCoord.xy);        // 광선 방향
+    vec3 rayOrigin = getCamPos();
+    vec3 rayDir = getRayDir(gl_FragCoord.xy);
 
     // 2. 레이-박스 교차 검사
     vec2 tHit = intersectAABB(rayOrigin, rayDir, uVolumeMin, uVolumeMax);
     
-    // 박스와 교차하지 않으면 프래그먼트 버림
     if (tHit.x > tHit.y || tHit.y < 0.0) {
         discard;
     }
     
-    // 레이마칭 시작/종료 거리 설정
-    float t = max(tHit.x, 0.0);  // 카메라가 박스 안에 있을 수 있으므로 max 사용
+    float t = max(tHit.x, 0.0) + 0.001;  // 약간 안쪽에서 시작
     float tEnd = tHit.y;
 
     // 3. 레이마칭 (Sphere Tracing)
@@ -137,59 +152,50 @@ void main() {
     vec3 hitPoint;
     
     for (int i = 0; i < MAX_STEPS; i++) {
-        // 최대 거리 초과 시 종료
         if (t > tEnd) break;
         
-        // 현재 위치에서 SDF 값 샘플링
         vec3 p = rayOrigin + rayDir * t;
-        float d = mapSDFd(p);
+        float d = mapSDFdWithBoundsCheck(p);
         
-        // 표면에 충분히 가까우면 히트
-        if (d < EPS) {
+        // 표면 근처 판정 (절대값 사용)
+        if (abs(d) < EPS) {
             hit = true;
             hitPoint = p;
             break;
         }
         
-        // SDF 값만큼 전진 (Sphere Tracing의 핵심)
-        // 최소 스텝 크기를 보장하여 무한 루프 방지
-        t += max(d, EPS * 10.0);
+        // SDF 값만큼 전진 (절대값 사용, 음수 SDF도 처리)
+        t += max(abs(d) * 0.5, EPS);  // 0.5 계수로 오버슈팅 방지
     }
     
-    // 표면을 찾지 못하면 프래그먼트 버림
     if (!hit) { 
         discard; 
     }
 
-    // 4. 셰이딩 (Phong Illumination)
-    // 법선 계산
+    // 4. 셰이딩
     vec3 n = calcNormal(hitPoint);
-    
-    // 기본 색상 (토끼/구 색상)
     vec3 baseColor = vec3(0.8, 0.6, 0.4);
-    
-    // 뷰 방향 (표면에서 카메라로)
     vec3 V = normalize(rayOrigin - hitPoint);
-    
-    // 광원 방향 (헤드라이트: 카메라 방향과 동일)
     vec3 L = V;
-    
-    // 하프 벡터 (Blinn-Phong용)
     vec3 H = normalize(L + V);
     
-    // 조명 계산
-    float diff = max(dot(n, L), 0.0);                    // 난반사
-    float spec = pow(max(dot(n, H), 0.0), 32.0);         // 정반사
+    // 양면 조명
+    float NdotL = dot(n, L);
+    if (NdotL < 0.0) {
+        n = -n;  // 법선 뒤집기
+        NdotL = -NdotL;
+    }
     
-    // 최종 색상 조합
-    vec3 ambient = 0.15 * baseColor;                     // 환경광
+    float diff = max(NdotL, 0.0);
+    float spec = pow(max(dot(n, H), 0.0), 32.0);
+    
+    vec3 ambient = 0.2 * baseColor;
     vec3 finalColor = ambient + diff * baseColor + spec * vec3(0.3);
 
     // 5. 깊이 버퍼 설정
-    // 월드 좌표를 클립 공간으로 변환하여 깊이값 계산
     vec4 clipPos = uProj * uView * vec4(hitPoint, 1.0);
     float ndcZ = clipPos.z / clipPos.w;
-    gl_FragDepth = (ndcZ * 0.5) + 0.5;  // NDC(-1~1)를 깊이값(0~1)로 변환
+    gl_FragDepth = (ndcZ * 0.5) + 0.5;
 
     // 6. 최종 출력
     outColor = vec4(finalColor, 1.0);

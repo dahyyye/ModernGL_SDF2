@@ -275,10 +275,10 @@ void DgScene::renderScene()
 
 		for (DgVolume* pVolume : mSDFList)
 		{
-			if(pVolume==nullptr ||mSDFID ==0) continue;
+			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
 			glm::mat4 modelMat(1.0f);
 
-			GLuint shaderProgram = mShaders[4];
+			GLuint shaderProgram = mShaders[10];
 			glUseProgram(shaderProgram);
 
 			// 행렬 유니폼
@@ -296,7 +296,7 @@ void DgScene::renderScene()
 
 			// ★ 3D 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_3D, mSDFID);
+			glBindTexture(GL_TEXTURE_3D, pVolume->mTextureID);
 			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
 
 			// ★ Cull Face 비활성화
@@ -444,71 +444,26 @@ void DgScene::renderContextPopup()
 	}
 }
 
-void DgScene::createSDF(const DgVolume& volume)
-{
-	// 디버깅: 업로드할 데이터 확인
-	std::cout << "createSDF 호출됨" << std::endl;
-	std::cout << "  차원: " << volume.mDim[0] << " x " << volume.mDim[1] << " x " << volume.mDim[2] << std::endl;
-	std::cout << "  데이터 크기: " << volume.mData.size() << std::endl;
-	std::cout << "  첫 번째 값: " << volume.mData[0] << std::endl;
-
-	// 텍스처 ID 생성
-	if (mSDFID == 0)
-		glGenTextures(1, &mSDFID);
-
-	glBindTexture(GL_TEXTURE_3D, mSDFID);
-
-	// ★ 중요: 데이터 업로드
-	glTexImage3D(
-		GL_TEXTURE_3D,
-		0,                      // mipmap level
-		GL_R32F,                // 내부 포맷 (32비트 float)
-		volume.mDim[0],
-		volume.mDim[1],
-		volume.mDim[2],
-		0,                      // border
-		GL_RED,                 // 입력 포맷
-		GL_FLOAT,               // 입력 데이터 타입
-		volume.mData.data()     // 데이터 포인터
-	);
-
-	// 텍스처 파라미터 설정
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-	glBindTexture(GL_TEXTURE_3D, 0);
-
-	// OpenGL 에러 체크
-	GLenum err = glGetError();
-	if (err != GL_NO_ERROR) {
-		std::cout << "OpenGL 에러: " << err << std::endl;
-	}
-	else {
-		std::cout << "텍스처 업로드 성공! ID: " << mSDFID << std::endl;
-	}
-
-	////SDF 텍스처 ID 생성
-	//if (mSDFID == 0)
-	//	glGenTextures(1, &mSDFID);
-
-	//glBindTexture(GL_TEXTURE_3D, mSDFID);
-
-	////GPU 업로드
-	//glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,	volume.mDim[0], volume.mDim[1], volume.mDim[2], 0, GL_RED, GL_FLOAT, volume.mData.data());
-
-	////텍스처 파라미터 설정
-	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-
-	//glBindTexture(GL_TEXTURE_3D, 0);
-}
 void DgScene::addSDFVolume(DgVolume* volume)
 {
 	mSDFList.push_back(volume);
+}
+
+void DgScene::resetScene()
+{
+	// 1. 모든 볼륨 삭제
+	for (DgVolume* v : mSDFList)
+	{
+		delete v;  // 소멸자에서 mMesh와 mTextureID도 정리됨
+	}
+	mSDFList.clear();
+
+	// 2. 카메라 초기화
+	mZoom = -45.0f;
+	mRotMat = glm::mat4(1.0f);
+	mRotMat = glm::rotate(mRotMat, glm::radians(30.0f), glm::vec3(1, 0, 0));  // pitch
+	mRotMat = glm::rotate(mRotMat, glm::radians(60.0f), glm::vec3(0, 1, 0));  // yaw
+	mPan = glm::vec3(0.0f);
+
+	std::cout << "장면 초기화 완료" << std::endl;
 }

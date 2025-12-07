@@ -22,7 +22,6 @@ public:
 	glm::vec3 mPan;
 
 private:
-	GLuint mSDFID = 0; //볼륨 텍스처 ID
 	std::vector<DgVolume*> mSDFList; //DgVolume 객체 관리 리스트
 	DgScene()
 	{
@@ -36,8 +35,6 @@ private:
 	}
 	~DgScene()
 	{
-		if (mSDFID != 0)
-			glDeleteTextures(1, &mSDFID);
 		for (DgVolume* v : mSDFList)
 			delete v;
 
@@ -80,6 +77,6 @@ public:
 	void renderContextPopup();														// 컨텍스트 팝업 렌더링
 	void processMouseEvent();														// 마우스 이벤트 처리
 	void processKeyboardEvent();	// 키보드 이벤트 처리
-	void createSDF(const DgVolume& volume);
 	void addSDFVolume(DgVolume* volume);
+	void resetScene();																// 장면 초기화
 };

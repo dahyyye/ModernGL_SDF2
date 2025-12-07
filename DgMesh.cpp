@@ -653,25 +653,28 @@ DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos)
 	mesh->mNormals.emplace_back(0, -1, 0); // 4: 아래
 	mesh->mNormals.emplace_back(0, 1, 0);  // 5: 위
 
+	// ★★★ 기본 재질 추가 ★★★
+	mesh->mMaterials.emplace_back();
+
 	// 12개 삼각형 (6면 x 2)
 	// 앞면 (z = z0)
-	mesh->mFaces.emplace_back(0, 2, 1, 0, 0, 0, -1);
-	mesh->mFaces.emplace_back(0, 3, 2, 0, 0, 0, -1);
-	// 뒷면 (z = z1)
-	mesh->mFaces.emplace_back(4, 5, 6, 1, 1, 1, -1);
-	mesh->mFaces.emplace_back(4, 6, 7, 1, 1, 1, -1);
-	// 왼쪽 (x = x0)
-	mesh->mFaces.emplace_back(0, 4, 7, 2, 2, 2, -1);
-	mesh->mFaces.emplace_back(0, 7, 3, 2, 2, 2, -1);
-	// 오른쪽 (x = x1)
-	mesh->mFaces.emplace_back(1, 2, 6, 3, 3, 3, -1);
-	mesh->mFaces.emplace_back(1, 6, 5, 3, 3, 3, -1);
-	// 아래 (y = y0)
-	mesh->mFaces.emplace_back(0, 1, 5, 4, 4, 4, -1);
-	mesh->mFaces.emplace_back(0, 5, 4, 4, 4, 4, -1);
-	// 위 (y = y1)
-	mesh->mFaces.emplace_back(3, 7, 6, 5, 5, 5, -1);
-	mesh->mFaces.emplace_back(3, 6, 2, 5, 5, 5, -1);
+	mesh->mFaces.emplace_back(0, 2, 1, 0, 0, 0, 0);
+	mesh->mFaces.emplace_back(0, 3, 2, 0, 0, 0, 0);
+	// 뒷면 (z = z1)							  
+	mesh->mFaces.emplace_back(4, 5, 6, 1, 1, 1, 0);
+	mesh->mFaces.emplace_back(4, 6, 7, 1, 1, 1, 0);
+	// 왼쪽 (x = x0)							  
+	mesh->mFaces.emplace_back(0, 4, 7, 2, 2, 2, 0);
+	mesh->mFaces.emplace_back(0, 7, 3, 2, 2, 2, 0);
+	// 오른쪽 (x = x1)							 
+	mesh->mFaces.emplace_back(1, 2, 6, 3, 3, 3, 0);
+	mesh->mFaces.emplace_back(1, 6, 5, 3, 3, 3, 0);
+	// 아래 (y = y0)							  
+	mesh->mFaces.emplace_back(0, 1, 5, 4, 4, 4, 0);
+	mesh->mFaces.emplace_back(0, 5, 4, 4, 4, 4, 0);
+	// 위 (y = y1)							   
+	mesh->mFaces.emplace_back(3, 7, 6, 5, 5, 5, 0);
+	mesh->mFaces.emplace_back(3, 6, 2, 5, 5, 5, 0);
 
 	return mesh;
 }

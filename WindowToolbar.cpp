@@ -97,7 +97,7 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("NewScene", ToImTex(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		
+		DgScene::instance().resetScene();
 	}
 	ImGui::SameLine();
 
@@ -110,9 +110,8 @@ void CreateMesh() {
 
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-
+			volume->createTexture();
 			DgScene::instance().addSDFVolume(volume);
-			DgScene::instance().createSDF(*volume);
 		}
 		else {
 			delete volume;
@@ -178,9 +177,8 @@ void CreateMesh() {
 
 		if (volume->loadFromVTI(".\\res\\volume\\Bunny_64.vti")) {
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-
+			volume->createTexture();
 			DgScene::instance().addSDFVolume(volume);
-			DgScene::instance().createSDF(*volume);
 		}
 		else {
 			delete volume;
