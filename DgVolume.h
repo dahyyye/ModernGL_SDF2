@@ -19,6 +19,9 @@ public:
 	/*! \brief SDF의 기본 메쉬 */
 	DgMesh* mMesh = nullptr;
 
+	/*! \brief 볼륨 이름 (sphere, bunny 등) */
+	std::string mName;
+
 	/*! \brief 격자 해상도 */
 	int mDim[3] = { 0, 0, 0 };
 

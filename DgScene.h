@@ -79,4 +79,5 @@ public:
 	void processKeyboardEvent();	// 키보드 이벤트 처리
 	void addSDFVolume(DgVolume* volume);
 	void resetScene();																// 장면 초기화
+	std::vector<DgVolume*>& getSDFList() { return mSDFList; }
 };

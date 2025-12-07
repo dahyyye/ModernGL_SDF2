@@ -107,7 +107,7 @@ void CreateMesh() {
 
 		// VTI 파일에서 SDF 로드
 		if (volume->loadFromVTI(".\\res\\volume\\Sphere_64.vti")) {
-
+			volume->mName = "sphere";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
 			volume->createTexture();
@@ -174,7 +174,7 @@ void CreateMesh() {
 	if (ImGui::ImageButton("bunny", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
-
+		volume->mName = "bunny";
 		if (volume->loadFromVTI(".\\res\\volume\\Bunny_64.vti")) {
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
 			volume->createTexture();

@@ -41,28 +41,61 @@ void ShowWindowSceneLayer(bool* p_open)
 		return;
 	}
 
+	// 볼륨 목록 표시
+	std::vector<DgVolume*>& sdfList = DgScene::instance().getSDFList();
+
+	if (ImGui::TreeNode("Volumes"))
+	{
+		if (sdfList.empty())
+		{
+			ImGui::TextDisabled("No volumes");
+		}
+		else
+		{
+			static int selectedIndex = -1;
+
+			// 각 이름별 카운터 (sphere1, sphere2, bunny1, bunny2...)
+			std::map<std::string, int> nameCounter;
+
+			for (size_t i = 0; i < sdfList.size(); ++i)
+			{
+				DgVolume* vol = sdfList[i];
+				if (vol == nullptr) continue;
+
+				// 이름별 번호 계산
+				std::string baseName = vol->mName.empty() ? "volume" : vol->mName;
+				nameCounter[baseName]++;
+				int number = nameCounter[baseName];
+
+				// 라벨 생성 (예: sphere1, bunny2)
+				char label[64];
+				snprintf(label, sizeof(label), "%s%d", baseName.c_str(), number);
+
+				// 선택 가능한 항목으로 표시
+				bool isSelected = (selectedIndex == (int)i);
+				if (ImGui::Selectable(label, isSelected))
+				{
+					selectedIndex = (int)i;
+				}
+
+				// 우클릭 컨텍스트 메뉴
+				if (ImGui::BeginPopupContextItem())
+				{
+					if (ImGui::MenuItem("Delete"))
+					{
+						delete sdfList[i];
+						sdfList.erase(sdfList.begin() + i);
+						if (selectedIndex == (int)i)
+							selectedIndex = -1;
+						ImGui::EndPopup();
+						break;
+					}
+					ImGui::EndPopup();
+				}
+			}
+		}
+		ImGui::TreePop();
+	}
+
 	ImGui::End();
-	//if (ImGui::TreeNode("Model"))
-	//{
-	//	int node_clicked = -1;
-
-	//	// 메쉬를 선택한다.
-	//	if (node_clicked != -1)	{
-	//		
-	//	}
-	//	ImGui::TreePop();
-
-	//	//Context 팝업 메뉴를 생성한다.
-	//	if () {
-	//		if (ImGui::BeginPopupContextWindow())
-	//		{
-	//			//MenuFile();
-	//			if (ImGui::MenuItem("Delete"))
-	//			{
-	//				//삭제
-	//			}
-	//			ImGui::EndPopup();
-	//		}
-	//	}
-	//}
 }
