@@ -97,20 +97,26 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("NewScene", ToImTex(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-
+		
 	}
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
-		volume->mMesh = import_mesh_obj(".\\res\\object\\sphere.obj");
-		volume->setDimensions(16, 16, 16);
-		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->computeSDF();
 
-		DgScene::instance().addSDFVolume(volume);
-		DgScene::instance().createSDF(*volume);
+		// VTI 파일에서 SDF 로드
+		if (volume->loadFromVTI(".\\res\\volume\\Sphere_64.vti")) {
+
+			// 바운딩 박스 메쉬 생성
+			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
+
+			DgScene::instance().addSDFVolume(volume);
+			DgScene::instance().createSDF(*volume);
+		}
+		else {
+			delete volume;
+		}
 	}
 	ImGui::SameLine();
 
@@ -169,10 +175,16 @@ void CreateMesh() {
 	if (ImGui::ImageButton("bunny", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
-		volume->mMesh = import_mesh_obj(".\\res\\object\\bunny.obj");
-		volume->setDimensions(16, 16, 16);
-		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->computeSDF();
+
+		if (volume->loadFromVTI(".\\res\\volume\\Bunny_64.vti")) {
+			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
+
+			DgScene::instance().addSDFVolume(volume);
+			DgScene::instance().createSDF(*volume);
+		}
+		else {
+			delete volume;
+		}
 	}
 	ImGui::SameLine();
 }

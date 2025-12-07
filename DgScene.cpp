@@ -272,6 +272,7 @@ void DgScene::renderScene()
 			pMesh->render();
 			glUseProgram(0);
 		}
+
 		for (DgVolume* pVolume : mSDFList)
 		{
 			if(pVolume==nullptr ||mSDFID ==0) continue;
@@ -279,29 +280,31 @@ void DgScene::renderScene()
 
 			GLuint shaderProgram = mShaders[4];
 			glUseProgram(shaderProgram);
+
+			// 행렬 유니폼
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
-
-			glm::vec3 viewPos = glm::vec3(glm::inverse(viewMat)[3]);
-			glm::vec3 lightPos = glm::vec3(glm::inverse(viewMat)[3]);
-			glUniform3fv(glGetUniformLocation(shaderProgram, "uViewPos"), 1, glm::value_ptr(viewPos));
-			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightPos"), 1, glm::value_ptr(lightPos));
-			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightColor"), 1, glm::value_ptr(glm::vec3(1.0f)));
-
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));  // ★ uProjection이 아닌 uProj
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(viewMat)));
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projMat)));
 			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
+
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
+				(float)pVolume->mMin.mPos[0], (float)pVolume->mMin.mPos[1], (float)pVolume->mMin.mPos[2]);
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
+				(float)pVolume->mMax.mPos[0], (float)pVolume->mMax.mPos[1], (float)pVolume->mMax.mPos[2]);
+
+			// ★ 3D 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_3D, mSDFID);
 			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
 
-			// 볼륨 경계 유니폼 전달
-			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"), (float)pVolume->mMin.mPos[0], (float)pVolume->mMin.mPos[1], (float)pVolume->mMin.mPos[2]);
-			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"), (float)pVolume->mMax.mPos[0], (float)pVolume->mMax.mPos[1], (float)pVolume->mMax.mPos[2]);
+			// ★ Cull Face 비활성화
+			glDisable(GL_CULL_FACE);
 
 			pVolume->mMesh->render();
 
+			glEnable(GL_CULL_FACE);
 			glBindTexture(GL_TEXTURE_3D, 0);
 			glUseProgram(0);
 		}
@@ -380,6 +383,7 @@ void DgScene::processKeyboardEvent()
 		}		
 	}
 }
+
 void DgScene::renderContextPopup()
 {
 	if (ImGui::BeginPopupContextWindow("SceneContext", ImGuiPopupFlags_MouseButtonRight))
@@ -442,23 +446,67 @@ void DgScene::renderContextPopup()
 
 void DgScene::createSDF(const DgVolume& volume)
 {
-	//SDF 텍스처 ID 생성
+	// 디버깅: 업로드할 데이터 확인
+	std::cout << "createSDF 호출됨" << std::endl;
+	std::cout << "  차원: " << volume.mDim[0] << " x " << volume.mDim[1] << " x " << volume.mDim[2] << std::endl;
+	std::cout << "  데이터 크기: " << volume.mData.size() << std::endl;
+	std::cout << "  첫 번째 값: " << volume.mData[0] << std::endl;
+
+	// 텍스처 ID 생성
 	if (mSDFID == 0)
 		glGenTextures(1, &mSDFID);
 
 	glBindTexture(GL_TEXTURE_3D, mSDFID);
 
-	//GPU 업로드
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,	volume.mDim[0], volume.mDim[1], volume.mDim[2], 0, GL_RED, GL_FLOAT, volume.mData.data());
+	// ★ 중요: 데이터 업로드
+	glTexImage3D(
+		GL_TEXTURE_3D,
+		0,                      // mipmap level
+		GL_R32F,                // 내부 포맷 (32비트 float)
+		volume.mDim[0],
+		volume.mDim[1],
+		volume.mDim[2],
+		0,                      // border
+		GL_RED,                 // 입력 포맷
+		GL_FLOAT,               // 입력 데이터 타입
+		volume.mData.data()     // 데이터 포인터
+	);
 
-	//텍스처 파라미터 설정
+	// 텍스처 파라미터 설정
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
 	glBindTexture(GL_TEXTURE_3D, 0);
+
+	// OpenGL 에러 체크
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		std::cout << "OpenGL 에러: " << err << std::endl;
+	}
+	else {
+		std::cout << "텍스처 업로드 성공! ID: " << mSDFID << std::endl;
+	}
+
+	////SDF 텍스처 ID 생성
+	//if (mSDFID == 0)
+	//	glGenTextures(1, &mSDFID);
+
+	//glBindTexture(GL_TEXTURE_3D, mSDFID);
+
+	////GPU 업로드
+	//glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,	volume.mDim[0], volume.mDim[1], volume.mDim[2], 0, GL_RED, GL_FLOAT, volume.mData.data());
+
+	////텍스처 파라미터 설정
+	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	//glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+
+	//glBindTexture(GL_TEXTURE_3D, 0);
 }
 void DgScene::addSDFVolume(DgVolume* volume)
 {

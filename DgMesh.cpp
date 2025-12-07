@@ -624,3 +624,54 @@ const double& DgPos::operator[](const int& idx) const
 	assert(idx >= 0 && idx < 3);
 	return mPos[idx];
 }
+
+/*!
+*   @brief  바운딩 박스 메쉬 생성 (레이마칭용)
+*/
+DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos)
+{
+	DgMesh* mesh = new DgMesh();
+
+	double x0 = minPos.mPos[0], y0 = minPos.mPos[1], z0 = minPos.mPos[2];
+	double x1 = maxPos.mPos[0], y1 = maxPos.mPos[1], z1 = maxPos.mPos[2];
+
+	// 8개 정점
+	mesh->mVerts.emplace_back(x0, y0, z0); // 0
+	mesh->mVerts.emplace_back(x1, y0, z0); // 1
+	mesh->mVerts.emplace_back(x1, y1, z0); // 2
+	mesh->mVerts.emplace_back(x0, y1, z0); // 3
+	mesh->mVerts.emplace_back(x0, y0, z1); // 4
+	mesh->mVerts.emplace_back(x1, y0, z1); // 5
+	mesh->mVerts.emplace_back(x1, y1, z1); // 6
+	mesh->mVerts.emplace_back(x0, y1, z1); // 7
+
+	// 법선 (각 면에 대해)
+	mesh->mNormals.emplace_back(0, 0, -1); // 0: 앞면
+	mesh->mNormals.emplace_back(0, 0, 1);  // 1: 뒷면
+	mesh->mNormals.emplace_back(-1, 0, 0); // 2: 왼쪽
+	mesh->mNormals.emplace_back(1, 0, 0);  // 3: 오른쪽
+	mesh->mNormals.emplace_back(0, -1, 0); // 4: 아래
+	mesh->mNormals.emplace_back(0, 1, 0);  // 5: 위
+
+	// 12개 삼각형 (6면 x 2)
+	// 앞면 (z = z0)
+	mesh->mFaces.emplace_back(0, 2, 1, 0, 0, 0, -1);
+	mesh->mFaces.emplace_back(0, 3, 2, 0, 0, 0, -1);
+	// 뒷면 (z = z1)
+	mesh->mFaces.emplace_back(4, 5, 6, 1, 1, 1, -1);
+	mesh->mFaces.emplace_back(4, 6, 7, 1, 1, 1, -1);
+	// 왼쪽 (x = x0)
+	mesh->mFaces.emplace_back(0, 4, 7, 2, 2, 2, -1);
+	mesh->mFaces.emplace_back(0, 7, 3, 2, 2, 2, -1);
+	// 오른쪽 (x = x1)
+	mesh->mFaces.emplace_back(1, 2, 6, 3, 3, 3, -1);
+	mesh->mFaces.emplace_back(1, 6, 5, 3, 3, 3, -1);
+	// 아래 (y = y0)
+	mesh->mFaces.emplace_back(0, 1, 5, 4, 4, 4, -1);
+	mesh->mFaces.emplace_back(0, 5, 4, 4, 4, 4, -1);
+	// 위 (y = y1)
+	mesh->mFaces.emplace_back(3, 7, 6, 5, 5, 5, -1);
+	mesh->mFaces.emplace_back(3, 6, 2, 5, 5, 5, -1);
+
+	return mesh;
+}

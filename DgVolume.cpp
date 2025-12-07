@@ -197,3 +197,111 @@ std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh* mesh, cons
 	
 	// (추후) BVH를 활용
 }
+
+/*!
+*   @brief  VTI 파일에서 SDF 데이터를 로드하여 mData에 저장
+*
+*   @param  filename    VTI 파일 경로
+*   @return 로드 성공 여부
+*/
+bool DgVolume::loadFromVTI(const char* filename)
+{
+	// 1) VTI 파일 읽기
+	vtkSmartPointer<vtkXMLImageDataReader> reader =
+		vtkSmartPointer<vtkXMLImageDataReader>::New();
+
+	if (!reader->CanReadFile(filename)) {
+		std::cerr << "VTI 파일을 읽을 수 없습니다: " << filename << std::endl;
+		return false;
+	}
+
+	reader->SetFileName(filename);
+	reader->Update();
+
+	vtkSmartPointer<vtkImageData> imageData = reader->GetOutput();
+	if (!imageData) {
+		std::cerr << "VTI 데이터 로드 실패: " << filename << std::endl;
+		return false;
+	}
+
+	// 2) 차원 정보 추출
+	int dims[3];
+	imageData->GetDimensions(dims);
+	mDim[0] = dims[0];
+	mDim[1] = dims[1];
+	mDim[2] = dims[2];
+
+	// 3) 원점과 간격 추출
+	double origin[3];
+	double spacing[3];
+	imageData->GetOrigin(origin);
+	imageData->GetSpacing(spacing);
+
+	mSpacing[0] = spacing[0];
+	mSpacing[1] = spacing[1];
+	mSpacing[2] = spacing[2];
+
+	// 4) 볼륨 경계 계산 (min = origin, max = origin + (dim-1)*spacing)
+	mMin.mPos[0] = origin[0];
+	mMin.mPos[1] = origin[1];
+	mMin.mPos[2] = origin[2];
+
+	mMax.mPos[0] = origin[0] + (dims[0] - 1) * spacing[0];
+	mMax.mPos[1] = origin[1] + (dims[1] - 1) * spacing[1];
+	mMax.mPos[2] = origin[2] + (dims[2] - 1) * spacing[2];
+
+	// 5) 스칼라 데이터를 mData에 복사
+	vtkDataArray* scalars = imageData->GetPointData()->GetScalars();
+	if (!scalars) {
+		std::cerr << "스칼라 데이터가 없습니다: " << filename << std::endl;
+		return false;
+	}
+
+	int totalSize = dims[0] * dims[1] * dims[2];
+	mData.resize(totalSize);
+
+	for (int i = 0; i < totalSize; ++i) {
+		mData[i] = static_cast<float>(scalars->GetTuple1(i));
+	}
+
+	//=========================================================================
+	// 디버깅: mData 통계 출력
+	//=========================================================================
+	float minVal = mData[0];
+	float maxVal = mData[0];
+	int negCount = 0;   // 음수 개수 (내부)
+	int posCount = 0;   // 양수 개수 (외부)
+	int zeroCount = 0;  // 0에 가까운 값 (표면)
+
+	for (int i = 0; i < totalSize; ++i) {
+		float v = mData[i];
+		if (v < minVal) minVal = v;
+		if (v > maxVal) maxVal = v;
+
+		if (v < -0.001f) negCount++;
+		else if (v > 0.001f) posCount++;
+		else zeroCount++;
+	}
+
+	std::cout << "========== mData 디버깅 ==========" << std::endl;
+	std::cout << "  총 복셀 수: " << totalSize << std::endl;
+	std::cout << "  최소값: " << minVal << std::endl;
+	std::cout << "  최대값: " << maxVal << std::endl;
+	std::cout << "  음수 개수 (내부): " << negCount << " (" << (100.0f * negCount / totalSize) << "%)" << std::endl;
+	std::cout << "  양수 개수 (외부): " << posCount << " (" << (100.0f * posCount / totalSize) << "%)" << std::endl;
+	std::cout << "  표면 근처 (|v|<0.001): " << zeroCount << std::endl;
+	std::cout << "==================================" << std::endl;
+
+	// 중앙 슬라이스 몇 개 값 출력
+	int midZ = dims[2] / 2;
+	int midY = dims[1] / 2;
+	std::cout << "  중앙 슬라이스 (z=" << midZ << ", y=" << midY << ") 값들:" << std::endl;
+	std::cout << "  ";
+	for (int x = 0; x < dims[0]; x += dims[0] / 8) {
+		int idx = x + midY * dims[0] + midZ * dims[0] * dims[1];
+		std::cout << mData[idx] << " ";
+	}
+	std::cout << std::endl;
+
+	return true;
+}

@@ -210,3 +210,6 @@ DgMesh* import_mesh_obj(const char* fname);
  *	\return	생성된 프로그램의 핸들을 반환한다.
  */
 GLuint load_shaders(const char* vertexPath, const char* fragmentPath);
+
+// 바운딩 박스 메쉬 생성 함수 선언
+DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos);

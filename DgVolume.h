@@ -52,6 +52,9 @@ public:
 	/*! #brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
 	std::pair<DgFace*, float> findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p);
 
+	/*! #brisf VTI 로드 함수 */
+	bool loadFromVTI(const char* filename);
+
 private:
 	//float findClosestDistanceToMesh(const glm::vec3& p);
 	//float getSign(const glm::vec3& p);
