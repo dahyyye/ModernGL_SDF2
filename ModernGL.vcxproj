@@ -166,7 +166,6 @@
   <ItemGroup>
     <ClInclude Include="DgBoolean.h" />
     <ClInclude Include="DgMesh.h" />
-    <ClInclude Include="DgSDF.h" />
     <ClInclude Include="DgViewer.h" />
     <ClInclude Include="DgVolume.h" />
     <ClInclude Include="ImGuiManager.h" />
