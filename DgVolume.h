@@ -40,6 +40,9 @@ public:
 	/* 볼륨의 텍스쳐 id */
 	GLuint mTextureID = 0;
 
+	/* 선택 상태 */
+	bool mSelected = false;
+
 public:
 
 	DgVolume();
@@ -63,6 +66,15 @@ public:
 
 	/*! #brief 텍스쳐 생성 함수 */
 	void createTexture();
+
+	/*! #brief 볼륨의 중심점 반환 */
+	glm::vec3 getCenter() const {
+		return glm::vec3(
+			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f,
+			(mMin.mPos[1] + mMax.mPos[1]) * 0.5f,
+			(mMin.mPos[2] + mMax.mPos[2]) * 0.5f
+		);
+	}
 
 private:
 };
