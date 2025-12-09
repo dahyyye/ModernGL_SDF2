@@ -109,6 +109,11 @@ void OpenProperty() {
 		}
 	}
 
+	if (ImGui::CollapsingHeader("Offset"))
+	{
+
+	}
+
 	if (ImGui::CollapsingHeader("Sculpt"))
 	{
 		if (ImGui::ImageButton("sculpt_add", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))

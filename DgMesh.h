@@ -211,5 +211,12 @@ DgMesh* import_mesh_obj(const char* fname);
  */
 GLuint load_shaders(const char* vertexPath, const char* fragmentPath);
 
-// 바운딩 박스 메쉬 생성 함수 선언
+/*!
+* 	\brief	주어진 최소점과 최대점을 이용하여 바운딩 박스 메쉬를 생성한다.
+* 
+* 	\param[in]	minPos	바운딩 박스의 최소점
+* 	\param[in]	maxPos	바운딩 박스의 최대점
+* 
+* 	\return	생성된 바운딩 박스 메쉬를 반환한다.
+*/
 DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos);
