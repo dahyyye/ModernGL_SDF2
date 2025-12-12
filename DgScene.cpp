@@ -1,5 +1,7 @@
 #include "DgViewer.h"
+#include ".\\include\\STB\\stb_image.h"	// 아이콘 로딩용
 
+// 지면 격자 메쉬 생성
 void DgScene::createGroundMesh()
 {
 	// -10부터 10까지 1.0 단위 간격으로 격자선 생성
@@ -51,7 +53,7 @@ void DgScene::createGroundMesh()
 	glBindVertexArray(0);   // VAO 언바인딩 (추후 다른 객체 설정에 영향을 주지 않도록)
 }
 
-// [추가] 바운딩 박스 와이어프레임 버퍼 설정
+// 바운딩 박스 와이어프레임 버퍼 설정
 void DgScene::setupBBoxBuffer()
 {
 	if (mBBoxBufferInitialized) return;
@@ -89,7 +91,7 @@ void DgScene::setupBBoxBuffer()
 	mBBoxBufferInitialized = true;
 }
 
-// [추가] 바운딩 박스 셰이더 로드
+// 바운딩 박스 셰이더 로드
 void DgScene::loadBBoxShader()
 {
 	if (mBBoxShader == 0)
@@ -103,6 +105,7 @@ void DgScene::loadBBoxShader()
 	}
 }
 
+// 구면 좌표 계산
 void DgScene::getSphereCoords(double x, double y, float* px, float* py, float* pz)
 {
 	*px = (2.0f * (float)x - mSceneSize[0]) / mSceneSize[0];
@@ -117,6 +120,7 @@ void DgScene::getSphereCoords(double x, double y, float* px, float* py, float* p
 		*pz = std::sqrtf(1.0f - r);
 }
 
+// SceneGL 윈도우 출력
 void DgScene::showWindow()
 {
 	// 오픈 상태가 아니면 리턴한다.
@@ -157,8 +161,11 @@ void DgScene::showWindow()
 		return;
 	}
 
-	// [추가] 윈도우 위치 저장 (드래그 선택 좌표 계산용)
+	// 윈도우 위치 저장 (드래그 선택 좌표 계산용)
 	mWindowPos = ImGui::GetWindowPos();
+
+	// 편집 툴바 렌더링 추가
+	renderEditToolbar();
 
 	// 마우스 이벤트를 처리
 	processMouseEvent();
@@ -169,13 +176,88 @@ void DgScene::showWindow()
 	// 장면과 도구를 렌더링
 	renderScene();
 
-	// [추가] 드래그 선택 박스 렌더링 (ImGui 오버레이)
+	// 드래그 선택 박스 렌더링 (ImGui 오버레이)
 	renderDragSelectBox();
 
 	// Context 팝업 메뉴를 렌더링
 	renderContextPopup();
 
 	ImGui::End();
+}
+
+// 아이콘 텍스처 로딩 헬퍼 함수 추가
+static GLuint LoadIconTexture(const char* file) {
+	int w, h, ch;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* pixels = stbi_load(file, &w, &h, &ch, 0);
+	if (!pixels) return 0;
+
+	GLenum fmt = (ch == 4) ? GL_RGBA : (ch == 3) ? GL_RGB : GL_RED;
+
+	GLuint tex = 0;
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, pixels);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	stbi_image_free(pixels);
+	return tex;
+}
+
+static inline ImTextureID ToImTexID(GLuint tex) {
+	return (ImTextureID)(uintptr_t)tex;
+}
+
+
+// 편집 툴바 렌더링 함수
+void DgScene::renderEditToolbar()
+{
+	// 아이콘 텍스처 로딩 (최초 1회만)
+	static GLuint moveIcon = 0;
+	static bool iconsLoaded = false;
+
+	if (!iconsLoaded)
+	{
+		moveIcon = LoadIconTexture(".\\res\\icons\\move.png");
+		iconsLoaded = true;
+	}
+
+	ImGui::BeginGroup();
+
+	const ImVec2 iconSize(28, 28);
+
+	// 이동 모드 버튼 (move.png 아이콘 사용)
+	bool isMoveMode = (mEditMode == EditMode::Move);
+	if (isMoveMode)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.9f, 0.5f, 0.2f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.6f, 0.3f, 1.0f));
+	}
+
+	if (moveIcon != 0)
+	{
+		if (ImGui::ImageButton("MoveMode", ToImTexID(moveIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
+		{
+			// 토글: Move <-> Select
+			mEditMode = (mEditMode == EditMode::Move) ? EditMode::Select : EditMode::Move;
+		}
+	}
+	else
+	{
+		if (ImGui::Button("Move", ImVec2(50, 30)))
+		{
+			mEditMode = (mEditMode == EditMode::Move) ? EditMode::Select : EditMode::Move;
+		}
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move Tool (Toggle)");
+	if (isMoveMode) ImGui::PopStyleColor(2);
+
+	ImGui::EndGroup();
+	ImGui::Separator();
 }
 
 void DgScene::processMouseEvent()
@@ -208,7 +290,35 @@ void DgScene::processMouseEvent()
 			mStartPos[1] = pos[1];
 		}
 
-		// [추가] 좌클릭 (Ctrl 없이): 드래그 선택 시작
+		// 이동 모드에서 좌클릭 드래그: 선택된 볼륨 이동
+		else if (!io.KeyCtrl && mEditMode == EditMode::Move && hasSelectedVolumes())
+		{
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				mIsMoving = true;
+				mMoveStartPos = pos;
+			}
+			else if (mIsMoving && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+			{
+				// 마우스 이동량 계산
+				float dx = (pos.x - mMoveStartPos.x) * 0.02f;
+				float dy = (mMoveStartPos.y - pos.y) * 0.02f;
+
+				// 카메라 회전을 고려하여 월드 좌표로 변환
+				glm::vec3 worldDelta = glm::inverse(glm::mat3(mRotMat)) * glm::vec3(dx, dy, 0.0f);
+
+				// 선택된 볼륨들 이동
+				moveSelectedVolumes(worldDelta);
+
+				mMoveStartPos = pos;
+			}
+			else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			{
+				mIsMoving = false;
+			}
+		}
+
+		// 좌클릭 (Ctrl 없이): 드래그 선택 시작
 		else if (!io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 		{
 			mIsDragSelecting = true;
@@ -216,7 +326,7 @@ void DgScene::processMouseEvent()
 			mDragEndPos = mDragStartPos;
 		}
 
-		// [추가] 드래그 선택 중: 끝 위치 업데이트
+		// 드래그 선택 중: 끝 위치 업데이트
 		else if (!io.KeyCtrl && mIsDragSelecting && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 		{
 			mDragEndPos = ImGui::GetMousePos();
@@ -224,7 +334,7 @@ void DgScene::processMouseEvent()
 
 		else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))		// 클릭했던 왼쪽 버튼을 놓는 경우
 		{
-			// [추가] 드래그 선택 완료: 선택 수행
+			// 드래그 선택 완료: 선택 수행
 			if (mIsDragSelecting)
 			{
 				mDragEndPos = ImGui::GetMousePos();
@@ -281,7 +391,30 @@ void DgScene::processMouseEvent()
 	}
 }
 
-// [추가] 드래그 선택 박스 렌더링 (반투명 빨간색 사각형)
+// 선택된 볼륨 이동 함수 추가
+void DgScene::moveSelectedVolumes(const glm::vec3& delta)
+{
+	for (DgVolume* pVolume : mSDFList)
+	{
+		if (pVolume != nullptr && pVolume->mSelected)
+		{
+			pVolume->translate(delta);
+		}
+	}
+}
+
+
+// [수정] 선택된 볼륨이 있는지 확인 함수 추가
+bool DgScene::hasSelectedVolumes() const
+{
+	for (DgVolume* v : mSDFList)
+	{
+		if (v && v->mSelected) return true;
+	}
+	return false;
+}
+
+// 드래그 선택 박스 렌더링
 void DgScene::renderDragSelectBox()
 {
 	if (!mIsDragSelecting) return;
@@ -298,7 +431,7 @@ void DgScene::renderDragSelectBox()
 	drawList->AddRect(minPos, maxPos, IM_COL32(80, 160, 100, 255), 0.0f, 0, 1.0f);
 }
 
-// [추가] 월드 좌표가 스크린 사각형 내에 있는지 확인
+// 월드 좌표가 스크린 사각형 내에 있는지 확인
 bool DgScene::isPointInScreenRect(const glm::vec3& worldPos, const glm::mat4& viewMat, const glm::mat4& projMat,
 	const ImVec2& rectMin, const ImVec2& rectMax)
 {
@@ -327,7 +460,7 @@ bool DgScene::isPointInScreenRect(const glm::vec3& worldPos, const glm::mat4& vi
 		screenY >= rectMin.y && screenY <= rectMax.y);
 }
 
-// [추가] 드래그 선택 수행
+// 드래그 선택 수행
 void DgScene::performDragSelection(const glm::mat4& viewMat, const glm::mat4& projMat)
 {
 	// 드래그 영역이 너무 작으면 (클릭만 한 경우) 선택 해제
@@ -350,18 +483,20 @@ void DgScene::performDragSelection(const glm::mat4& viewMat, const glm::mat4& pr
 	{
 		if (pVolume == nullptr) continue;
 
+		// 이동된 위치 반영
 		glm::vec3 center = pVolume->getCenter();
+		glm::vec3 minPos = pVolume->getTransformedMin();
+		glm::vec3 maxPos = pVolume->getTransformedMax();
 
-		// 바운딩 박스의 8개 코너도 확인 (더 정확한 선택을 위해)
 		glm::vec3 corners[8] = {
-			glm::vec3(pVolume->mMin.mPos[0], pVolume->mMin.mPos[1], pVolume->mMin.mPos[2]),
-			glm::vec3(pVolume->mMax.mPos[0], pVolume->mMin.mPos[1], pVolume->mMin.mPos[2]),
-			glm::vec3(pVolume->mMax.mPos[0], pVolume->mMax.mPos[1], pVolume->mMin.mPos[2]),
-			glm::vec3(pVolume->mMin.mPos[0], pVolume->mMax.mPos[1], pVolume->mMin.mPos[2]),
-			glm::vec3(pVolume->mMin.mPos[0], pVolume->mMin.mPos[1], pVolume->mMax.mPos[2]),
-			glm::vec3(pVolume->mMax.mPos[0], pVolume->mMin.mPos[1], pVolume->mMax.mPos[2]),
-			glm::vec3(pVolume->mMax.mPos[0], pVolume->mMax.mPos[1], pVolume->mMax.mPos[2]),
-			glm::vec3(pVolume->mMin.mPos[0], pVolume->mMax.mPos[1], pVolume->mMax.mPos[2])
+			glm::vec3(minPos.x, minPos.y, minPos.z),
+			glm::vec3(maxPos.x, minPos.y, minPos.z),
+			glm::vec3(maxPos.x, maxPos.y, minPos.z),
+			glm::vec3(minPos.x, maxPos.y, minPos.z),
+			glm::vec3(minPos.x, minPos.y, maxPos.z),
+			glm::vec3(maxPos.x, minPos.y, maxPos.z),
+			glm::vec3(maxPos.x, maxPos.y, maxPos.z),
+			glm::vec3(minPos.x, maxPos.y, maxPos.z)
 		};
 
 		bool selected = false;
@@ -391,7 +526,7 @@ void DgScene::performDragSelection(const glm::mat4& viewMat, const glm::mat4& pr
 	}
 }
 
-// [추가] 모든 볼륨 선택 해제
+// 모든 볼륨 선택 해제
 void DgScene::clearSelection()
 {
 	for (DgVolume* pVolume : mSDFList)
@@ -403,7 +538,7 @@ void DgScene::clearSelection()
 	}
 }
 
-// [추가] 선택된 볼륨의 바운딩 박스 렌더링 (빨간색 와이어프레임)
+// 선택된 볼륨의 바운딩 박스 렌더링 (와이어프레임)
 void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::mat4& projMat)
 {
 	// 바운딩 박스 버퍼 초기화
@@ -426,23 +561,24 @@ void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::m
 	{
 		if (pVolume == nullptr || !pVolume->mSelected) continue;
 
-		// 바운딩 박스 크기와 위치 계산
-		glm::vec3 minPos(pVolume->mMin.mPos[0], pVolume->mMin.mPos[1], pVolume->mMin.mPos[2]);
-		glm::vec3 maxPos(pVolume->mMax.mPos[0], pVolume->mMax.mPos[1], pVolume->mMax.mPos[2]);
+		// 이동된 위치 반영
+		glm::vec3 minPos = pVolume->getTransformedMin();
+		glm::vec3 maxPos = pVolume->getTransformedMax();
 		glm::vec3 size = maxPos - minPos;
 
-		// 모델 행렬: 스케일 + 이동
 		glm::mat4 modelMat(1.0f);
 		modelMat = glm::translate(modelMat, minPos);
 		modelMat = glm::scale(modelMat, size);
 
-		// 유니폼 설정
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
 
-		// 바운딩 박스 색 설정
-		glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 0.85f, 0.4f, 0.35f);
+		// 이동 모드일 때 바운딩 박스 색상 변경
+		if (mEditMode == EditMode::Move)
+			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 1.0f, 0.6f, 0.2f);
+		else
+			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 0.85f, 0.4f, 0.35f);
 
 		// 바운딩 박스 와이어프레임 렌더링
 		glBindVertexArray(mBBoxVAO);
@@ -543,6 +679,7 @@ void DgScene::renderScene()
 		{
 			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
 			glm::mat4 modelMat(1.0f);
+			modelMat = glm::translate(modelMat, pVolume->mPosition);
 
 			GLuint shaderProgram = mShaders[10];
 			glUseProgram(shaderProgram);
@@ -557,10 +694,13 @@ void DgScene::renderScene()
 
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 
+			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
+			glm::vec3 transformedMin = pVolume->getTransformedMin();
+			glm::vec3 transformedMax = pVolume->getTransformedMax();
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
-				(float)pVolume->mMin.mPos[0], (float)pVolume->mMin.mPos[1], (float)pVolume->mMin.mPos[2]);
+				transformedMin.x, transformedMin.y, transformedMin.z);
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
-				(float)pVolume->mMax.mPos[0], (float)pVolume->mMax.mPos[1], (float)pVolume->mMax.mPos[2]);
+				transformedMax.x, transformedMax.y, transformedMax.z);
 
 			// 3D 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
@@ -577,7 +717,7 @@ void DgScene::renderScene()
 			glUseProgram(0);
 		}
 
-		// [추가] 선택된 볼륨의 바운딩 박스 렌더링 (빨간색 와이어프레임)
+		// 선택된 볼륨의 바운딩 박스 렌더링
 		renderSelectedBoundingBoxes(viewMat, projMat);
 
 		// FPS 렌더링
@@ -628,7 +768,7 @@ void DgScene::renderFps()
 		else
 			ImGui::Text("Mouse Position: <invalid>");
 
-		// [추가] 선택된 볼륨 수 표시
+		// 선택된 볼륨 수 표시
 		int selectedCount = 0;
 		for (DgVolume* v : mSDFList)
 		{

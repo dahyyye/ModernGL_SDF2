@@ -1,6 +1,12 @@
 #pragma once
 #include "DgViewer.h"
 #include "DgVolume.h"
+
+enum class EditMode {
+	Select,		// 선택 모드 (기본)
+	Move		// 이동 모드
+};
+
 class DgScene
 {
 public:
@@ -32,6 +38,11 @@ public:
 	GLuint mBBoxVBO;
 	GLuint mBBoxShader;				// 바운딩 박스 전용 셰이더
 	bool mBBoxBufferInitialized;
+
+	// 편집 모드 관련 변수
+	EditMode mEditMode = EditMode::Select;	// 현재 편집 모드
+	bool mIsMoving = false;					// 이동 드래그 중인지
+	ImVec2 mMoveStartPos;					// 이동 시작 마우스 위치
 
 private:
 	std::vector<DgVolume*> mSDFList; //DgVolume 객체 관리 리스트
@@ -132,4 +143,12 @@ public:
 
 	// SDF 리스트 접근자
 	const std::vector<DgVolume*>& getSDFList() const { return mSDFList; }
+
+	// 편집 모드 관련 함수
+	void setEditMode(EditMode mode) { mEditMode = mode; }
+	EditMode getEditMode() const { return mEditMode; }
+	void moveSelectedVolumes(const glm::vec3& delta);	// 선택된 볼륨 이동
+	void renderEditToolbar();							// 편집 툴바 렌더링
+	bool hasSelectedVolumes() const;					// 선택된 볼륨 있는지 확인
 };
+

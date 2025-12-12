@@ -43,6 +43,9 @@ public:
 	/* 선택 상태 */
 	bool mSelected = false;
 
+	/*! \brief 볼륨 위치 */
+	glm::vec3 mPosition = glm::vec3(0.0f);
+
 public:
 
 	DgVolume();
@@ -67,13 +70,36 @@ public:
 	/*! #brief 텍스쳐 생성 함수 */
 	void createTexture();
 
-	/*! #brief 볼륨의 중심점 반환 */
+	/*! #brief 볼륨의 중심점 반환 (위치 포함) */
 	glm::vec3 getCenter() const {
 		return glm::vec3(
-			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f,
-			(mMin.mPos[1] + mMax.mPos[1]) * 0.5f,
-			(mMin.mPos[2] + mMax.mPos[2]) * 0.5f
+			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f + mPosition.x,
+			(mMin.mPos[1] + mMax.mPos[1]) * 0.5f + mPosition.y,
+			(mMin.mPos[2] + mMax.mPos[2]) * 0.5f + mPosition.z
 		);
+	}
+
+	/*! #brief 이동된 최소점 반환 */
+	glm::vec3 getTransformedMin() const {
+		return glm::vec3(
+			mMin.mPos[0] + mPosition.x,
+			mMin.mPos[1] + mPosition.y,
+			mMin.mPos[2] + mPosition.z
+		);
+	}
+
+	/*! #brief 이동된 최대점 반환 */
+	glm::vec3 getTransformedMax() const {
+		return glm::vec3(
+			mMax.mPos[0] + mPosition.x,
+			mMax.mPos[1] + mPosition.y,
+			mMax.mPos[2] + mPosition.z
+		);
+	}
+
+	/*! #brief 위치 이동 */
+	void translate(const glm::vec3& delta) {
+		mPosition += delta;
 	}
 
 private:
