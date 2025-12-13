@@ -218,11 +218,13 @@ void DgScene::renderEditToolbar()
 {
 	// 아이콘 텍스처 로딩 (최초 1회만)
 	static GLuint moveIcon = 0;
+	static GLuint rotateIcon = 0;
 	static bool iconsLoaded = false;
 
 	if (!iconsLoaded)
 	{
 		moveIcon = LoadIconTexture(".\\res\\icons\\move.png");
+		rotateIcon = LoadIconTexture(".\\res\\icons\\rotation.png");
 		iconsLoaded = true;
 	}
 
@@ -255,6 +257,34 @@ void DgScene::renderEditToolbar()
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move Tool (Toggle)");
 	if (isMoveMode) ImGui::PopStyleColor(2);
+
+	ImGui::SameLine();
+
+	// 회전 모드 버튼 (토글 방식)
+	bool isRotateMode = (mEditMode == EditMode::Rotate);
+	if (isRotateMode)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.9f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 1.0f, 1.0f));
+	}
+
+	if (rotateIcon != 0)
+	{
+		if (ImGui::ImageButton("RotateMode", ToImTexID(rotateIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
+		{
+			// 토글: Rotate <-> Select
+			mEditMode = (mEditMode == EditMode::Rotate) ? EditMode::Select : EditMode::Rotate;
+		}
+	}
+	else
+	{
+		if (ImGui::Button("Rotate", ImVec2(50, 30)))
+		{
+			mEditMode = (mEditMode == EditMode::Rotate) ? EditMode::Select : EditMode::Rotate;
+		}
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate Tool (Toggle)");
+	if (isRotateMode) ImGui::PopStyleColor(2);
 
 	ImGui::EndGroup();
 	ImGui::Separator();
@@ -309,6 +339,34 @@ void DgScene::processMouseEvent()
 
 				// 선택된 볼륨들 이동
 				moveSelectedVolumes(worldDelta);
+
+				mMoveStartPos = pos;
+			}
+			else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+			{
+				mIsMoving = false;
+			}
+		}
+
+		// [추가] 회전 모드에서 좌클릭 드래그: 선택된 볼륨 회전
+		else if (!io.KeyCtrl && mEditMode == EditMode::Rotate && hasSelectedVolumes())
+		{
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				mIsMoving = true;  // 같은 플래그 재사용
+				mMoveStartPos = pos;
+			}
+			else if (mIsMoving && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+			{
+				// 마우스 이동량을 회전량으로 변환 (라디안)
+				float dx = (pos.x - mMoveStartPos.x) * 0.01f;
+				float dy = (pos.y - mMoveStartPos.y) * 0.01f;
+
+				// X 드래그 → Y축 회전, Y 드래그 → X축 회전
+				glm::vec3 rotDelta(dy, dx, 0.0f);
+
+				// 선택된 볼륨들 회전
+				rotateSelectedVolumes(rotDelta);
 
 				mMoveStartPos = pos;
 			}
@@ -403,6 +461,17 @@ void DgScene::moveSelectedVolumes(const glm::vec3& delta)
 	}
 }
 
+// [추가] 선택된 볼륨 회전 함수
+void DgScene::rotateSelectedVolumes(const glm::vec3& delta)
+{
+	for (DgVolume* pVolume : mSDFList)
+	{
+		if (pVolume != nullptr && pVolume->mSelected)
+		{
+			pVolume->rotate(delta);
+		}
+	}
+}
 
 // [수정] 선택된 볼륨이 있는지 확인 함수 추가
 bool DgScene::hasSelectedVolumes() const
@@ -561,24 +630,30 @@ void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::m
 	{
 		if (pVolume == nullptr || !pVolume->mSelected) continue;
 
-		// 이동된 위치 반영
-		glm::vec3 minPos = pVolume->getTransformedMin();
-		glm::vec3 maxPos = pVolume->getTransformedMax();
-		glm::vec3 size = maxPos - minPos;
+		/// [수정] 회전 포함된 모델 행렬 사용
+		glm::vec3 localMin = pVolume->getLocalMin();
+		glm::vec3 localMax = pVolume->getLocalMax();
+		glm::vec3 size = localMax - localMin;
 
-		glm::mat4 modelMat(1.0f);
-		modelMat = glm::translate(modelMat, minPos);
-		modelMat = glm::scale(modelMat, size);
+		// 로컬 바운딩박스를 위한 스케일/이동 행렬
+		glm::mat4 bboxLocal(1.0f);
+		bboxLocal = glm::translate(bboxLocal, localMin);
+		bboxLocal = glm::scale(bboxLocal, size);
+
+		// 볼륨의 모델 행렬 (이동 + 회전)을 적용
+		glm::mat4 modelMat = pVolume->getModelMatrix() * bboxLocal;
 
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
 
-		// 이동 모드일 때 바운딩 박스 색상 변경
+		// [수정] 모드별 바운딩 박스 색상 변경
 		if (mEditMode == EditMode::Move)
-			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 1.0f, 0.6f, 0.2f);
+			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 1.0f, 0.6f, 0.2f);   // 주황색
+		else if (mEditMode == EditMode::Rotate)
+			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 0.2f, 0.7f, 0.9f);   // 하늘색
 		else
-			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 0.85f, 0.4f, 0.35f);
+			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 0.85f, 0.4f, 0.35f); // 빨간색
 
 		// 바운딩 박스 와이어프레임 렌더링
 		glBindVertexArray(mBBoxVAO);
@@ -678,8 +753,9 @@ void DgScene::renderScene()
 		for (DgVolume* pVolume : mSDFList)
 		{
 			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
-			glm::mat4 modelMat(1.0f);
-			modelMat = glm::translate(modelMat, pVolume->mPosition);
+
+			glm::mat4 modelMat = pVolume->getModelMatrix();
+			glm::mat4 modelInverse = glm::inverse(modelMat);
 
 			GLuint shaderProgram = mShaders[10];
 			glUseProgram(shaderProgram);
@@ -693,14 +769,15 @@ void DgScene::renderScene()
 			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
 
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 
 			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
-			glm::vec3 transformedMin = pVolume->getTransformedMin();
-			glm::vec3 transformedMax = pVolume->getTransformedMax();
+			glm::vec3 localMin = pVolume->getLocalMin();
+			glm::vec3 localMax = pVolume->getLocalMax();
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
-				transformedMin.x, transformedMin.y, transformedMin.z);
+				localMin.x, localMin.y, localMin.z);
 			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
-				transformedMax.x, transformedMax.y, transformedMax.z);
+				localMax.x, localMax.y, localMax.z);
 
 			// 3D 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
@@ -778,6 +855,8 @@ void DgScene::renderFps()
 		{
 			ImGui::Text("Selected: %d volume(s)", selectedCount);
 		}
+
+		ImGui::Text("Edit Mode: %s", mEditMode == EditMode::Move ? "Move" : "Select");
 
 		if (ImGui::BeginPopupContextWindow())
 		{
@@ -886,6 +965,6 @@ void DgScene::resetScene()
 	mRotMat = glm::rotate(mRotMat, glm::radians(30.0f), glm::vec3(1, 0, 0));  // pitch
 	mRotMat = glm::rotate(mRotMat, glm::radians(60.0f), glm::vec3(0, 1, 0));  // yaw
 	mPan = glm::vec3(0.0f);
-
+	mEditMode = EditMode::Select;
 	std::cout << "장면 초기화 완료" << std::endl;
 }

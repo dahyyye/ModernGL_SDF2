@@ -4,7 +4,8 @@
 
 enum class EditMode {
 	Select,		// 선택 모드 (기본)
-	Move		// 이동 모드
+	Move,		// 이동 모드
+	Rotate		// 회전 모드
 };
 
 class DgScene
@@ -129,14 +130,14 @@ public:
 	void addSDFVolume(DgVolume* volume);										// SDF 볼륨 추가
 	void resetScene();															// 장면 초기화
 
-	// [추가] 드래그 선택 관련 함수
+	// 드래그 선택 관련 함수
 	void renderDragSelectBox();														// 드래그 선택 박스 렌더링
 	void performDragSelection(const glm::mat4& viewMat, const glm::mat4& projMat);	// 드래그 선택 수행
 	bool isPointInScreenRect(const glm::vec3& worldPos, const glm::mat4& viewMat, const glm::mat4& projMat,
 		const ImVec2& rectMin, const ImVec2& rectMax);								// 포인트가 스크린 사각형 내에 있는지 확인
 	void clearSelection();															// 선택 해제
 
-	// [추가] 바운딩 박스 렌더링 관련 함수
+	// 바운딩 박스 렌더링 관련 함수
 	void setupBBoxBuffer();															// 바운딩 박스 버퍼 설정
 	void loadBBoxShader();															// 바운딩 박스 셰이더 로드
 	void renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::mat4& projMat);	// 선택된 볼륨의 바운딩 박스 렌더링
@@ -147,8 +148,9 @@ public:
 	// 편집 모드 관련 함수
 	void setEditMode(EditMode mode) { mEditMode = mode; }
 	EditMode getEditMode() const { return mEditMode; }
-	void moveSelectedVolumes(const glm::vec3& delta);	// 선택된 볼륨 이동
-	void renderEditToolbar();							// 편집 툴바 렌더링
-	bool hasSelectedVolumes() const;					// 선택된 볼륨 있는지 확인
+	void moveSelectedVolumes(const glm::vec3& delta);		// 선택된 볼륨 이동
+	void rotateSelectedVolumes(const glm::vec3& delta);		// 선택된 볼륨 회전
+	void renderEditToolbar();								// 편집 툴바 렌더링
+	bool hasSelectedVolumes() const;						// 선택된 볼륨 있는지 확인
 };
 

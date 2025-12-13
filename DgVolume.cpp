@@ -22,6 +22,7 @@ DgVolume::DgVolume()
 	mSpacing[2] = 0;
 
 	mPosition = glm::vec3(0.0f);
+	mRotation = glm::vec3(0.0f);
 }
 
 DgVolume::DgVolume(DgMesh* mesh)
@@ -29,6 +30,7 @@ DgVolume::DgVolume(DgMesh* mesh)
 	mMesh = mesh;
 	mName = "volume";
 	mPosition = glm::vec3(0.0f);
+	mRotation = glm::vec3(0.0f);
 }
 
 DgVolume::DgVolume(DgVolume& cpy)
@@ -53,6 +55,7 @@ DgVolume::DgVolume(DgVolume& cpy)
 	mSpacing[2] = cpy.mSpacing[2];
 
 	mPosition = cpy.mPosition;
+	mRotation = cpy.mRotation;
 }
 DgVolume::~DgVolume()
 {
