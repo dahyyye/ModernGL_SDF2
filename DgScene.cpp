@@ -208,10 +208,10 @@ static GLuint LoadIconTexture(const char* file) {
 	return tex;
 }
 
+// OpenGL 텍스처 ID를 ImGui 텍스처 ID로 변환하는 헬퍼 함수
 static inline ImTextureID ToImTexID(GLuint tex) {
 	return (ImTextureID)(uintptr_t)tex;
 }
-
 
 // 편집 툴바 렌더링 함수
 void DgScene::renderEditToolbar()
@@ -290,6 +290,7 @@ void DgScene::renderEditToolbar()
 	ImGui::Separator();
 }
 
+// 마우스 이벤트 처리
 void DgScene::processMouseEvent()
 {
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None))
@@ -348,7 +349,7 @@ void DgScene::processMouseEvent()
 			}
 		}
 
-		// [추가] 회전 모드에서 좌클릭 드래그: 선택된 볼륨 회전
+		// 회전 모드에서 좌클릭 드래그: 선택된 볼륨 회전
 		else if (!io.KeyCtrl && mEditMode == EditMode::Rotate && hasSelectedVolumes())
 		{
 			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
@@ -449,7 +450,7 @@ void DgScene::processMouseEvent()
 	}
 }
 
-// 선택된 볼륨 이동 함수 추가
+// 선택된 볼륨 이동 함수
 void DgScene::moveSelectedVolumes(const glm::vec3& delta)
 {
 	for (DgVolume* pVolume : mSDFList)
@@ -461,7 +462,7 @@ void DgScene::moveSelectedVolumes(const glm::vec3& delta)
 	}
 }
 
-// [추가] 선택된 볼륨 회전 함수
+// 선택된 볼륨 회전 함수
 void DgScene::rotateSelectedVolumes(const glm::vec3& delta)
 {
 	for (DgVolume* pVolume : mSDFList)
@@ -473,7 +474,7 @@ void DgScene::rotateSelectedVolumes(const glm::vec3& delta)
 	}
 }
 
-// [수정] 선택된 볼륨이 있는지 확인 함수 추가
+// 선택된 볼륨이 있는지 확인하는 함수
 bool DgScene::hasSelectedVolumes() const
 {
 	for (DgVolume* v : mSDFList)
@@ -630,7 +631,7 @@ void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::m
 	{
 		if (pVolume == nullptr || !pVolume->mSelected) continue;
 
-		/// [수정] 회전 포함된 모델 행렬 사용
+		/// 회전 포함된 모델 행렬 사용
 		glm::vec3 localMin = pVolume->getLocalMin();
 		glm::vec3 localMax = pVolume->getLocalMax();
 		glm::vec3 size = localMax - localMin;
@@ -647,7 +648,7 @@ void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::m
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
 
-		// [수정] 모드별 바운딩 박스 색상 변경
+		// 모드별 바운딩 박스 색상 변경
 		if (mEditMode == EditMode::Move)
 			glUniform3f(glGetUniformLocation(shaderProgram, "uColor"), 1.0f, 0.6f, 0.2f);   // 주황색
 		else if (mEditMode == EditMode::Rotate)
@@ -667,6 +668,7 @@ void DgScene::renderSelectedBoundingBoxes(const glm::mat4& viewMat, const glm::m
 	glUseProgram(0);
 }
 
+// 장면 렌더링
 void DgScene::renderScene()
 {
 	// 현재 윈도우(3D Scene)의 정보를 구하여, 렌더링 버퍼를 갱신한다.
@@ -806,6 +808,7 @@ void DgScene::renderScene()
 	ImGui::Image(textureID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 }
 
+// FPS 및 마우스 좌표 출력 함수
 void DgScene::renderFps()
 {
 	// 출력할 윈도우의 위치와 투명도를 설정한다.
@@ -873,6 +876,7 @@ void DgScene::renderFps()
 	ImGui::PopStyleVar();
 }
 
+// 키보드 이벤트 처리
 void DgScene::processKeyboardEvent()
 {
 	// 키보드 이벤트를 처리한다.
@@ -885,6 +889,7 @@ void DgScene::processKeyboardEvent()
 	}
 }
 
+// 장면 우클릭 팝업 메뉴 렌더링
 void DgScene::renderContextPopup()
 {
 	if (ImGui::BeginPopupContextWindow("SceneContext", ImGuiPopupFlags_MouseButtonRight))
@@ -945,11 +950,13 @@ void DgScene::renderContextPopup()
 	}
 }
 
+// SDF 볼륨 추가 함수
 void DgScene::addSDFVolume(DgVolume* volume)
 {
 	mSDFList.push_back(volume);
 }
 
+// 장면 초기화 함수
 void DgScene::resetScene()
 {
 	// 1. 모든 볼륨 삭제

@@ -58,13 +58,13 @@ private:
 		mRotMat = glm::rotate(mRotMat, glm::radians(60.0f), glm::vec3(0, 1, 0)); // yaw
 		mPan = glm::vec3(0.0f);
 
-		// [추가] 드래그 선택 초기화
+		// 드래그 선택 초기화
 		mIsDragSelecting = false;
 		mDragStartPos = ImVec2(0.0f, 0.0f);
 		mDragEndPos = ImVec2(0.0f, 0.0f);
 		mWindowPos = ImVec2(0.0f, 0.0f);
 
-		// [추가] 바운딩 박스 버퍼 초기화
+		// 바운딩 박스 버퍼 초기화
 		mBBoxVAO = 0;
 		mBBoxVBO = 0;
 		mBBoxShader = 0;
@@ -78,13 +78,13 @@ private:
 		glDeleteVertexArrays(1, &mGroundVAO);
 		glDeleteBuffers(1, &mGroundVBO);
 
-		// [추가] 바운딩 박스 버퍼 삭제
+		// 바운딩 박스 버퍼 삭제
 		if (mBBoxBufferInitialized) {
 			glDeleteVertexArrays(1, &mBBoxVAO);
 			glDeleteBuffers(1, &mBBoxVBO);
 		}
 
-		// [추가] 바운딩 박스 셰이더 삭제
+		// 바운딩 박스 셰이더 삭제
 		if (mBBoxShader != 0) {
 			glDeleteProgram(mBBoxShader);
 		}

@@ -57,6 +57,7 @@ DgVolume::DgVolume(DgVolume& cpy)
 	mPosition = cpy.mPosition;
 	mRotation = cpy.mRotation;
 }
+
 DgVolume::~DgVolume()
 {
 	if (mMesh != nullptr) {
@@ -67,6 +68,7 @@ DgVolume::~DgVolume()
         glDeleteTextures(1, &mTextureID);
     }
 }
+
 void DgVolume::setDimensions(int dimX, int dimY, int dimZ)
 {
 	mDim[0] = dimX;
@@ -209,8 +211,6 @@ std::pair<DgFace*, float> DgVolume::findClosestDistanceToMesh(DgMesh* mesh, cons
 	int minIndex = std::min_element(distances.begin(), distances.end()) - distances.begin();
 
 	return std::make_pair(&mesh->mFaces[minIndex], isInside[minIndex] ? distances[minIndex] * -1.0 : distances[minIndex]);
-	
-	// (추후) BVH를 활용
 }
 
 /*!
@@ -279,9 +279,7 @@ bool DgVolume::loadFromVTI(const char* filename)
 		mData[i] = static_cast<float>(scalars->GetTuple1(i));
 	}
 
-	//=========================================================================
 	// 디버깅: mData 통계 출력
-	//=========================================================================
 	float minVal = mData[0];
 	float maxVal = mData[0];
 	int negCount = 0;   // 음수 개수 (내부)
@@ -321,6 +319,10 @@ bool DgVolume::loadFromVTI(const char* filename)
 	return true;
 }
 
+/*!
+* @brief	텍스쳐 생성 함수
+* 
+*/
 void DgVolume::createTexture()
 {
 	// 기존 텍스처가 있으면 삭제
@@ -353,5 +355,5 @@ void DgVolume::createTexture()
 
 	glBindTexture(GL_TEXTURE_3D, 0);
 
-	std::cout << "볼륨 텍스처 생성 완료! ID: " << mTextureID << std::endl;
+	std::cout << "볼륨 텍스처 생성 완료 ID: " << mTextureID << std::endl;
 }

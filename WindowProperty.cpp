@@ -78,7 +78,7 @@ void OpenProperty() {
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\Union-A-B.png",
 		".\\res\\icons\\Intersection-A-B.png",
-		".\\res\\icons\\Union-A-B.png",
+		".\\res\\icons\\Difference-A-B.png",
 		".\\res\\icons\\sculpt_add.png",
 		".\\res\\icons\\sculpt_remove.png"
 	};
@@ -114,6 +114,11 @@ void OpenProperty() {
 
 	}
 
+	if (ImGui::CollapsingHeader("Sweeping"))
+	{
+
+	}
+
 	if (ImGui::CollapsingHeader("Sculpt"))
 	{
 		if (ImGui::ImageButton("sculpt_add", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
@@ -125,10 +130,5 @@ void OpenProperty() {
 		{
 
 		}
-	}
-
-	if (ImGui::CollapsingHeader("Sweeping"))
-	{
-
 	}
 }

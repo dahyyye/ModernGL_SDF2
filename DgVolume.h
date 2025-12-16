@@ -58,22 +58,22 @@ public:
 	
 	void setDimensions(int dimX, int dimY, int dimZ);
 	
-	/*! #brief 입력 메쉬의 격자 공간을 정의(AABB) */
+	/*! \brief 입력 메쉬의 격자 공간을 정의(AABB) */
 	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
-	/*! #brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
+	/*! \brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
 	void computeSDF();
 
-	/*! #brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
+	/*! \brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
 	std::pair<DgFace*, float> findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p);
 
-	/*! #brief VTI 로드 함수 */
+	/*! \brief VTI 로드 함수 */
 	bool loadFromVTI(const char* filename);
 
-	/*! #brief 텍스쳐 생성 함수 */
+	/*! \brief 텍스쳐 생성 함수 */
 	void createTexture();
 
-	/*! #brief 볼륨의 중심점 반환 (위치 포함) */
+	/*! \brief 볼륨의 중심점 반환 (위치 포함) */
 	glm::vec3 getCenter() const {
 		glm::vec3 localCenter(
 			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f,
@@ -83,17 +83,17 @@ public:
 		return glm::vec3(getModelMatrix() * glm::vec4(localCenter, 1.0f));
 	}
 
-	/*! #brief 로컬 최소점 반환 */
+	/*! \brief 로컬 최소점 반환 */
 	glm::vec3 getLocalMin() const {
 		return glm::vec3(mMin.mPos[0], mMin.mPos[1], mMin.mPos[2]);
 	}
 
-	/*! #brief 로컬 최대점 반환 */
+	/*! \brief 로컬 최대점 반환 */
 	glm::vec3 getLocalMax() const {
 		return glm::vec3(mMax.mPos[0], mMax.mPos[1], mMax.mPos[2]);
 	}
 
-	/*! #brief 이동된 최소점 반환 */
+	/*! \brief 이동된 최소점 반환 */
 	glm::vec3 getTransformedMin() const {
 		return glm::vec3(
 			mMin.mPos[0] + mPosition.x,
@@ -102,7 +102,7 @@ public:
 		);
 	}
 
-	/*! #brief 이동된 최대점 반환 */
+	/*! \brief 이동된 최대점 반환 */
 	glm::vec3 getTransformedMax() const {
 		return glm::vec3(
 			mMax.mPos[0] + mPosition.x,
@@ -111,7 +111,7 @@ public:
 		);
 	}
 
-	/*! #brief 모델 행렬 반환 (이동 + 회전) */
+	/*! \brief 모델 행렬 반환 (이동 + 회전) */
 	glm::mat4 getModelMatrix() const {
 		glm::mat4 model(1.0f);
 
@@ -135,12 +135,12 @@ public:
 		return model;
 	}
 
-	/*! #brief 위치 이동 */
+	/*! \brief 위치 이동 */
 	void translate(const glm::vec3& delta) {
 		mPosition += delta;
 	}
 
-	/*! #brief 회전 적용 (라디안) */
+	/*! \brief 회전 적용 (라디안) */
 	void rotate(const glm::vec3& deltaRadians) {
 		mRotation += deltaRadians;
 	}
