@@ -40,6 +40,9 @@ public:
 	/* 볼륨의 텍스쳐 id */
 	GLuint mTextureID = 0;
 
+	/* 오프셋 */
+	float mOffset = 0.0f;
+
 	/* 선택 상태 */
 	bool mSelected = false;
 

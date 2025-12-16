@@ -111,7 +111,50 @@ void OpenProperty() {
 
 	if (ImGui::CollapsingHeader("Offset"))
 	{
+		// 선택된 볼륨 찾기
+		DgVolume* selectedVol = nullptr;
+		for (DgVolume* vol : DgScene::instance().getSDFList())
+		{
+			if (vol && vol->mSelected) {
+				selectedVol = vol;
+				break;
+			}
+		}
 
+		if (selectedVol)
+		{
+			// 슬라이더: 가운데가 0, 범위는 볼륨 크기에 따라 조정
+			float offset = selectedVol->mOffset;
+
+			ImGui::Text("Offset = %.2f", offset);
+
+			if (ImGui::SliderFloat("##OffsetSlider", &offset, -2.0f, 1.0f, ""))
+			{
+				// 선택된 모든 볼륨에 적용
+				for (DgVolume* vol : DgScene::instance().getSDFList())
+				{
+					if (vol && vol->mSelected)
+					{
+						vol->mOffset = offset;
+					}
+				}
+			}
+
+			// 리셋 버튼
+			ImGui::SameLine();
+			if (ImGui::Button("Reset"))
+			{
+				for (DgVolume* vol : DgScene::instance().getSDFList())
+				{
+					if (vol && vol->mSelected)
+						vol->mOffset = 0.0f;
+				}
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled("No volume selected");
+		}
 	}
 
 	if (ImGui::CollapsingHeader("Sweeping"))

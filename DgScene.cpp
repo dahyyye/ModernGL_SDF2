@@ -772,6 +772,7 @@ void DgScene::renderScene()
 
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
+			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
 
 			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
 			glm::vec3 localMin = pVolume->getLocalMin();

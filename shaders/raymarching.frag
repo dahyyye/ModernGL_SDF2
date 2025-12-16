@@ -21,9 +21,12 @@ uniform mat4 uInvView;          // 뷰 행렬의 역행렬
 uniform mat4 uInvProj;          // 투영 행렬의 역행렬
 uniform vec2 uResolution;       // 화면 해상도
 
-// [추가] 모델 변환 관련
+// 모델 변환 관련
 uniform mat4 uModel;            // 모델 행렬 (이동 + 회전)
 uniform mat4 uModelInverse;     // 모델 행렬의 역행렬
+
+// 오프셋 값
+uniform float uOffset;         // SDF 오프셋 값
 
 //=============================================================================
 // 상수 정의
@@ -62,7 +65,7 @@ float mapSDF(vec3 p)
     vec3 volumeRange = uVolumeMax - uVolumeMin;
     vec3 uvw = (p - uVolumeMin) / volumeRange;
     uvw = clamp(uvw, vec3(0.001), vec3(0.999));
-    return texture(uSDFVolume, uvw).r;
+    return texture(uSDFVolume, uvw).r - uOffset;
 }
 
 //=============================================================================
@@ -78,7 +81,7 @@ float mapSDFWithBoundsCheck(vec3 p)
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
         return 1.0;
     }
-    return texture(uSDFVolume, uvw).r;
+    return texture(uSDFVolume, uvw).r - uOffset;
 }
 
 //=============================================================================
@@ -140,24 +143,17 @@ vec3 calcNormal(vec3 p)
 //=============================================================================
 void main() 
 {
-    //=========================================================================
     // 1. 월드 공간에서 광선 설정
-    //=========================================================================
     vec3 worldRayOrigin = getCameraPosition();
     vec3 worldRayDir    = getRayDirection(gl_FragCoord.xy);
 
-    //=========================================================================
     // 2. 월드 레이를 로컬 공간으로 변환
-    //-------------------------------------------------------------------------
     // 볼륨이 회전되어 있으면, 레이를 역방향으로 회전해서
     // 로컬 공간에서 레이마칭을 수행해야 함
-    //=========================================================================
     vec3 localRayOrigin = (uModelInverse * vec4(worldRayOrigin, 1.0)).xyz;
     vec3 localRayDir    = normalize((uModelInverse * vec4(worldRayDir, 0.0)).xyz);
 
-    //=========================================================================
     // 3. 로컬 공간에서 레이-박스 교차 검사
-    //=========================================================================
     vec2 tHit = intersectAABB(localRayOrigin, localRayDir, uVolumeMin, uVolumeMax);
     
     if (tHit.x > tHit.y || tHit.y < 0.0) {
@@ -167,11 +163,8 @@ void main()
     float t    = max(tHit.x, 0.0) + 0.001;
     float tEnd = tHit.y;
 
-    //=========================================================================
     // 4. 레이마칭 (Sphere Tracing)
-    //-------------------------------------------------------------------------
     // 로컬 공간에서 SDF를 샘플링하며 표면을 찾음
-    //=========================================================================
     bool hit = false;
     vec3 localHitPoint;
     
@@ -195,14 +188,10 @@ void main()
         discard; 
     }
 
-    //=========================================================================
     // 5. 로컬 히트 포인트를 월드 공간으로 변환
-    //=========================================================================
     vec3 worldHitPoint = (uModel * vec4(localHitPoint, 1.0)).xyz;
 
-    //=========================================================================
     // 6. 셰이딩 (Phong 조명)
-    //=========================================================================
     vec3 N = calcNormal(localHitPoint);
     vec3 V = normalize(worldRayOrigin - worldHitPoint);
     vec3 L = V;  // 헤드라이트 조명
@@ -226,15 +215,11 @@ void main()
     
     vec3 finalColor = ambient + diffuse + specular;
 
-    //=========================================================================
     // 7. 깊이 버퍼 설정
-    //=========================================================================
     vec4 clipPos = uProj * uView * vec4(worldHitPoint, 1.0);
     float ndcZ = clipPos.z / clipPos.w;
     gl_FragDepth = (ndcZ * 0.5) + 0.5;
 
-    //=========================================================================
     // 8. 최종 출력
-    //=========================================================================
     outColor = vec4(finalColor, 1.0);
 }
