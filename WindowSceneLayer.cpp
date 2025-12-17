@@ -96,6 +96,16 @@ void ShowWindowSceneLayer(bool* p_open)
 		}
 		ImGui::TreePop();
 	}
+	if (ImGui::TreeNode("State"))
+	{
+		if (sdfList.empty()) {
+			ImGui::TextDisabled("No volumes");
+		}
+		else {
+
+		}
+		ImGui::TreePop();
+	}
 
 	ImGui::End();
 }

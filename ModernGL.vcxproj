@@ -145,6 +145,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="DgBoolean.cpp" />
+    <ClCompile Include="DgSweep.cpp" />
     <ClCompile Include="DgViewer.cpp" />
     <ClCompile Include="DgMesh.cpp" />
     <ClCompile Include="DgVolume.cpp" />
@@ -166,6 +167,7 @@
   <ItemGroup>
     <ClInclude Include="DgBoolean.h" />
     <ClInclude Include="DgMesh.h" />
+    <ClInclude Include="DgSweep.h" />
     <ClInclude Include="DgViewer.h" />
     <ClInclude Include="DgVolume.h" />
     <ClInclude Include="ImGuiManager.h" />

@@ -93,19 +93,54 @@ void OpenProperty() {
 	// 기본 모델 정보를 출력한다.
 	if (ImGui::CollapsingHeader("Boolean"))
 	{
+		// 선택된 볼륨 수집
+		std::vector<DgVolume*> selected;
+		for (DgVolume* vol : DgScene::instance().getSDFList())
+		{
+			if (vol && vol->mSelected)
+				selected.push_back(vol);
+		}
+
 		if (ImGui::ImageButton("Union", ToImTex(icon_tex_id[0]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
-
+			if (selected.size() >= 2)
+			{
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 64);
+				if (result)
+				{
+					DgScene::instance().addSDFVolume(result);
+					for (DgVolume* vol : selected) vol->mSelected = false;
+					result->mSelected = true;
+				}
+			}
 		}
 		ImGui::SameLine();
 		if (ImGui::ImageButton("Intersection", ToImTex(icon_tex_id[1]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
-
+			if (selected.size() >= 2)
+			{
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Intersection, 64);
+				if (result)
+				{
+					DgScene::instance().addSDFVolume(result);
+					for (DgVolume* vol : selected) vol->mSelected = false;
+					result->mSelected = true;
+				}
+			}
 		}
 		ImGui::SameLine();
 		if (ImGui::ImageButton("Difference", ToImTex(icon_tex_id[2]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
-
+			if (selected.size() >= 2)
+			{
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Difference, 64);
+				if (result)
+				{
+					DgScene::instance().addSDFVolume(result);
+					for (DgVolume* vol : selected) vol->mSelected = false;
+					result->mSelected = true;
+				}
+			}
 		}
 	}
 
