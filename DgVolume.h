@@ -31,7 +31,7 @@ public:
 	/*! \brief 격자 공간 최대점 */
 	DgPos mMax;
 
-	/*! \brief 격자 간격(해상도) */
+	/*! \brief 격자 간격 */
 	double mSpacing[3] = { 0.0, 0.0, 0.0};
 
 	/*! \brief 부호거리장 데이터(격자 샘플별 부호거리 값) */

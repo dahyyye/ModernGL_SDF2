@@ -6,6 +6,10 @@
 
 DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim)
 {
+    clock_t start, finish;
+	double duration;
+    start = clock();
+
     if (volumes.size() < 2) return nullptr;
 
     // 결합된 바운딩 박스 계산
@@ -70,12 +74,14 @@ DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode 
                         break;
                     }
                 }
-
                 int index = i + j * dim + k * dim * dim;
                 result->mData[index] = resultSDF;
             }
         }
     }
+	finish = clock();
+    duration = (double)(finish - start) / CLOCKS_PER_SEC;
+    cout << duration << "초" << endl;
 
     // 텍스처 및 메쉬 생성
     result->createTexture();
@@ -112,16 +118,15 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
             break;
 
         case BooleanMode::Difference:
-            // 첫 번째 볼륨 범위 유지
             break;
         }
     }
 
     // 패딩 추가 (경계 잘림 방지)
-    glm::vec3 size = combinedMax - combinedMin;
+    /*glm::vec3 size = combinedMax - combinedMin;
     float padding = glm::max(size.x, glm::max(size.y, size.z)) * 0.05f;
     combinedMin -= glm::vec3(padding);
-    combinedMax += glm::vec3(padding);
+    combinedMax += glm::vec3(padding);*/
 }
 
 void DgBoolean::getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax)
@@ -144,7 +149,7 @@ void DgBoolean::getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax
     glm::vec3 transformed = glm::vec3(model * glm::vec4(corners[0], 1.0f));
     outMin = outMax = transformed;
 
-    for (int i = 1; i < 8; i++) {
+	for (int i = 1; i < 8; i++) { // 8개의 코너를 월드 좌표로 변환 및 크기 계산
         transformed = glm::vec3(model * glm::vec4(corners[i], 1.0f));
         outMin = glm::min(outMin, transformed);
         outMax = glm::max(outMax, transformed);
@@ -153,9 +158,6 @@ void DgBoolean::getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax
 
 std::string DgBoolean::generateName(BooleanMode mode)
 {
-    static int unionCount = 0;
-    static int intersectionCount = 0;
-    static int differenceCount = 0;
 
     switch (mode) {
     case BooleanMode::Union:        return "union";
@@ -167,19 +169,20 @@ std::string DgBoolean::generateName(BooleanMode mode)
 
 float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos)
 {
-    // 월드 → 로컬
+    // 새로운 바운딩 박스의 월드 좌표 → 로컬좌표
     glm::vec3 localPos = glm::vec3(invModel * glm::vec4(worldPos, 1.0f));
 
-    // 로컬 → UVW
+	// 원래 볼륨의 크기를 가져옴 (로컬 -> uvw 변환용)
     glm::vec3 volMin = vol->getLocalMin();
     glm::vec3 volMax = vol->getLocalMax();
     glm::vec3 range = volMax - volMin;
 
-    // 0으로 나누기 방지
+    // 0으로 나누기 방지 (range가 너무 작으면 나눗셈에서 오류남)
     if (range.x < 0.0001f || range.y < 0.0001f || range.z < 0.0001f) {
         return 1.0f;
     }
 
+	// UVW 좌표 계산하면 각 x, y, z가 기존 로컬 좌표의 범위를 [0,1]로 정규화시켜줌
     glm::vec3 uvw = (localPos - volMin) / range;
 
     // 범위 밖이면 경계까지의 거리를 더해서 반환
@@ -206,10 +209,12 @@ float DgBoolean::trilinearInterpolate(const float* data,
     int dimX, int dimY, int dimZ,
     const glm::vec3& uvw)
 {
+	// UVW 좌표를 격자 인덱스로 변환
     float fx = uvw.x * (dimX - 1);
     float fy = uvw.y * (dimY - 1);
     float fz = uvw.z * (dimZ - 1);
 
+    //주변 8개 격자점의 정수 인덱스 찾기
     int x0 = std::max(0, std::min((int)std::floor(fx), dimX - 1));
     int y0 = std::max(0, std::min((int)std::floor(fy), dimY - 1));
     int z0 = std::max(0, std::min((int)std::floor(fz), dimZ - 1));
@@ -218,10 +223,12 @@ float DgBoolean::trilinearInterpolate(const float* data,
     int y1 = std::min(y0 + 1, dimY - 1);
     int z1 = std::min(z0 + 1, dimZ - 1);
 
+    //보간 가중치 계산
     float tx = fx - std::floor(fx);
     float ty = fy - std::floor(fy);
     float tz = fz - std::floor(fz);
 
+	// 8개 격자점의 값 가져오기
     int sliceXY = dimX * dimY;
 
     float c000 = data[x0 + y0 * dimX + z0 * sliceXY];
@@ -233,13 +240,16 @@ float DgBoolean::trilinearInterpolate(const float* data,
     float c011 = data[x0 + y1 * dimX + z1 * sliceXY];
     float c111 = data[x1 + y1 * dimX + z1 * sliceXY];
 
+    // X축 보간 (8개 → 4개)
     float c00 = c000 * (1 - tx) + c100 * tx;
     float c01 = c001 * (1 - tx) + c101 * tx;
     float c10 = c010 * (1 - tx) + c110 * tx;
     float c11 = c011 * (1 - tx) + c111 * tx;
 
+    // Y축 보간 (4개 → 2개)
     float c0 = c00 * (1 - ty) + c10 * ty;
     float c1 = c01 * (1 - ty) + c11 * ty;
 
+    // Z축 보간 (2개 → 1개)
     return c0 * (1 - tz) + c1 * tz;
 }

@@ -98,5 +98,8 @@
     <ClInclude Include="DgSweep.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="DgTrajectory.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

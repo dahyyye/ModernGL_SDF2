@@ -106,12 +106,13 @@ void OpenProperty() {
 		if (ImGui::ImageButton("Union", ToImTex(icon_tex_id[0]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selected.size() >= 2)
-			{
-				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 64);
+			{clock_t start, finish;
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 128);
 				if (result)
 				{
 					DgScene::instance().addSDFVolume(result);
-					for (DgVolume* vol : selected) vol->mSelected = false;
+					for (DgVolume* vol : selected)
+						vol->mSelected = false;
 					result->mSelected = true;
 				}
 			}
@@ -160,7 +161,6 @@ void OpenProperty() {
 
 		if (selectedVol)
 		{
-			// 슬라이더: 가운데가 0, 범위는 볼륨 크기에 따라 조정
 			float offset = selectedVol->mOffset;
 
 			ImGui::Text("Offset = %.2f", offset);
@@ -198,7 +198,7 @@ void OpenProperty() {
 	{
 		if (ImGui::ImageButton("create_crv", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
-
+			DgScene::instance().enterTrajectoryMode();
 		}
 		ImGui::SameLine();
 		if (ImGui::ImageButton("create_polyline", ToImTex(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))

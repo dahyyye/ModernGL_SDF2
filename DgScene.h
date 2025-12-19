@@ -1,11 +1,13 @@
 #pragma once
 #include "DgViewer.h"
 #include "DgVolume.h"
+#include "DgTrajectory.h"
 
 enum class EditMode {
 	Select,		// 선택 모드 (기본)
 	Move,		// 이동 모드
-	Rotate		// 회전 모드
+	Rotate,		// 회전 모드
+	Trajectory	// 궤적 모드
 };
 
 class DgScene
@@ -44,6 +46,18 @@ public:
 	EditMode mEditMode = EditMode::Select;	// 현재 편집 모드
 	bool mIsMoving = false;					// 이동 드래그 중인지
 	ImVec2 mMoveStartPos;					// 이동 시작 마우스 위치
+
+	// 궤적 모드 관련 변수
+	bool mDrawing = false;					// 궤적 그리는 중인지
+	DgTrajectory mTrajectory;				// 현재 궤적
+	DgVolume* mDrawingVolume = nullptr;		// 궤적 생성 대상 볼륨
+	glm::quat mCurrentRot;					// 현재 회전
+	glm::vec3 mOriginalPos;					// 원래 위치
+	glm::vec3 mOriginalRot;					// 원래 회전
+
+	// 궤적 시각화용
+	GLuint mTrajectoryVAO = 0;
+	GLuint mTrajectoryVBO = 0;
 
 private:
 	std::vector<DgVolume*> mSDFList; //DgVolume 객체 관리 리스트
@@ -92,6 +106,18 @@ private:
 		for (DgMesh* m : mMeshList)
 			delete m;
 		
+		for (GLuint id : mShaders)
+			glDeleteProgram(id);
+
+		// 궤적 버퍼 삭제
+		if (mTrajectoryVAO != 0) {
+			glDeleteVertexArrays(1, &mTrajectoryVAO);
+			glDeleteBuffers(1, &mTrajectoryVBO);
+		}
+
+		for (DgMesh* m : mMeshList)
+			delete m;
+
 		for (GLuint id : mShaders)
 			glDeleteProgram(id);
 	}
@@ -152,5 +178,14 @@ public:
 	void rotateSelectedVolumes(const glm::vec3& delta);		// 선택된 볼륨 회전
 	void renderEditToolbar();								// 편집 툴바 렌더링
 	bool hasSelectedVolumes() const;						// 선택된 볼륨 있는지 확인
+
+	// 궤적 기록 관련 함수
+	void enterTrajectoryMode();
+	void exitTrajectoryMode();
+	void startDrawing();
+	void stopDrawing();
+	void Drawing();
+	glm::vec3 mouseToWorld(ImVec2 mouse, float planeY);
+	void renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
 };
 

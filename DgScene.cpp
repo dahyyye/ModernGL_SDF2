@@ -295,6 +295,12 @@ void DgScene::processMouseEvent()
 {
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None))
 	{
+		// 궤적 모드
+		if (mEditMode == EditMode::Trajectory) {
+			Drawing();
+			return;
+		}
+
 		// 현재 윈도우의 좌측 상단을 기준(0, 0)으로 마우스 좌표(x, y)를 구한다.
 		ImVec2 pos = ImGui::GetMousePos() - ImGui::GetCursorScreenPos();
 		int x = (int)pos.x, y = (int)pos.y;
@@ -800,6 +806,9 @@ void DgScene::renderScene()
 		// 선택된 볼륨의 바운딩 박스 렌더링
 		renderSelectedBoundingBoxes(viewMat, projMat);
 
+		// 궤적 시각화
+		renderTrajectory(viewMat, projMat);  
+
 		// FPS 렌더링
 		renderFps();					
 	}
@@ -885,7 +894,15 @@ void DgScene::processKeyboardEvent()
 	{
 		if (ImGui::IsKeyPressed(ImGuiKey_Escape))
 		{
-			glfwSetWindowShouldClose(ImGuiManager::instance().mWindow, true);
+			// 궤적 모드면 종료, 아니면 프로그램 종료
+			if (mEditMode == EditMode::Trajectory)
+			{
+				exitTrajectoryMode();
+			}
+			else
+			{
+				glfwSetWindowShouldClose(ImGuiManager::instance().mWindow, true);
+			}
 		}		
 	}
 }
@@ -975,4 +992,202 @@ void DgScene::resetScene()
 	mPan = glm::vec3(0.0f);
 	mEditMode = EditMode::Select;
 	std::cout << "장면 초기화 완료" << std::endl;
+}
+
+
+// 궤적 모드 진입 함수
+void DgScene::enterTrajectoryMode()
+{
+	// 선택된 볼륨 찾기
+	DgVolume* vol = nullptr;
+	int count = 0;
+	for (DgVolume* v : mSDFList) {
+		if (v && v->mSelected) { 
+			vol = v; 
+		}
+	}
+
+	// 볼륨의 원래 상태 저장
+	mDrawingVolume = vol;						// 기록할 볼륨 설정
+	mOriginalPos = vol->mPosition;				// 위치
+	mOriginalRot = vol->mRotation;				// 회전
+	mCurrentRot = glm::quat(vol->mRotation);	// 현재 회전을 쿼터니언으로 설정
+	
+	mEditMode = EditMode::Trajectory;			// 편집 모드 변경
+
+	std::cout << "궤적 모드 (좌클릭 드래그: 궤적 생성, W/S/A/D: 회전)" << std::endl;
+}
+
+void DgScene::exitTrajectoryMode()
+{
+	// 볼륨 원래 위치로 복원
+	if (mDrawingVolume) {
+		mDrawingVolume->mPosition = mOriginalPos;
+		mDrawingVolume->mRotation = mOriginalRot;
+	}
+
+	mDrawing = false;
+	mDrawingVolume = nullptr;
+	mTrajectory.clear();
+	mEditMode = EditMode::Select;
+
+	std::cout << "궤적 모드 종료" << std::endl;
+}
+
+void DgScene::startDrawing()
+{
+	if (!mDrawingVolume) return;
+
+	mDrawing = true;
+	mTrajectory.clear();
+
+	// 첫 프레임 추가
+	ImVec2 mouse = ImGui::GetMousePos();
+	glm::vec3 worldPos = mouseToWorld(mouse, mOriginalPos.y);
+	mTrajectory.addFrame(worldPos, mCurrentRot);
+
+	std::cout << "궤적 생성 시작" << std::endl;
+}
+
+void DgScene::stopDrawing()
+{
+	if (!mDrawing) return;
+
+	mDrawing = false;
+
+	if (mTrajectory.size() > 1) {
+		std::cout << "궤적 생성 완료, 프레임 수: " << mTrajectory.size() << std::endl;
+	}
+	else {
+		std::cout << "궤적이 너무 짧음" << std::endl;
+	}
+}
+
+// 궤적 그리기 함수
+void DgScene::Drawing()
+{
+	if (!mDrawingVolume) return;
+
+	// 마우스 위치 → 월드 좌표
+	ImVec2 mouse = ImGui::GetMousePos();
+	glm::vec3 worldPos = mouseToWorld(mouse, mOriginalPos.y);
+
+	if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+		startDrawing();
+	}
+
+	// 볼륨 이동
+	if (mDrawing) {
+		glm::vec3 center(
+			(mDrawingVolume->mMin.mPos[0] + mDrawingVolume->mMax.mPos[0]) * 0.5f,
+			(mDrawingVolume->mMin.mPos[1] + mDrawingVolume->mMax.mPos[1]) * 0.5f,
+			(mDrawingVolume->mMin.mPos[2] + mDrawingVolume->mMax.mPos[2]) * 0.5f
+		);
+		mDrawingVolume->mPosition = worldPos - center;
+		mDrawingVolume->mRotation = glm::eulerAngles(mCurrentRot);
+
+		// 프레임 기록
+		if (glm::length(worldPos - mTrajectory.frames.back().position) > 0.1f)
+		{
+			mTrajectory.addFrame(worldPos, mCurrentRot);
+		}
+	}
+
+	// 키보드 회전 처리
+	const float speed = 0.03f;
+	if (ImGui::IsKeyDown(ImGuiKey_W))
+		mCurrentRot = glm::angleAxis(-speed, glm::vec3(1, 0, 0)) * mCurrentRot;
+	if (ImGui::IsKeyDown(ImGuiKey_S))
+		mCurrentRot = glm::angleAxis(+speed, glm::vec3(1, 0, 0)) * mCurrentRot;
+	if (ImGui::IsKeyDown(ImGuiKey_A))
+		mCurrentRot = glm::angleAxis(+speed, glm::vec3(0, 1, 0)) * mCurrentRot;
+	if (ImGui::IsKeyDown(ImGuiKey_D))
+		mCurrentRot = glm::angleAxis(-speed, glm::vec3(0, 1, 0)) * mCurrentRot;
+	
+	if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+		stopDrawing();
+	}
+}
+
+// 마우스 좌표를 월드 좌표로 변환하는 함수
+glm::vec3 DgScene::mouseToWorld(ImVec2 mouse, float planeY)
+{
+	glm::mat4 proj = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
+	glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, mZoom));
+	view = view * mRotMat;
+	view = glm::translate(view, mPan);
+
+	glm::mat4 invView = glm::inverse(view);
+	glm::mat4 invProj = glm::inverse(proj);
+
+	// 스크린 → NDC
+	ImVec2 content = mWindowPos + ImGui::GetStyle().WindowPadding;
+	content.y += ImGui::GetFrameHeight();
+	float ndcX = ((mouse.x - content.x) / mSceneSize.x) * 2.0f - 1.0f;
+	float ndcY = 1.0f - ((mouse.y - content.y) / mSceneSize.y) * 2.0f;
+
+	// NDC → 월드 레이
+	glm::vec4 near = invProj * glm::vec4(ndcX, ndcY, -1, 1);
+	glm::vec4 far = invProj * glm::vec4(ndcX, ndcY, 1, 1);
+	near /= near.w;
+	far /= far.w;
+
+	glm::vec3 rayO = glm::vec3(invView * near);
+	glm::vec3 rayD = glm::normalize(glm::vec3(invView * far) - rayO);
+
+	// Y = planeY 평면과 교차
+	if (std::abs(rayD.y) < 0.0001f) return glm::vec3(rayO.x, planeY, rayO.z);
+	float t = (planeY - rayO.y) / rayD.y;
+	return rayO + rayD * t;
+}
+
+// 궤적 렌더링 함수
+void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat)
+{
+	if (mEditMode != EditMode::Trajectory || mTrajectory.size() < 2) return;
+
+	// 정점 데이터 생성
+	std::vector<float> verts;
+	for (auto& frame : mTrajectory.frames) {
+		verts.push_back(frame.position.x);
+		verts.push_back(frame.position.y);
+		verts.push_back(frame.position.z);
+	}
+
+	// VAO/VBO 초기화
+	if (mTrajectoryVAO == 0) {
+		glGenVertexArrays(1, &mTrajectoryVAO);
+		glGenBuffers(1, &mTrajectoryVBO);
+	}
+
+	// VBO 업데이트
+	glBindVertexArray(mTrajectoryVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, mTrajectoryVBO);
+	glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(0);
+
+	// 바운딩 박스 셰이더 사용
+	loadBBoxShader();
+	glUseProgram(mBBoxShader);
+
+	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uModel"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
+	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
+
+	// 녹색 라인으로 궤적 그리기
+	glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 0.2f, 0.9f, 0.3f);
+	glLineWidth(3.0f);
+	glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mTrajectory.size());
+
+	//// 노란색 점으로 프레임 위치 표시
+	//glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
+	//glPointSize(6.0f);
+	//glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
+
+	// 정리
+	glBindVertexArray(0);
+	glUseProgram(0);
+	glLineWidth(1.0f);
+	glPointSize(1.0f);
 }
