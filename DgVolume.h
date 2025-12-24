@@ -49,8 +49,8 @@ public:
 	/*! \brief 볼륨 위치 */
 	glm::vec3 mPosition = glm::vec3(0.0f);
 
-	/*! \brief 볼륨 회전 (오일러 각도, 라디안) */
-	glm::vec3 mRotation = glm::vec3(0.0f);
+	/*! \brief 볼륨 회전 (쿼터니언) */
+	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
 public:
 
@@ -130,9 +130,7 @@ public:
 
 		// 중심으로 이동 → 회전 → 원래 위치로
 		model = glm::translate(model, center);
-		model = glm::rotate(model, mRotation.y, glm::vec3(0, 1, 0));  // Y축 회전
-		model = glm::rotate(model, mRotation.x, glm::vec3(1, 0, 0));  // X축 회전
-		model = glm::rotate(model, mRotation.z, glm::vec3(0, 0, 1));  // Z축 회전
+		model = model * glm::mat4_cast(mRotation);
 		model = glm::translate(model, -center);
 
 		return model;
@@ -144,8 +142,9 @@ public:
 	}
 
 	/*! \brief 회전 적용 (라디안) */
-	void rotate(const glm::vec3& deltaRadians) {
-		mRotation += deltaRadians;
+	void rotate(const glm::quat& deltaRadians) {
+		glm::quat deltaQuat = glm::quat(deltaRadians);  // 오일러 → 쿼터니언
+		mRotation = deltaQuat * mRotation;
 	}
 
 private:

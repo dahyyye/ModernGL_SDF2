@@ -35,7 +35,7 @@
 #include "DgBoolean.h"
 #include "DgTrajectory.h"
 
-//Window관련 cpp에서 구현된 함수
+// Window관련 cpp에서 구현된 함수
 void ShowWindowToolBar(bool* p_open);
 void ShowWindowSceneLayer(bool* p_open);
 void ShowWindowModelProperty(bool* p_open);

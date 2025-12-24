@@ -1011,7 +1011,7 @@ void DgScene::enterTrajectoryMode()
 	mDrawingVolume = vol;						// 기록할 볼륨 설정
 	mOriginalPos = vol->mPosition;				// 위치
 	mOriginalRot = vol->mRotation;				// 회전
-	mCurrentRot = glm::quat(vol->mRotation);	// 현재 회전을 쿼터니언으로 설정
+	mCurrentRot = vol->mRotation;				// 현재 회전
 	
 	mEditMode = EditMode::Trajectory;			// 편집 모드 변경
 
@@ -1084,10 +1084,10 @@ void DgScene::Drawing()
 			(mDrawingVolume->mMin.mPos[2] + mDrawingVolume->mMax.mPos[2]) * 0.5f
 		);
 		mDrawingVolume->mPosition = worldPos - center;
-		mDrawingVolume->mRotation = glm::eulerAngles(mCurrentRot);
+		mDrawingVolume->mRotation = mCurrentRot;
 
 		// 프레임 기록
-		if (glm::length(worldPos - mTrajectory.frames.back().position) > 0.1f)
+		if (glm::length(worldPos - mTrajectory.frames.back().position) > 5.0f)
 		{
 			mTrajectory.addFrame(worldPos, mCurrentRot);
 		}
@@ -1180,10 +1180,10 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 	glLineWidth(3.0f);
 	glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mTrajectory.size());
 
-	//// 노란색 점으로 프레임 위치 표시
-	//glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
-	//glPointSize(6.0f);
-	//glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
+	// 노란색 점으로 프레임 위치 표시
+	glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
+	glPointSize(6.0f);
+	glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
 
 	// 정리
 	glBindVertexArray(0);

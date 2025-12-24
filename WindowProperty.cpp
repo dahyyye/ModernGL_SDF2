@@ -196,14 +196,33 @@ void OpenProperty() {
 
 	if (ImGui::CollapsingHeader("Sweeping"))
 	{
+		// 선택된 볼륨 확인
+		DgVolume* selectedVol = nullptr;
+		for (DgVolume* vol : DgScene::instance().getSDFList())
+		{
+			if (vol && vol->mSelected) {
+				selectedVol = vol;
+				break;
+			}
+		}
+
 		if (ImGui::ImageButton("create_crv", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
-			DgScene::instance().enterTrajectoryMode();
+			if(selectedVol)
+				DgScene::instance().enterTrajectoryMode();
 		}
+
 		ImGui::SameLine();
 		if (ImGui::ImageButton("create_polyline", ToImTex(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
+			if (selectedVol) {
+				DgScene::instance().enterTrajectoryMode();
+			}
+		}
 
+		if (DgScene::instance().getEditMode() == EditMode::Trajectory)
+		{
+			ImGui::Text("Rotate: W / A / S / D");
 		}
 	}
 

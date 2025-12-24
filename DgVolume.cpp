@@ -22,7 +22,7 @@ DgVolume::DgVolume()
 	mSpacing[2] = 0;
 
 	mPosition = glm::vec3(0.0f);
-	mRotation = glm::vec3(0.0f);
+	mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 DgVolume::DgVolume(DgMesh* mesh)

@@ -53,7 +53,7 @@ public:
 	DgVolume* mDrawingVolume = nullptr;		// 궤적 생성 대상 볼륨
 	glm::quat mCurrentRot;					// 현재 회전
 	glm::vec3 mOriginalPos;					// 원래 위치
-	glm::vec3 mOriginalRot;					// 원래 회전
+	glm::quat mOriginalRot;					// 원래 회전
 
 	// 궤적 시각화용
 	GLuint mTrajectoryVAO = 0;
