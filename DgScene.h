@@ -49,6 +49,7 @@ public:
 
 	// 궤적 모드 관련 변수
 	bool mDrawing = false;					// 궤적 그리는 중인지
+	bool mDragInput = true;					// true : 드래그, false : 클릭
 	DgTrajectory mTrajectory;				// 현재 궤적
 	DgVolume* mDrawingVolume = nullptr;		// 궤적 생성 대상 볼륨
 	glm::quat mCurrentRot;					// 현재 회전
@@ -180,7 +181,7 @@ public:
 	bool hasSelectedVolumes() const;						// 선택된 볼륨 있는지 확인
 
 	// 궤적 기록 관련 함수
-	void enterTrajectoryMode();
+	void enterTrajectoryMode(bool dragInput = true);
 	void exitTrajectoryMode();
 	void startDrawing();
 	void stopDrawing();

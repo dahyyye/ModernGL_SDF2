@@ -22,6 +22,30 @@ public:
 	 */
 	static DgVolume* Boolean(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim);
 	
+	/*!
+	 *  \brief  월드 좌표에서 볼륨의 SDF 값 샘플링
+	 *
+	 *  \param[in]  vol         샘플링할 볼륨
+	 *  \param[in]  invModel    볼륨 모델 행렬의 역행렬 (월드→로컬 변환용)
+	 *  \param[in]  worldPos    샘플링할 월드 좌표
+	 *
+	 *  \return     해당 위치의 SDF 값 (범위 밖이면 경계값 + 거리)
+	 */
+	static float resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos);
+
+	/*!
+	 *  \brief  삼선형 보간으로 SDF 값 계산
+	 *
+	 *  \param[in]  data    SDF 데이터 배열
+	 *  \param[in]  dimX    X축 격자 해상도
+	 *  \param[in]  dimY    Y축 격자 해상도
+	 *  \param[in]  dimZ    Z축 격자 해상도
+	 *  \param[in]  uvw     정규화된 텍스처 좌표 [0,1]^3
+	 *
+	 *  \return     보간된 SDF 값
+	 */
+	static float trilinearInterpolate(const float* data, int dimX, int dimY, int dimZ, const glm::vec3& uvw);
+
 private:
 
 	/*!
@@ -55,28 +79,5 @@ private:
 	 */
 	static std::string generateName(BooleanMode mode);
 
-	/*!
-	 *  \brief  월드 좌표에서 볼륨의 SDF 값 샘플링
-	 *
-	 *  \param[in]  vol         샘플링할 볼륨
-	 *  \param[in]  invModel    볼륨 모델 행렬의 역행렬 (월드→로컬 변환용)
-	 *  \param[in]  worldPos    샘플링할 월드 좌표
-	 *
-	 *  \return     해당 위치의 SDF 값 (범위 밖이면 경계값 + 거리)
-	 */
-	static float resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos);
-
-	/*!
-	 *  \brief  삼선형 보간으로 SDF 값 계산
-	 *
-	 *  \param[in]  data    SDF 데이터 배열
-	 *  \param[in]  dimX    X축 격자 해상도
-	 *  \param[in]  dimY    Y축 격자 해상도
-	 *  \param[in]  dimZ    Z축 격자 해상도
-	 *  \param[in]  uvw     정규화된 텍스처 좌표 [0,1]^3
-	 *
-	 *  \return     보간된 SDF 값
-	 */
-	static float trilinearInterpolate(const float* data, int dimX, int dimY, int dimZ, const glm::vec3& uvw);
-
+	
 };

@@ -122,11 +122,11 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
         }
     }
 
-    // 패딩 추가 (경계 잘림 방지)
-    /*glm::vec3 size = combinedMax - combinedMin;
+    // 패딩 추가
+    glm::vec3 size = combinedMax - combinedMin;
     float padding = glm::max(size.x, glm::max(size.y, size.z)) * 0.05f;
     combinedMin -= glm::vec3(padding);
-    combinedMax += glm::vec3(padding);*/
+    combinedMax += glm::vec3(padding);
 }
 
 void DgBoolean::getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax)

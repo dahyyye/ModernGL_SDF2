@@ -209,20 +209,65 @@ void OpenProperty() {
 		if (ImGui::ImageButton("create_crv", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if(selectedVol)
-				DgScene::instance().enterTrajectoryMode();
+				DgScene::instance().enterTrajectoryMode(true);
 		}
 
 		ImGui::SameLine();
 		if (ImGui::ImageButton("create_polyline", ToImTex(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selectedVol) {
-				DgScene::instance().enterTrajectoryMode();
+				DgScene::instance().enterTrajectoryMode(false);
 			}
 		}
 
 		if (DgScene::instance().getEditMode() == EditMode::Trajectory)
 		{
 			ImGui::Text("Rotate: W / A / S / D");
+		}
+
+		DgTrajectory& traj = DgScene::instance().mTrajectory;
+
+		if (traj.size() >= 2)
+		{
+			ImGui::Separator();
+			ImGui::Text("Trajectory: %d frames", (int)traj.size());
+
+			// 해상도 설정
+			static int sweepResolution = 128;
+			ImGui::SliderInt("Resolution", &sweepResolution, 64, 512);
+
+			// 타임 스텝 설정
+			static int timeSteps = 100;
+			ImGui::SliderInt("Time Steps", &timeSteps, 20, 500);
+
+			// Sweep 버튼
+			if (ImGui::Button("Generate Swept Volume", ImVec2(-1, 40)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+					DgVolume* swept = DgSweep::generateSweptVolume(
+						brush, traj, sweepResolution, timeSteps
+					);
+
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+
+						// 궤적 초기화
+						DgScene::instance().exitTrajectoryMode();
+						std::cout << "Swept Volume 생성 완료" << std::endl;
+					}
+				}
+			}
+
+			// 궤적 초기화 버튼
+			if (ImGui::Button("Clear Trajectory", ImVec2(-1, 0)))
+			{
+				DgScene::instance().exitTrajectoryMode();
+			}
 		}
 	}
 

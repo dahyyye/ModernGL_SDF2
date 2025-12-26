@@ -14,11 +14,6 @@ struct DgTrajectoryFrame
     DgTrajectoryFrame(glm::vec3 pos, glm::quat rot)
         : position(pos), rotation(rot) {
     }
-
-    /*glm::mat4 getMatrix() const {
-        glm::mat4 m = glm::translate(glm::mat4(1.0f), position);
-        return m * glm::mat4_cast(rotation);
-    }*/
 };
 
 class DgTrajectory
@@ -34,22 +29,27 @@ public:
         frames.emplace_back(pos, rot);
     }
 
-    //// t=0~1 사이 값으로 보간된 프레임 반환 (Swept Volume용)
-    //    DgTrajectoryFrame interpolate(float t) const {
-    //    if (frames.empty()) return DgTrajectoryFrame();
-    //    if (frames.size() == 1 || t <= 0.0f) return frames.front();
-    //    if (t >= 1.0f) return frames.back();
+    // t (0~1)에서의 변환 행렬 반환
+    glm::mat4 getTransformAt(float t) const {
+        if (frames.empty()) return glm::mat4(1.0f);
+        if (frames.size() == 1) {
+            return glm::translate(glm::mat4(1.0f), frames[0].position)
+                * glm::mat4_cast(frames[0].rotation); // 이동 * 회전
+        }
 
-    //    float scaled = t * (frames.size() - 1);
-    //    size_t i0 = (size_t)scaled;
-    //    size_t i1 = std::min(i0 + 1, frames.size() - 1);
-    //    float local = scaled - (float)i0;
+        // t를 프레임 인덱스로 변환
+        t = glm::clamp(t, 0.0f, 1.0f);
+        float idx = t * (frames.size() - 1);
+        int i0 = (int)floor(idx);
+        int i1 = glm::min(i0 + 1, (int)frames.size() - 1);
+        float alpha = idx - i0;
 
-    //    DgTrajectoryFrame result;
-    //    result.position = glm::mix(frames[i0].position, frames[i1].position, local);
-    //    result.rotation = glm::slerp(frames[i0].rotation, frames[i1].rotation, local);
-    //    return result;
-    //}
+        // 선형 보간 (위치) + SLERP (회전)
+        glm::vec3 pos = glm::mix(frames[i0].position, frames[i1].position, alpha);
+        glm::quat rot = glm::slerp(frames[i0].rotation, frames[i1].rotation, alpha);
+
+        return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
+    }
 };
 
 

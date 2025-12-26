@@ -296,9 +296,17 @@ void DgScene::processMouseEvent()
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None))
 	{
 		// 궤적 모드
-		if (mEditMode == EditMode::Trajectory) {
+		if (mEditMode == EditMode::Trajectory && mDragInput == true) {
 			Drawing();
 			return;
+		}
+		else {
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+				ImVec2 mouse = ImGui::GetMousePos();
+				glm::vec3 worldPos = mouseToWorld(mouse, mOriginalPos.y);
+				mTrajectory.addFrame(worldPos, mCurrentRot);
+				std::cout << "점 추가: " << mTrajectory.size() << std::endl;
+			}
 		}
 
 		// 현재 윈도우의 좌측 상단을 기준(0, 0)으로 마우스 좌표(x, y)를 구한다.
@@ -904,6 +912,23 @@ void DgScene::processKeyboardEvent()
 				glfwSetWindowShouldClose(ImGuiManager::instance().mWindow, true);
 			}
 		}		
+		// Enter: 폴리라인 완성
+		if (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))
+		{
+			if (mEditMode == EditMode::Trajectory && !mDragInput)
+			{
+				if (mTrajectory.size() >= 2)
+				{
+					std::cout << "폴리라인 완성, 프레임 수: " << mTrajectory.size() << std::endl;
+					// TODO: 여기서 Swept Volume 생성 호출
+				}
+				else
+				{
+					std::cout << "점이 2개 이상 필요합니다" << std::endl;
+				}
+				exitTrajectoryMode();
+			}
+		}
 	}
 }
 
@@ -996,7 +1021,7 @@ void DgScene::resetScene()
 
 
 // 궤적 모드 진입 함수
-void DgScene::enterTrajectoryMode()
+void DgScene::enterTrajectoryMode(bool dragInput)
 {
 	// 선택된 볼륨 찾기
 	DgVolume* vol = nullptr;
@@ -1012,10 +1037,15 @@ void DgScene::enterTrajectoryMode()
 	mOriginalPos = vol->mPosition;				// 위치
 	mOriginalRot = vol->mRotation;				// 회전
 	mCurrentRot = vol->mRotation;				// 현재 회전
-	
+	mDragInput = dragInput;						// 드래그 입력 모드 설정
+	mTrajectory.clear();						// 기존 궤적 초기화
+
 	mEditMode = EditMode::Trajectory;			// 편집 모드 변경
 
-	std::cout << "궤적 모드 (좌클릭 드래그: 궤적 생성, W/S/A/D: 회전)" << std::endl;
+	if (dragInput)
+		std::cout << "궤적 모드 (드래그: 궤적 생성, WASD: 회전)" << std::endl;
+	else
+		std::cout << "폴리라인 모드 (클릭: 점 추가, ESC: 완성)" << std::endl;
 }
 
 void DgScene::exitTrajectoryMode()
@@ -1087,7 +1117,7 @@ void DgScene::Drawing()
 		mDrawingVolume->mRotation = mCurrentRot;
 
 		// 프레임 기록
-		if (glm::length(worldPos - mTrajectory.frames.back().position) > 5.0f)
+		if (glm::length(worldPos - mTrajectory.frames.back().position) > 1.0f)
 		{
 			mTrajectory.addFrame(worldPos, mCurrentRot);
 		}
