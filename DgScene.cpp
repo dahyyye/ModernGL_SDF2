@@ -296,18 +296,21 @@ void DgScene::processMouseEvent()
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None))
 	{
 		// 궤적 모드
-		if (mEditMode == EditMode::Trajectory && mDragInput == true) {
-			Drawing();
+		if (mEditMode == EditMode::Trajectory ) {
+			if (mDragInput == true) {
+				Drawing();
+			}
+			else {
+				if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+					ImVec2 mouse = ImGui::GetMousePos();
+					glm::vec3 worldPos = mouseToWorld(mouse, mOriginalPos.y);
+					mTrajectory.addFrame(worldPos, mCurrentRot);
+					std::cout << "점 추가: " << mTrajectory.size() << std::endl;
+				}
+			}
 			return;
 		}
-		else {
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-				ImVec2 mouse = ImGui::GetMousePos();
-				glm::vec3 worldPos = mouseToWorld(mouse, mOriginalPos.y);
-				mTrajectory.addFrame(worldPos, mCurrentRot);
-				std::cout << "점 추가: " << mTrajectory.size() << std::endl;
-			}
-		}
+		
 
 		// 현재 윈도우의 좌측 상단을 기준(0, 0)으로 마우스 좌표(x, y)를 구한다.
 		ImVec2 pos = ImGui::GetMousePos() - ImGui::GetCursorScreenPos();
