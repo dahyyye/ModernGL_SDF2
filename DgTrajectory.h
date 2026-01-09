@@ -50,6 +50,19 @@ public:
 
         return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
     }
+
+    /*!
+     *  \brief  직선 궤적 생성 (시작점, 끝점 2개만 저장)
+     *  \param  startPos  시작 위치
+     *  \param  endPos    끝 위치
+     */
+    void generateLinear(const glm::vec3& startPos, const glm::vec3& endPos)
+    {
+        clear();
+        glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
+        addFrame(startPos, baseRot);
+        addFrame(endPos, baseRot);
+    }
 };
 
 

@@ -1179,6 +1179,8 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 {
 	if (mEditMode != EditMode::Trajectory || mTrajectory.size() < 2) return;
 
+	glDisable(GL_DEPTH_TEST);
+
 	// 정점 데이터 생성
 	std::vector<float> verts;
 	for (auto& frame : mTrajectory.frames) {
@@ -1219,6 +1221,7 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 	glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
 
 	// 정리
+	glEnable(GL_DEPTH_TEST);
 	glBindVertexArray(0);
 	glUseProgram(0);
 	glLineWidth(1.0f);

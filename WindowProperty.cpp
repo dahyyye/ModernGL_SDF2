@@ -73,7 +73,7 @@ void ShowWindowModelProperty(bool* p_open)
 }
 
 void OpenProperty() {
-	const int NumIcons = 7;
+	const int NumIcons = 9;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\Union-A-B.png",
@@ -81,6 +81,8 @@ void OpenProperty() {
 		".\\res\\icons\\Difference-A-B.png",
 		".\\res\\icons\\create_crv.png",
 		".\\res\\icons\\create_polyline.png",
+		".\\res\\icons\\create_linear.png",
+		".\\res\\icons\\create_Bezier_crv.png",
 		".\\res\\icons\\sculpt_add.png",
 		".\\res\\icons\\sculpt_remove.png"
 	};
@@ -220,6 +222,32 @@ void OpenProperty() {
 			}
 		}
 
+		ImGui::Separator();
+		ImGui::Text("Auto-generated Curves:");
+
+		// Linear 
+		if (ImGui::ImageButton("create_linear", ToImTex(icon_tex_id[5]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		{
+			if (selectedVol) {
+				// 볼륨 중심 계산
+				glm::vec3 center = selectedVol->getCenter();
+
+				// 직선 궤적 생성: 중심에서 X축으로 5만큼 이동
+				DgScene::instance().mTrajectory.generateLinear(center, center + glm::vec3(5.0f, 0.0f, 0.0f));
+				DgScene::instance().mDrawingVolume = selectedVol;
+				DgScene::instance().setEditMode(EditMode::Trajectory);
+
+				std::cout << "직선 궤적 생성 완료" << std::endl;
+			}
+		}
+		ImGui::SameLine();
+
+		// Bezier 
+		if (ImGui::ImageButton("create_Bezier", ToImTex(icon_tex_id[6]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		{
+		
+		}
+
 		if (DgScene::instance().getEditMode() == EditMode::Trajectory)
 		{
 			ImGui::Text("Rotate: W / A / S / D");
@@ -273,12 +301,12 @@ void OpenProperty() {
 
 	if (ImGui::CollapsingHeader("Sculpt"))
 	{
-		if (ImGui::ImageButton("sculpt_add", ToImTex(icon_tex_id[5]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("sculpt_add", ToImTex(icon_tex_id[7]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 
 		}
 		ImGui::SameLine();
-		if (ImGui::ImageButton("sculpt_remove", ToImTex(icon_tex_id[6]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("sculpt_remove", ToImTex(icon_tex_id[8]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 
 		}
