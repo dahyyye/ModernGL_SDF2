@@ -212,6 +212,15 @@ DgMesh* import_mesh_obj(const char* fname);
 GLuint load_shaders(const char* vertexPath, const char* fragmentPath);
 
 /*!
+ *  \brief  Compute Shader 프로그램을 생성한다.
+ *
+ *  \param[in]  computePath  Compute Shader 파일의 경로
+ *
+ *  \return 생성된 프로그램의 핸들을 반환한다.
+ */
+GLuint loadComputeShader(const char* computePath);
+
+/*!
 * 	\brief	주어진 최소점과 최대점을 이용하여 바운딩 박스 메쉬를 생성한다.
 * 
 * 	\param[in]	minPos	바운딩 박스의 최소점

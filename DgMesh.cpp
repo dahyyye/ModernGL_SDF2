@@ -613,6 +613,55 @@ GLuint load_shaders(const char* vertexPath, const char* fragmentPath)
 	return programID;
 }
 
+GLuint loadComputeShader(const char* computePath)
+{
+	// 파일 열기
+	std::ifstream file(computePath);
+	if (!file.is_open()) {
+		std::cerr << "Compute Shader 파일 열기 실패: " << computePath << std::endl;
+		return 0;
+	}
+
+	// 파일 내용 읽기
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	std::string code = buffer.str();
+	const char* codePtr = code.c_str();
+	file.close();
+
+	// Compute Shader 컴파일
+	GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(shader, 1, &codePtr, nullptr);
+	glCompileShader(shader);
+
+	// 컴파일 에러 체크
+	GLint success;
+	GLchar infoLog[512];
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+		std::cerr << "Compute Shader 컴파일 실패:\n" << infoLog << std::endl;
+		return 0;
+	}
+
+	// 프로그램 링크
+	GLuint programID = glCreateProgram();
+	glAttachShader(programID, shader);
+	glLinkProgram(programID);
+
+	// 링크 에러 체크
+	glGetProgramiv(programID, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(programID, 512, nullptr, infoLog);
+		std::cerr << "Compute Shader 링크 실패:\n" << infoLog << std::endl;
+		return 0;
+	}
+
+	glDeleteShader(shader);
+	std::cout << "Compute Shader 로드 성공: " << computePath << std::endl;
+	return programID;
+}
+
 double& DgPos::operator[](const int& idx)
 {
 	assert(idx >= 0 && idx < 3);

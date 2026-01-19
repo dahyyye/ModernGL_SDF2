@@ -41,7 +41,7 @@
 #include "DgSweep.h"
 #include "DgBoolean.h"
 #include "DgTrajectory.h"
-#include "DgSweepVia.h"
+//#include "DgSweepVia.h"
 
 // Window관련 cpp에서 구현된 함수
 void ShowWindowToolBar(bool* p_open);

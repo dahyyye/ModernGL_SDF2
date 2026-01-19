@@ -267,16 +267,16 @@ void OpenProperty() {
 
 			// 타임 스텝 설정
 			static int timeSteps = 100;
-			ImGui::SliderInt("Time Steps", &timeSteps, 20, 500);
+			ImGui::SliderInt("sampling", &timeSteps, 20, 500);
 
 			// Sweep 버튼 (기존 Stamping)
-			if (ImGui::Button("Stamping", ImVec2(-1, 40)))
+			if (ImGui::Button("Stamping CPU", ImVec2(-1,0)))
 			{
 				DgVolume* brush = DgScene::instance().mDrawingVolume;
 				if (brush)
 				{
 					DgVolume* swept = DgSweep::generateSweptVolume(
-						brush, traj, sweepResolution, timeSteps
+						brush, traj, sweepResolution, timeSteps, false
 					);
 
 					if (swept)
@@ -285,18 +285,29 @@ void OpenProperty() {
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
-						std::cout << "Stamping 완료" << std::endl;
+						std::cout << "Swept Volume 생성 완료 (CPU)" << std::endl;
 					}
 				}
 			}
 
-			// Sweep 버튼 (논문 Continuation)
-			if (ImGui::Button("Continuation", ImVec2(-1, 40)))
+			// GPU 버전 버튼
+			if (ImGui::Button("Stamping GPU", ImVec2(-1, 0)))
 			{
 				DgVolume* brush = DgScene::instance().mDrawingVolume;
 				if (brush)
 				{
+					DgVolume* swept = DgSweep::generateSweptVolume(
+						brush, traj, sweepResolution, timeSteps, true
+					);
 
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+						DgScene::instance().exitTrajectoryMode();
+						std::cout << "Swept Volume 생성 완료 (GPU)" << std::endl;
+					}
 				}
 			}
 

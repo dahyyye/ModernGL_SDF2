@@ -1,5 +1,7 @@
 #pragma once
 
+#include "DgViewer.h"
+
 class DgVolume;
 class DgTrajectory;
 
@@ -8,7 +10,20 @@ public:
     static DgVolume* generateSweptVolume(
         DgVolume* brush,
         const DgTrajectory& trajectory,
-        int resolution = 64,
-        int timeSteps = 100
+        int resolution = 128,
+        int timeSteps = 100,
+		bool useGPU = false
     );
+
+private:
+    static GLuint sComputeShader;
+	static GLuint sTransformSSBO;
+	static bool sInitialized;
+
+    static bool initializeGPU();
+
+    static DgVolume* generateCPU(DgVolume* brush, const DgTrajectory& trajectory,
+        int resolution, int timeSteps);
+    static DgVolume* generateGPU(DgVolume* brush, const DgTrajectory& trajectory,
+        int resolution, int timeSteps);
 };
