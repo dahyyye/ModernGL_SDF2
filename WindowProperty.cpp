@@ -269,8 +269,8 @@ void OpenProperty() {
 			static int timeSteps = 100;
 			ImGui::SliderInt("Time Steps", &timeSteps, 20, 500);
 
-			// Sweep 버튼
-			if (ImGui::Button("Generate Swept Volume", ImVec2(-1, 40)))
+			// Sweep 버튼 (기존 Stamping)
+			if (ImGui::Button("Stamping", ImVec2(-1, 40)))
 			{
 				DgVolume* brush = DgScene::instance().mDrawingVolume;
 				if (brush)
@@ -284,11 +284,19 @@ void OpenProperty() {
 						DgScene::instance().addSDFVolume(swept);
 						swept->mSelected = true;
 						brush->mSelected = false;
-
-						// 궤적 초기화
 						DgScene::instance().exitTrajectoryMode();
-						std::cout << "Swept Volume 생성 완료" << std::endl;
+						std::cout << "Stamping 완료" << std::endl;
 					}
+				}
+			}
+
+			// Sweep 버튼 (논문 Continuation)
+			if (ImGui::Button("Continuation", ImVec2(-1, 40)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+
 				}
 			}
 

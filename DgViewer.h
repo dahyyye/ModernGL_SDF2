@@ -7,6 +7,13 @@
 #include <iostream>
 #include <cstdlib>
 #include <filesystem>
+#include <algorithm>
+#include <cmath>
+#include <cfloat>
+#include <random>
+#include <stack>
+#include <array>
+#include <functional>
 
 // GLEW/GLFW 관련 헤더 파일
 #include "./include/gl/glew.h"
@@ -34,6 +41,7 @@
 #include "DgSweep.h"
 #include "DgBoolean.h"
 #include "DgTrajectory.h"
+#include "DgSweepVia.h"
 
 // Window관련 cpp에서 구현된 함수
 void ShowWindowToolBar(bool* p_open);
