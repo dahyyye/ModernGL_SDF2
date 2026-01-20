@@ -29,7 +29,7 @@ DgVolume* DgSweep::generateSweptVolume(
 DgVolume* DgSweep::generateCPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
-    int timeSteps)
+    int samplingSteps)
 {
     clock_t start = clock();
 
@@ -41,9 +41,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     // 궤적 중심점들의 AABB 계산
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
-    for (int step = 0; step <= timeSteps; ++step)
+    for (int step = 0; step <= samplingSteps; ++step)
     {
-        float t = (float)step / timeSteps;
+        float t = (float)step / samplingSteps;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
 
@@ -77,9 +77,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     result->mData.resize(totalSize, FLT_MAX);
 
     // 스탬핑
-    for (int step = 0; step <= timeSteps; ++step)
+    for (int step = 0; step <= samplingSteps; ++step)
     {
-        float t = (float)step / timeSteps;
+        float t = (float)step / samplingSteps;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::mat4 invTransform = glm::inverse(transform);
 
@@ -104,7 +104,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
         }
 
         if (step % 10 == 0)
-            std::cout << "Stamping: " << (step * 100 / timeSteps) << "%" << std::endl;
+            std::cout << "Stamping: " << (step * 100 / samplingSteps) << "%" << std::endl;
     }
 
     clock_t finish = clock();
@@ -124,7 +124,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
 DgVolume* DgSweep::generateGPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
-    int timeSteps)
+    int samplingSteps)
 {
     if (!initializeGPU()) return nullptr;
 
@@ -138,9 +138,9 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
 
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
-    for (int step = 0; step <= timeSteps; ++step)
+    for (int step = 0; step <= samplingSteps; ++step)
     {
-        float t = (float)step / timeSteps;
+        float t = (float)step / samplingSteps;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
 
@@ -151,37 +151,40 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // 2. 변환 행렬 → SSBO 업로드
-    std::vector<glm::mat4> invTransforms(timeSteps + 1);
-    for (int step = 0; step <= timeSteps; ++step)
+    // 변환 행렬
+    std::vector<glm::mat4> invTransforms(samplingSteps + 1);
+    for (int step = 0; step <= samplingSteps; ++step)
     {
-        float t = (float)step / timeSteps;
+        float t = (float)step / samplingSteps;
         glm::mat4 transform = trajectory.getTransformAt(t);
         invTransforms[step] = glm::inverse(transform);
     }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, invTransforms.size() * sizeof(glm::mat4),
-        invTransforms.data(), GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);
+    // Compute Shader 실행
+    glUseProgram(sComputeShader);
 
-    // 3. 결과 3D 텍스처 생성
+	// SSBO에 변환 행렬 업로드
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);         // SSBO 바인딩
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 
+		invTransforms.size() * sizeof(glm::mat4),       //크기: 행렬 개수 * 행렬 크기
+        invTransforms.data(),                           // CPU 메모리 주소
+		GL_DYNAMIC_DRAW);                               // 사용 빈도: 동적 업데이트
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);  // 바인딩 포인트 2에 연결
+
+    // 결과 3D 텍스처 생성
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
-    glBindTexture(GL_TEXTURE_3D, resultTexture);
+    glBindTexture(GL_TEXTURE_3D, resultTexture);    // 작업 대상으로 지정
 
-    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,         // 빈 3D 텍스처 생성
         resolution, resolution, resolution,
         0, GL_RED, GL_FLOAT, nullptr);
 
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       // 텍스처 샘플링 설정
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    // 4. Compute Shader 실행
-    glUseProgram(sComputeShader);
 
     // 브러시 SDF 텍스처 (읽기)
     glActiveTexture(GL_TEXTURE0);
@@ -204,11 +207,11 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glUniform3f(glGetUniformLocation(sComputeShader, "uBrushMax"),
         localMax.x, localMax.y, localMax.z);
 
-    glUniform1i(glGetUniformLocation(sComputeShader, "uTimeSteps"), timeSteps);
+    glUniform1i(glGetUniformLocation(sComputeShader, "uTimeSteps"), samplingSteps);
 
     // Dispatch
-    int numGroups = (resolution + 7) / 8;
-    glDispatchCompute(numGroups, numGroups, numGroups);
+	int numGroups = (resolution + 7) / 8;       // 나누어떨어지지 않을 때를 대비해 올림처리
+	glDispatchCompute(numGroups, numGroups, numGroups); // 워크 그룹 동시 실행
 
     // GPU 완료 대기
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -237,7 +240,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     // 텍스처 ID 직접 사용     
     result->mTextureID = resultTexture;
 
-    // 메쉬 생성
+    // 박스 메쉬 생성
     result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
     result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
