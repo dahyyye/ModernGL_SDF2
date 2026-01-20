@@ -7,17 +7,10 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 
 
-// 입력 : brush SDF, 출력 : 결과 볼륨
+// brush SDF, 결과 볼륨, 변환 행렬 배열 (SSBO)
 layout(binding = 0) uniform sampler3D uBrushSDF;
 layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
-
-
-
-
-// 변환 행렬 배열 (SSBO)
-layout(std430, binding = 2) buffer TransformBuffer {
-    mat4 invTransforms[];
-};
+layout(std430, binding = 2) buffer TransformBuffer { mat4 invTransforms[]; };
 
 
 
@@ -26,11 +19,9 @@ layout(std430, binding = 2) buffer TransformBuffer {
 uniform vec3 uVolumeMin;
 uniform vec3 uVolumeMax;
 uniform ivec3 uResolution;
-
 uniform vec3 uBrushMin;
 uniform vec3 uBrushMax;
-
-uniform int uTimeSteps;
+uniform int uSamplingSteps;
 
 
 
@@ -80,7 +71,7 @@ void main()
     // 모든 시간에서 최소 SDF
     float minSDF = 1e10;
 
-    for (int t = 0; t <= uTimeSteps; t++)
+    for (int t = 0; t <= uSamplingSteps; t++)
     {
         float sdf = sampleBrushSDF(worldPos, invTransforms[t]);
         minSDF = min(minSDF, sdf);

@@ -24,7 +24,6 @@ DgVolume* DgSweep::generateSweptVolume(
         return generateCPU(brush, trajectory, resolution, timeSteps);
     }
 }
-
 // CPU 기반 스탬핑 방식
 DgVolume* DgSweep::generateCPU(DgVolume* brush,
     const DgTrajectory& trajectory,
@@ -159,7 +158,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         glm::mat4 transform = trajectory.getTransformAt(t);
         invTransforms[step] = glm::inverse(transform);
     }
-
+     
     // Compute Shader 실행
     glUseProgram(sComputeShader);
 
@@ -181,7 +180,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         0, GL_RED, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       // 텍스처 샘플링 설정
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //텍스처 호출 시 주변 값을 보간해서 반환하도록 함
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -207,7 +206,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glUniform3f(glGetUniformLocation(sComputeShader, "uBrushMax"),
         localMax.x, localMax.y, localMax.z);
 
-    glUniform1i(glGetUniformLocation(sComputeShader, "uTimeSteps"), samplingSteps);
+    glUniform1i(glGetUniformLocation(sComputeShader, "uSamplingSteps"), samplingSteps);
 
     // Dispatch
 	int numGroups = (resolution + 7) / 8;       // 나누어떨어지지 않을 때를 대비해 올림처리
@@ -231,7 +230,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     result->mSpacing[1] = range.y / (resolution - 1);
     result->mSpacing[2] = range.z / (resolution - 1);
 
-    // GPU → CPU 복사 (비교용)
+    // GPU → CPU 복사
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
