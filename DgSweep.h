@@ -11,7 +11,7 @@ public:
         DgVolume* brush,
         const DgTrajectory& trajectory,
         int resolution = 128,
-        int timeSteps = 100,
+        int samplingSteps = 100,
 		bool useGPU = false
     );
 

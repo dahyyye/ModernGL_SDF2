@@ -12,16 +12,16 @@ DgVolume* DgSweep::generateSweptVolume(
     DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
-    int timeSteps,
+    int samplingSteps,
     bool useGPU)
 {
     if (!brush || trajectory.size() < 2) return nullptr;
 
     if (useGPU) {
-        return generateGPU(brush, trajectory, resolution, timeSteps);
+        return generateGPU(brush, trajectory, resolution, samplingSteps);
     }
     else {
-        return generateCPU(brush, trajectory, resolution, timeSteps);
+        return generateCPU(brush, trajectory, resolution, samplingSteps);
     }
 }
 // CPU 기반 스탬핑 방식
@@ -40,9 +40,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     // 궤적 중심점들의 AABB 계산
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
-    for (int step = 0; step <= samplingSteps; ++step)
+    for (int step = 0; step < samplingSteps; ++step)
     {
-        float t = (float)step / samplingSteps;
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
 
@@ -76,9 +76,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     result->mData.resize(totalSize, FLT_MAX);
 
     // 스탬핑
-    for (int step = 0; step <= samplingSteps; ++step)
+    for (int step = 0; step < samplingSteps; ++step)
     {
-        float t = (float)step / samplingSteps;
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::mat4 invTransform = glm::inverse(transform);
 
@@ -137,9 +137,9 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
 
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
-    for (int step = 0; step <= samplingSteps; ++step)
+    for (int step = 0; step < samplingSteps; ++step)
     {
-        float t = (float)step / samplingSteps;
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
 
@@ -151,10 +151,10 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     combinedMax += glm::vec3(radius);
 
     // 변환 행렬
-    std::vector<glm::mat4> invTransforms(samplingSteps + 1);
-    for (int step = 0; step <= samplingSteps; ++step)
+    std::vector<glm::mat4> invTransforms(samplingSteps);
+    for (int step = 0; step < samplingSteps; ++step)
     {
-        float t = (float)step / samplingSteps;
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         invTransforms[step] = glm::inverse(transform);
     }
