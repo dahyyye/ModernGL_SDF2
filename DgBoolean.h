@@ -33,17 +33,6 @@ public:
 	 */
 	static float resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos);
 
-	// ↓ 이 아래에 추가
-	/*!
-	 *  \brief  로컬 좌표에서 직접 SDF 값 샘플링 (역변환 없이)
-	 *
-	 *  \param[in]  vol         샘플링할 볼륨
-	 *  \param[in]  localPos    볼륨 로컬 좌표 (호출자가 역변환 완료한 상태)
-	 *
-	 *  \return     해당 위치의 SDF 값
-	*/
-	static float sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos);
-
 	/*!
 	 *  \brief  삼선형 보간으로 SDF 값 계산
 	 *
