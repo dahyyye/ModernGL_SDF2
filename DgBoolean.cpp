@@ -205,6 +205,36 @@ float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm
     return sdfValue + outsideDist;
 }
 
+//Ãß°¡
+float DgBoolean::sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos)
+{
+    glm::vec3 volMin = vol->getLocalMin();
+    glm::vec3 volMax = vol->getLocalMax();
+    glm::vec3 range = volMax - volMin;
+
+    if (range.x < 0.0001f || range.y < 0.0001f || range.z < 0.0001f)
+        return 1.0f;
+
+    glm::vec3 uvw = (localPos - volMin) / range;
+
+    float outsideDist = 0.0f;
+    if (uvw.x < 0.0f || uvw.x > 1.0f ||
+        uvw.y < 0.0f || uvw.y > 1.0f ||
+        uvw.z < 0.0f || uvw.z > 1.0f)
+    {
+        glm::vec3 clamped = glm::clamp(uvw, glm::vec3(0.0f), glm::vec3(1.0f));
+        glm::vec3 diff = (uvw - clamped) * range;
+        outsideDist = glm::length(diff);
+        uvw = clamped;
+    }
+
+    float sdfValue = trilinearInterpolate(
+        vol->mData.data(),
+        vol->mDim[0], vol->mDim[1], vol->mDim[2], uvw);
+
+    return sdfValue + outsideDist;
+}
+
 float DgBoolean::trilinearInterpolate(const float* data,
     int dimX, int dimY, int dimZ,
     const glm::vec3& uvw)

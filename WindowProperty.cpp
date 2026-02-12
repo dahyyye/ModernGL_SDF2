@@ -311,6 +311,44 @@ void OpenProperty() {
 				}
 			}
 
+			/*if (ImGui::Button("Segment CPU", ImVec2(-1, 0)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+					DgVolume* swept = DgSweep::generateSweptVolume(
+						brush, traj, sweepResolution, timeSteps, false, true
+					);
+
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+						DgScene::instance().exitTrajectoryMode();
+					}
+				}
+			}*/
+
+			if (ImGui::Button("Test CPU", ImVec2(-1, 0)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+					DgVolume* swept = DgSweep::generateTestCPU(
+						brush, traj, sweepResolution, timeSteps
+					);
+
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+						DgScene::instance().exitTrajectoryMode();
+					}
+				}
+			}
+
 			// 궤적 초기화 버튼
 			if (ImGui::Button("Clear Trajectory", ImVec2(-1, 0)))
 			{

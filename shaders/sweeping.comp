@@ -71,7 +71,7 @@ void main()
     // 모든 시간에서 최소 SDF
     float minSDF = 1e10;
 
-    for (int t = 0; t <= uSamplingSteps; t++)
+    for (int t = 0; t < uSamplingSteps; t++)
     {
         float sdf = sampleBrushSDF(worldPos, invTransforms[t]);
         minSDF = min(minSDF, sdf);
