@@ -1221,9 +1221,32 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 	glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mTrajectory.size());
 
 	// 노란색 점으로 프레임 위치 표시
+	//glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
+	//glPointSize(6.0f);
+	//glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
+
+	// 노란색 점: controlPoints가 있으면 컨트롤 포인트만, 없으면 전체 frames
 	glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
-	glPointSize(6.0f);
-	glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
+	glPointSize(8.0f);
+
+	if (!mTrajectory.controlPoints.empty())
+	{
+		std::vector<float> cpVerts;
+		for (auto& cp : mTrajectory.controlPoints) {
+			cpVerts.push_back(cp.position.x);
+			cpVerts.push_back(cp.position.y);
+			cpVerts.push_back(cp.position.z);
+		}
+		glBufferData(GL_ARRAY_BUFFER, cpVerts.size() * sizeof(float), cpVerts.data(), GL_DYNAMIC_DRAW);
+		glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.controlPoints.size());
+
+		// frames 데이터 복원
+		glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+	}
+	else
+	{
+		glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
+	}
 
 	// 정리
 	glEnable(GL_DEPTH_TEST);
