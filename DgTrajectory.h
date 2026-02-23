@@ -20,9 +20,9 @@ class DgTrajectory
 {
 public:
     std::vector<DgTrajectoryFrame> frames;
-    std::vector<DgTrajectoryFrame> controlPoints;   // 컨트롤 포인트 (노란 점)
+    std::vector<DgTrajectoryFrame> controlPoints;   // 컨트롤 포인트
 
-    void clear() { frames.clear(); }
+    void clear() { frames.clear(); controlPoints.clear(); }
     size_t size() const { return frames.size(); }
     bool empty() const { return frames.empty(); }
 
@@ -33,6 +33,17 @@ public:
     // t (0~1)에서의 변환 행렬 반환
     glm::mat4 getTransformAt(float t) const {
         if (frames.empty()) return glm::mat4(1.0f);
+
+        // 컨트롤 포인트가 있으면 베지어 곡선 직접 계산
+        if (controlPoints.size() >= 4) {
+            t = glm::clamp(t, 0.0f, 1.0f);
+            glm::vec3 pos = cubicBezier(
+                controlPoints[0].position, controlPoints[1].position,
+                controlPoints[2].position, controlPoints[3].position, t);
+            glm::quat rot = glm::slerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
+            return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
+        }
+
         if (frames.size() == 1) {
             return glm::translate(glm::mat4(1.0f), frames[0].position)
                 * glm::mat4_cast(frames[0].rotation); // 이동 * 회전
@@ -96,6 +107,7 @@ public:
         glm::vec3 p2 = center + glm::vec3(7.0f, 0.0f, -4.0f);
         glm::vec3 p3 = center + glm::vec3(10.0f, 0.0f, 0.0f);
 
+		// 4개 컨트롤 포인트 저장 (회전은 고정)
         controlPoints.emplace_back(p0, baseRot);
         controlPoints.emplace_back(p1, baseRot);
         controlPoints.emplace_back(p2, baseRot);
