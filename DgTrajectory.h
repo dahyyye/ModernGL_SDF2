@@ -105,9 +105,9 @@ public:
         glm::vec3 p0 = center;
         glm::vec3 p1 = center + glm::vec3(3.0f, 0.0f, 4.0f);
         glm::vec3 p2 = center + glm::vec3(7.0f, 0.0f, -4.0f);
-        glm::vec3 p3 = center + glm::vec3(10.0f, 0.0f, 0.0f);
+        glm::vec3 p3 = center + glm::vec3(20.0f, 0.0f, 0.0f);
 
-		// 4개 컨트롤 포인트 저장 (회전은 고정)
+		// 4개 컨트롤 포인트 저장 
         controlPoints.emplace_back(p0, baseRot);
         controlPoints.emplace_back(p1, baseRot);
         controlPoints.emplace_back(p2, baseRot);

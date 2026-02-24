@@ -15,16 +15,26 @@ public:
 		bool useGPU = false
     );
 
+    static DgVolume* generateBrentCPU(DgVolume* brush, const DgTrajectory& trajectory,
+        int resolution, int samplingSteps);
+
+    static DgVolume* generateBrentGPU(DgVolume* brush, const DgTrajectory& trajectory,
+        int resolution, int samplingSteps);
+
 private:
     static GLuint sComputeShader;
 	static GLuint sTransformSSBO;
 	static bool sInitialized;
 
+    static GLuint sBrentComputeShader;
+    static GLuint sBrentTransformSSBO;
+    static bool sBrentInitialized;
+
     static bool initializeGPU();
+    static bool initializeBrentGPU();
 
     static DgVolume* generateCPU(DgVolume* brush, const DgTrajectory& trajectory,
         int resolution, int timeSteps);
     static DgVolume* generateGPU(DgVolume* brush, const DgTrajectory& trajectory,
-        int resolution, int timeSteps);
-    
+        int resolution, int timeSteps); 
 };

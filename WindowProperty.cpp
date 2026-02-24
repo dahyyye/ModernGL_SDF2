@@ -318,6 +318,48 @@ void OpenProperty() {
 				}
 			}
 
+			// Brent CPU 버튼
+			if (ImGui::Button("Brent CPU", ImVec2(-1, 0)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+					DgVolume* swept = DgSweep::generateBrentCPU(
+						brush, traj, sweepResolution, timeSteps
+					);
+
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+						DgScene::instance().exitTrajectoryMode();
+						std::cout << "Swept Volume 생성 완료 (Brent)" << std::endl;
+					}
+				}
+			}
+
+			// Brent GPU 버튼
+			if (ImGui::Button("Brent GPU", ImVec2(-1, 0)))
+			{
+				DgVolume* brush = DgScene::instance().mDrawingVolume;
+				if (brush)
+				{
+					DgVolume* swept = DgSweep::generateBrentGPU(
+						brush, traj, sweepResolution, timeSteps
+					);
+
+					if (swept)
+					{
+						DgScene::instance().addSDFVolume(swept);
+						swept->mSelected = true;
+						brush->mSelected = false;
+						DgScene::instance().exitTrajectoryMode();
+						std::cout << "Swept Volume 생성 완료 (Brent GPU)" << std::endl;
+					}
+				}
+			}
+
 			// 궤적 초기화 버튼
 			if (ImGui::Button("Clear Trajectory", ImVec2(-1, 0)))
 			{

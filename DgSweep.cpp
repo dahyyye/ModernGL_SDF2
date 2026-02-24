@@ -8,6 +8,381 @@ GLuint DgSweep::sComputeShader = 0;
 GLuint DgSweep::sTransformSSBO = 0;
 bool DgSweep::sInitialized = false;
 
+GLuint DgSweep::sBrentComputeShader = 0;
+GLuint DgSweep::sBrentTransformSSBO = 0;
+bool DgSweep::sBrentInitialized = false;
+
+// Brent's method로 선분 위 SDF 최소값 탐색
+static float brentMinimize(DgVolume* brush,
+    const glm::vec3& p0, const glm::vec3& p1,
+    float& outAlpha,
+    int maxIter = 20, float tol = 1e-4f)
+{
+    // SDF 평가 람다
+    auto f = [&](float alpha) -> float {
+        return DgBoolean::sampleLocalSDF(brush, glm::mix(p0, p1, alpha));
+        };
+
+    float a = 0.0f, b = 1.0f;
+
+    // Golden ratio
+    const float golden = 0.381966f;  // (3 - sqrt(5)) / 2
+
+    // 초기 내부점: 구간의 golden section 위치
+    float x = a + golden * (b - a);
+    float w = x, v = x;
+    float fx = f(x);
+    float fw = fx, fv = fx;
+
+    float d = 0.0f;   // 이전 스텝 크기
+    float e = 0.0f;   // 그 이전 스텝 크기
+
+    for (int iter = 0; iter < maxIter; ++iter)
+    {
+        float mid = 0.5f * (a + b);
+        float tol1 = tol * std::abs(x) + 1e-10f;
+        float tol2 = 2.0f * tol1;
+
+        // 수렴 확인
+        if (std::abs(x - mid) <= (tol2 - 0.5f * (b - a)))
+            break;
+
+        bool useParabolic = false;
+        float u = 0.0f;
+
+        // 포물선 보간 시도
+        if (std::abs(e) > tol1)
+        {
+            // x, w, v 세 점으로 포물선 피팅
+            float r = (x - w) * (fx - fv);
+            float q = (x - v) * (fx - fw);
+            float p = (x - v) * q - (x - w) * r;
+            q = 2.0f * (q - r);
+
+            if (q > 0.0f) p = -p;
+            else q = -q;
+
+            float etemp = e;
+            e = d;
+
+            // 포물선 스텝이 유효한지 확인
+            if (std::abs(p) < std::abs(0.5f * q * etemp)
+                && p > q * (a - x)
+                && p < q * (b - x))
+            {
+                // 포물선 스텝 채택
+                d = p / q;
+                u = x + d;
+
+                // 경계에 너무 가까우면 보정
+                if ((u - a) < tol2 || (b - u) < tol2)
+                    d = (x < mid) ? tol1 : -tol1;
+
+                useParabolic = true;
+            }
+        }
+
+        // 포물선 실패 → Golden Section
+        if (!useParabolic)
+        {
+            // x(0.382) < mid(0.5)? → YES → 오른쪽이 넓음
+            e = (x < mid) ? (b - x) : (a - x); // e = 1 - 0.382 = 0.618
+			d = golden * e;                    // d = 0.382 * 0.618 = 0.236
+        }
+
+        // 새 평가점
+        if (std::abs(d) >= tol1)
+            u = x + d;                         // u = 0.382 + 0.236 = 0.618
+        else
+            u = x + ((d > 0.0f) ? tol1 : -tol1);
+
+        float fu = f(u);
+
+        // 구간 및 최적점 업데이트
+        if (fu <= fx)
+        {
+            if (u < x) b = x;
+            else a = x;
+
+            v = w;  fv = fw;
+            w = x;  fw = fx;
+            x = u;  fx = fu;
+        }
+        else
+        {
+            if (u < x) a = u;
+            else b = u;
+
+            if (fu <= fw || w == x)
+            {
+                v = w;  fv = fw;
+                w = u;  fw = fu;
+            }
+            else if (fu <= fv || v == x || v == w)
+            {
+                v = u;  fv = fu;
+            }
+        }
+    }
+
+    outAlpha = x;
+    return fx;
+}
+
+DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
+    const DgTrajectory& trajectory,
+    int resolution,
+    int samplingSteps)
+{
+    clock_t start = clock();
+
+    glm::vec3 localMin = brush->getLocalMin();
+    glm::vec3 localMax = brush->getLocalMax();
+    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+
+    // 전체 바운딩 박스 계산
+    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        glm::mat4 transform = trajectory.getTransformAt(t);
+        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
+        combinedMin = glm::min(combinedMin, worldCenter);
+        combinedMax = glm::max(combinedMax, worldCenter);
+    }
+
+    float radius = glm::length(localMax - localCenter);
+    combinedMin -= glm::vec3(radius);
+    combinedMax += glm::vec3(radius);
+
+    DgVolume* result = new DgVolume();
+    result->mName = "Swept Volume (Brent)";
+    result->mDim[0] = resolution;
+    result->mDim[1] = resolution;
+    result->mDim[2] = resolution;
+
+    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
+    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
+
+    glm::vec3 range = combinedMax - combinedMin;
+    result->mSpacing[0] = range.x / (resolution - 1);
+    result->mSpacing[1] = range.y / (resolution - 1);
+    result->mSpacing[2] = range.z / (resolution - 1);
+
+    int totalSize = resolution * resolution * resolution;
+    result->mData.resize(totalSize, FLT_MAX);
+
+    // 역변환 사전 계산
+    std::vector<glm::mat4> invTransforms(samplingSteps);
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
+    }
+
+    // 통계
+    int skipCount = 0;
+    int brentCount = 0;
+
+    // --- 메인 루프: 세그먼트 순회 ---
+    for (int seg = 0; seg < samplingSteps - 1; ++seg)
+    {
+        for (int k = 0; k < resolution; ++k)
+        {
+            for (int j = 0; j < resolution; ++j)
+            {
+                for (int i = 0; i < resolution; ++i)
+                {
+                    glm::vec3 worldPos(
+                        combinedMin.x + i * result->mSpacing[0],
+                        combinedMin.y + j * result->mSpacing[1],
+                        combinedMin.z + k * result->mSpacing[2]
+                    );
+
+                    int index = i + j * resolution + k * resolution * resolution;
+
+                    // 역궤적 선분 생성
+                    glm::vec3 p0 = glm::vec3(invTransforms[seg] * glm::vec4(worldPos, 1.0f));
+                    glm::vec3 p1 = glm::vec3(invTransforms[seg + 1] * glm::vec4(worldPos, 1.0f));
+
+                    // 양 끝점 SDF
+                    float sdf0 = DgBoolean::sampleLocalSDF(brush, p0);
+                    float sdf1 = DgBoolean::sampleLocalSDF(brush, p1);
+                    float segLength = glm::length(p1 - p0);
+
+                    // 외부 판별
+                    if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength)
+                    {
+                        result->mData[index] = std::min(result->mData[index],
+                            std::min(sdf0, sdf1));
+                        skipCount++;
+                        continue;
+                    }
+
+                    // Brent's method로 최소값 탐색
+                    float bestAlpha;
+                    float bestSDF = brentMinimize(brush, p0, p1, bestAlpha);
+
+                    // 양 끝점과도 비교
+                    bestSDF = std::min(bestSDF, std::min(sdf0, sdf1));
+
+                    result->mData[index] = std::min(result->mData[index], bestSDF);
+                    brentCount++;
+                }
+            }
+        }
+
+        if (seg % 10 == 0)
+        {
+            std::cout << "Brent: " << (seg * 100 / (samplingSteps - 1)) << "%" << std::endl;
+        }
+    }
+
+    clock_t finish = clock();
+    double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+
+    int totalVoxelSeg = (samplingSteps - 1) * resolution * resolution * resolution;
+    std::cout << "Brent Swept Volume: " << duration << " sec" << std::endl;
+    std::cout << "  Skipped (Lipschitz): " << skipCount
+        << " (" << (100.0 * skipCount / totalVoxelSeg) << "%)" << std::endl;
+    std::cout << "  Brent evaluated:     " << brentCount
+        << " (" << (100.0 * brentCount / totalVoxelSeg) << "%)" << std::endl;
+
+    result->createTexture();
+    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
+    result->mPosition = glm::vec3(0.0f);
+    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    return result;
+}
+
+DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
+    const DgTrajectory& trajectory,
+    int resolution,
+    int samplingSteps)
+{
+    if (!initializeBrentGPU()) return nullptr;
+
+    clock_t start = clock();
+
+    // 바운딩 박스 계산
+    glm::vec3 localMin = brush->getLocalMin();
+    glm::vec3 localMax = brush->getLocalMax();
+    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+    float radius = glm::length(localMax - localCenter);
+
+    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        glm::mat4 transform = trajectory.getTransformAt(t);
+        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
+        combinedMin = glm::min(combinedMin, worldCenter);
+        combinedMax = glm::max(combinedMax, worldCenter);
+    }
+
+    combinedMin -= glm::vec3(radius);
+    combinedMax += glm::vec3(radius);
+
+    // 역변환 행렬
+    std::vector<glm::mat4> invTransforms(samplingSteps);
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
+    }
+
+    // Compute Shader 실행
+    glUseProgram(sBrentComputeShader);
+
+    // SSBO에 변환 행렬 업로드
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+        invTransforms.size() * sizeof(glm::mat4),
+        invTransforms.data(),
+        GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
+
+    // 결과 3D 텍스처 생성
+    GLuint resultTexture;
+    glGenTextures(1, &resultTexture);
+    glBindTexture(GL_TEXTURE_3D, resultTexture);
+
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+        resolution, resolution, resolution,
+        0, GL_RED, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    // brush SDF 텍스처 (읽기)
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, brush->mTextureID);
+    glUniform1i(glGetUniformLocation(sBrentComputeShader, "uBrushSDF"), 0);
+
+    // 결과 텍스처 (쓰기)
+    glBindImageTexture(1, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+    // Uniform 전달
+    glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMin"),
+        combinedMin.x, combinedMin.y, combinedMin.z);
+    glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMax"),
+        combinedMax.x, combinedMax.y, combinedMax.z);
+    glUniform3i(glGetUniformLocation(sBrentComputeShader, "uResolution"),
+        resolution, resolution, resolution);
+
+    glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMin"),
+        localMin.x, localMin.y, localMin.z);
+    glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMax"),
+        localMax.x, localMax.y, localMax.z);
+
+    glUniform1i(glGetUniformLocation(sBrentComputeShader, "uSamplingSteps"), samplingSteps);
+
+    // Dispatch
+    int numGroups = (resolution + 7) / 8;
+    glDispatchCompute(numGroups, numGroups, numGroups);
+
+    // GPU 완료 대기
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    // 결과 볼륨 생성
+    DgVolume* result = new DgVolume();
+    result->mName = "Swept Volume (Brent GPU)";
+    result->mDim[0] = resolution;
+    result->mDim[1] = resolution;
+    result->mDim[2] = resolution;
+
+    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
+    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
+
+    glm::vec3 range = combinedMax - combinedMin;
+    result->mSpacing[0] = range.x / (resolution - 1);
+    result->mSpacing[1] = range.y / (resolution - 1);
+    result->mSpacing[2] = range.z / (resolution - 1);
+
+    // GPU → CPU 복사
+    int totalSize = resolution * resolution * resolution;
+    result->mData.resize(totalSize);
+    glBindTexture(GL_TEXTURE_3D, resultTexture);
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
+
+    result->mTextureID = resultTexture;
+
+    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
+    result->mPosition = glm::vec3(0.0f);
+    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+
+    clock_t finish = clock();
+    double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+    std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
+
+    glUseProgram(0);
+    return result;
+}
+
 DgVolume* DgSweep::generateSweptVolume(
     DgVolume* brush,
     const DgTrajectory& trajectory,
@@ -270,5 +645,21 @@ bool DgSweep::initializeGPU()
     glGenBuffers(1, &sTransformSSBO);
 
     sInitialized = true;
+    return true;
+}
+
+bool DgSweep::initializeBrentGPU()
+{
+    if (sBrentInitialized) return true;
+
+    sBrentComputeShader = loadComputeShader(".\\shaders\\sweeping_brent.comp");
+    if (sBrentComputeShader == 0) {
+        std::cerr << "Brent Compute Shader 초기화 실패" << std::endl;
+        return false;
+    }
+
+    glGenBuffers(1, &sBrentTransformSSBO);
+
+    sBrentInitialized = true;
     return true;
 }

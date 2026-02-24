@@ -22,6 +22,8 @@ public:
 	 */
 	static DgVolume* Boolean(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim);
 	
+	static float sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos);
+
 	/*!
 	 *  \brief  월드 좌표에서 볼륨의 SDF 값 샘플링
 	 *

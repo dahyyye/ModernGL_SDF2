@@ -167,12 +167,9 @@ std::string DgBoolean::generateName(BooleanMode mode)
     return "boolean";
 }
 
-float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos)
+float DgBoolean::sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos)
 {
-    // 새로운 바운딩 박스의 월드 좌표 → 로컬좌표
-    glm::vec3 localPos = glm::vec3(invModel * glm::vec4(worldPos, 1.0f));
-
-	// 원래 볼륨의 크기를 가져옴 (로컬 -> uvw 변환용)
+    // 원래 볼륨의 크기를 가져옴 (로컬 -> uvw 변환용)
     glm::vec3 volMin = vol->getLocalMin();
     glm::vec3 volMax = vol->getLocalMax();
     glm::vec3 range = volMax - volMin;
@@ -182,7 +179,7 @@ float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm
         return 1.0f;
     }
 
-	// UVW 좌표 계산하면 각 x, y, z가 기존 로컬 좌표의 범위를 [0,1]로 정규화시켜줌
+    // UVW 좌표 계산하면 각 x, y, z가 기존 로컬 좌표의 범위를 [0,1]로 정규화시켜줌
     glm::vec3 uvw = (localPos - volMin) / range;
 
     // 범위 밖이면 경계까지의 거리를 더해서 반환
@@ -203,6 +200,14 @@ float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm
     float sdfValue = trilinearInterpolate(vol->mData.data(), vol->mDim[0], vol->mDim[1], vol->mDim[2], uvw);
 
     return sdfValue + outsideDist;
+}
+
+float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos)
+{
+    // 새로운 바운딩 박스의 월드 좌표 → 로컬좌표
+    glm::vec3 localPos = glm::vec3(invModel * glm::vec4(worldPos, 1.0f));
+
+    return sampleLocalSDF(vol, localPos);
 }
 
 float DgBoolean::trilinearInterpolate(const float* data,
