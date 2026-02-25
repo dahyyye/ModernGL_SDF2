@@ -92,11 +92,7 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("Box", DgUtil::toImTextureID(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
-		DgVolume* volume = new DgVolume();
-		volume->mMesh = import_mesh_obj(".\\res\\object\\box.obj");
-		volume->setDimensions(16, 16, 16);
-		volume->setGridSpace(*volume->mMesh, 0.5);
-		volume->computeSDF();
+		
 	}
 	ImGui::SameLine();
 

@@ -30,7 +30,7 @@ DgVolume::DgVolume(DgMesh* mesh)
 	mMesh = mesh;
 	mName = "volume";
 	mPosition = glm::vec3(0.0f);
-	mRotation = glm::vec3(0.0f);
+	mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 DgVolume::DgVolume(DgVolume& cpy)

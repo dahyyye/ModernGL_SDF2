@@ -87,7 +87,7 @@ DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode 
     result->createTexture();
     result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
-    result->mRotation = glm::vec3(0.0f);
+    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     return result;
 }

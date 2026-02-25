@@ -11,11 +11,6 @@
  *        단 하나의 .cpp에서만 정의해야 한다. 이 헤더는 stb_image.h를
  *        include하지 않으므로, 사용하는 쪽의 .cpp에서 include한다.
  */
-
-#include "./include/gl/glew.h"
-#include "./include/ImGui/imgui.h"
-#include "./include/STB/stb_image.h"
-
 namespace DgUtil
 {
     /*!

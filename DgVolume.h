@@ -32,11 +32,11 @@ public:
 	DgPos mMax;
 
 	/*! \brief 격자 간격 */
-	double mSpacing[3] = { 0.0, 0.0, 0.0};
+	double mSpacing[3] = { 0.0, 0.0, 0.0 };
 
 	/*! \brief 부호거리장 데이터(격자 샘플별 부호거리 값) */
 	std::vector<float> mData;
-	
+
 	/* 볼륨의 텍스쳐 id */
 	GLuint mTextureID = 0;
 
@@ -50,7 +50,7 @@ public:
 	glm::vec3 mPosition = glm::vec3(0.0f);
 
 	/*! \brief 볼륨 회전 (쿼터니언) */
-	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
 
 public:
 
@@ -58,9 +58,9 @@ public:
 	DgVolume(DgMesh* mMesh);
 	DgVolume(DgVolume& cpy);
 	~DgVolume();
-	
+
 	void setDimensions(int dimX, int dimY, int dimZ);
-	
+
 	/*! \brief 입력 메쉬의 격자 공간을 정의(AABB) */
 	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
@@ -130,7 +130,7 @@ public:
 
 		// 중심으로 이동 → 회전 → 원래 위치로
 		model = glm::translate(model, center);
-		model = model * glm::mat4_cast(mRotation);
+		model = model * glm::mat4_cast(mRotation);  // 쿼터니언 → 회전 행렬
 		model = glm::translate(model, -center);
 
 		return model;
@@ -141,10 +141,18 @@ public:
 		mPosition += delta;
 	}
 
-	/*! \brief 회전 적용 (라디안) */
-	void rotate(const glm::quat& deltaRadians) {
-		glm::quat deltaQuat = glm::quat(deltaRadians);  // 오일러 → 쿼터니언
-		mRotation = deltaQuat * mRotation;
+	/*!
+	 * \brief 회전 적용 (라디안 단위의 오일러 각도 증분)
+	 *
+	 * 마우스 드래그에서 넘어오는 delta는 (dx, dy, 0) 형태의 작은 각도 증분.
+	 * 이걸 각 축별 쿼터니언으로 만들어서 현재 회전에 곱한다.
+	 */
+	void rotate(const glm::vec3& deltaRadians) {
+		glm::quat rotX = glm::angleAxis(deltaRadians.x, glm::vec3(1, 0, 0));
+		glm::quat rotY = glm::angleAxis(deltaRadians.y, glm::vec3(0, 1, 0));
+		glm::quat rotZ = glm::angleAxis(deltaRadians.z, glm::vec3(0, 0, 1));
+		mRotation = rotY * rotX * rotZ * mRotation;
+		mRotation = glm::normalize(mRotation);  // 누적 오차 방지
 	}
 
 private:
