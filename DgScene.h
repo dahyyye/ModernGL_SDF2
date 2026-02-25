@@ -62,7 +62,7 @@ public:
 	GLuint mTrajectoryVBO = 0;
 
 private:
-	std::vector<DgVolume*> mSDFList; //DgVolume 按眉 包府 府胶飘
+	std::vector<DgVolume*> mSDFList; // DgVolume 按眉 包府 府胶飘
 
 	DgScene()
 	{

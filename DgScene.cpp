@@ -1,5 +1,4 @@
 #include "DgViewer.h"
-#include ".\\include\\STB\\stb_image.h"	// 아이콘 로딩용
 
 // 지면 격자 메쉬 생성
 void DgScene::createGroundMesh()
@@ -185,34 +184,6 @@ void DgScene::showWindow()
 	ImGui::End();
 }
 
-// 아이콘 텍스처 로딩 헬퍼 함수 추가
-static GLuint LoadIconTexture(const char* file) {
-	int w, h, ch;
-	stbi_set_flip_vertically_on_load(true);
-	unsigned char* pixels = stbi_load(file, &w, &h, &ch, 0);
-	if (!pixels) return 0;
-
-	GLenum fmt = (ch == 4) ? GL_RGBA : (ch == 3) ? GL_RGB : GL_RED;
-
-	GLuint tex = 0;
-	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, pixels);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	stbi_image_free(pixels);
-	return tex;
-}
-
-// OpenGL 텍스처 ID를 ImGui 텍스처 ID로 변환하는 헬퍼 함수
-static inline ImTextureID ToImTexID(GLuint tex) {
-	return (ImTextureID)(uintptr_t)tex;
-}
-
 // 편집 툴바 렌더링 함수
 void DgScene::renderEditToolbar()
 {
@@ -223,8 +194,8 @@ void DgScene::renderEditToolbar()
 
 	if (!iconsLoaded)
 	{
-		moveIcon = LoadIconTexture(".\\res\\icons\\move.png");
-		rotateIcon = LoadIconTexture(".\\res\\icons\\rotation.png");
+		moveIcon = DgUtil::loadTexture2D(".\\res\\icons\\move.png");
+		rotateIcon = DgUtil::loadTexture2D(".\\res\\icons\\rotation.png");
 		iconsLoaded = true;
 	}
 
@@ -242,7 +213,7 @@ void DgScene::renderEditToolbar()
 
 	if (moveIcon != 0)
 	{
-		if (ImGui::ImageButton("MoveMode", ToImTexID(moveIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("MoveMode", DgUtil::toImTextureID(moveIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			// 토글: Move <-> Select
 			mEditMode = (mEditMode == EditMode::Move) ? EditMode::Select : EditMode::Move;
@@ -270,7 +241,7 @@ void DgScene::renderEditToolbar()
 
 	if (rotateIcon != 0)
 	{
-		if (ImGui::ImageButton("RotateMode", ToImTexID(rotateIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("RotateMode", DgUtil::toImTextureID(rotateIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			// 토글: Rotate <-> Select
 			mEditMode = (mEditMode == EditMode::Rotate) ? EditMode::Select : EditMode::Rotate;

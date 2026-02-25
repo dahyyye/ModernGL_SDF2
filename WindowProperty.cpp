@@ -1,33 +1,4 @@
 #include "DgViewer.h"
-#define GLM_ENABLE_EXPERIMENTAL
-#include ".\\include\\STB\\stb_image.h"
-
-static inline ImTextureID ToImTex(GLuint tex) {
-	return (ImTextureID)(uintptr_t)tex;
-}
-
-// 텍스처 로더
-static GLuint LoadTexture2D(const char* file) {
-	int w, h, ch;
-	stbi_set_flip_vertically_on_load(true);
-	unsigned char* pixels = stbi_load(file, &w, &h, &ch, 0);
-	if (!pixels) return 0;
-
-	GLenum fmt = (ch == 4) ? GL_RGBA : (ch == 3) ? GL_RGB : GL_RED;
-
-	GLuint tex = 0;
-	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, pixels);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	stbi_image_free(pixels);
-	return tex;
-}
 
 bool show_window_model_property = true;
 void OpenProperty();
@@ -91,7 +62,7 @@ void OpenProperty() {
 	if (icon_tex_id[0] == 0)
 	{
 		for (int i = 0; i < NumIcons; ++i)
-			icon_tex_id[i] = LoadTexture2D(icon_files[i]);
+			icon_tex_id[i] = DgUtil::loadTexture2D(icon_files[i]);
 	}
 
 	// 기본 모델 정보를 출력한다.
@@ -105,7 +76,7 @@ void OpenProperty() {
 				selected.push_back(vol);
 		}
 
-		if (ImGui::ImageButton("Union", ToImTex(icon_tex_id[0]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("Union", DgUtil::toImTextureID(icon_tex_id[0]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selected.size() >= 2)
 			{clock_t start, finish;
@@ -120,7 +91,7 @@ void OpenProperty() {
 			}
 		}
 		ImGui::SameLine();
-		if (ImGui::ImageButton("Intersection", ToImTex(icon_tex_id[1]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("Intersection", DgUtil::toImTextureID(icon_tex_id[1]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selected.size() >= 2)
 			{
@@ -134,7 +105,7 @@ void OpenProperty() {
 			}
 		}
 		ImGui::SameLine();
-		if (ImGui::ImageButton("Difference", ToImTex(icon_tex_id[2]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("Difference", DgUtil::toImTextureID(icon_tex_id[2]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selected.size() >= 2)
 			{
@@ -208,14 +179,14 @@ void OpenProperty() {
 			}
 		}
 
-		if (ImGui::ImageButton("create_crv", ToImTex(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("create_crv", DgUtil::toImTextureID(icon_tex_id[3]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if(selectedVol)
 				DgScene::instance().enterTrajectoryMode(true);
 		}
 
 		ImGui::SameLine();
-		if (ImGui::ImageButton("create_polyline", ToImTex(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("create_polyline", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selectedVol) {
 				DgScene::instance().enterTrajectoryMode(false);
@@ -226,7 +197,7 @@ void OpenProperty() {
 		ImGui::Text("Auto-generated Curves:");
 
 		// Linear 
-		if (ImGui::ImageButton("create_linear", ToImTex(icon_tex_id[5]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("create_linear", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selectedVol) {
 				// 볼륨 중심 계산
@@ -244,7 +215,7 @@ void OpenProperty() {
 		ImGui::SameLine();
 
 		// Bezier 
-		if (ImGui::ImageButton("create_Curve", ToImTex(icon_tex_id[6]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
+		if (ImGui::ImageButton("create_Curve", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selectedVol) {
 				glm::vec3 center = selectedVol->getCenter();
@@ -365,19 +336,6 @@ void OpenProperty() {
 			{
 				DgScene::instance().exitTrajectoryMode();
 			}
-		}
-	}
-
-	if (ImGui::CollapsingHeader("Sculpt"))
-	{
-		if (ImGui::ImageButton("sculpt_add", ToImTex(icon_tex_id[7]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
-		{
-
-		}
-		ImGui::SameLine();
-		if (ImGui::ImageButton("sculpt_remove", ToImTex(icon_tex_id[8]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
-		{
-
 		}
 	}
 }

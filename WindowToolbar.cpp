@@ -1,33 +1,4 @@
 #include "DgViewer.h"
-#define GLM_ENABLE_EXPERIMENTAL
-#include ".\\include\\STB\\stb_image.h"
-
-static inline ImTextureID ToImTex(GLuint tex) {
-	return (ImTextureID)(uintptr_t)tex;
-}
-
-// 텍스처 로더
-static GLuint LoadTexture2D(const char* file) {
-	int w, h, ch;
-	stbi_set_flip_vertically_on_load(true);
-	unsigned char* pixels = stbi_load(file, &w, &h, &ch, 0);
-	if (!pixels) return 0;
-
-	GLenum fmt = (ch == 4) ? GL_RGBA : (ch == 3) ? GL_RGB : GL_RED;
-
-	GLuint tex = 0;
-	glGenTextures(1, &tex);
-	glBindTexture(GL_TEXTURE_2D, tex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, fmt, w, h, 0, fmt, GL_UNSIGNED_BYTE, pixels);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	stbi_image_free(pixels);
-	return tex;
-}
 
 bool show_window_tool_bar = true;
 void CreateMesh();
@@ -92,16 +63,16 @@ void CreateMesh() {
 	if (icon_tex_id[0] == 0)
 	{
 		for (int i = 0; i < NumIcons; ++i)
-			icon_tex_id[i] = LoadTexture2D(icon_files[i]);
+			icon_tex_id[i] = DgUtil::loadTexture2D(icon_files[i]);
 	}
 
-	if (ImGui::ImageButton("NewScene", ToImTex(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("NewScene", DgUtil::toImTextureID(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgScene::instance().resetScene();
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("Sphere", ToImTex(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("Sphere", DgUtil::toImTextureID(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
 
@@ -119,7 +90,7 @@ void CreateMesh() {
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("Box", ToImTex(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("Box", DgUtil::toImTextureID(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
 		volume->mMesh = import_mesh_obj(".\\res\\object\\box.obj");
@@ -129,7 +100,7 @@ void CreateMesh() {
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("Torus", ToImTex(icon_tex_id[3]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("Torus", DgUtil::toImTextureID(icon_tex_id[3]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
 
@@ -147,43 +118,43 @@ void CreateMesh() {
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("roundBox", ToImTex(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("roundBox", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("boxFrame", ToImTex(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("boxFrame", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("cappedTorus", ToImTex(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("cappedTorus", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("link", ToImTex(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("link", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("cylinder", ToImTex(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("cylinder", DgUtil::toImTextureID(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("cone", ToImTex(icon_tex_id[9]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("cone", DgUtil::toImTextureID(icon_tex_id[9]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 
 	}
 	ImGui::SameLine();
 
-	if (ImGui::ImageButton("bunny", ToImTex(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+	if (ImGui::ImageButton("bunny", DgUtil::toImTextureID(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 	{
 		DgVolume* volume = new DgVolume();
 		volume->mName = "Bunny";

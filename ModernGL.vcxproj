@@ -177,6 +177,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="DgTrajectory.h" />
+    <ClInclude Include="DgUtil.h" />
     <ClInclude Include="DgViewer.h" />
     <ClInclude Include="DgVolume.h" />
     <ClInclude Include="ImGuiManager.h" />

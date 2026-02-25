@@ -41,7 +41,9 @@
 #include "DgSweep.h"
 #include "DgBoolean.h"
 #include "DgTrajectory.h"
+#include "DgUtil.h"
 //#include "DgSweepVia.h"
+#define GLM_ENABLE_EXPERIMENTAL
 
 // Window관련 cpp에서 구현된 함수
 void ShowWindowToolBar(bool* p_open);
