@@ -4,92 +4,220 @@
 #include <cmath>
 #include <iostream>
 
+// ===================================================================
+//  GPU 정적 변수
+// ===================================================================
+GLuint DgBoolean::sComputeShader = 0;
+bool   DgBoolean::sInitialized = false;
+
+
+// ===================================================================
+//  메인 진입점 (GPU)
+// ===================================================================
 DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim)
 {
-    clock_t start, finish;
-	double duration;
-    start = clock();
-
     if (volumes.size() < 2) return nullptr;
+    return BooleanGPU(volumes, mode, dim);
+}
 
-    // 결합된 바운딩 박스 계산
-    glm::vec3 combinedMin, combinedMax;
-    computeAABB(volumes, combinedMin, combinedMax, mode);
 
-    // 새 볼륨 생성
+// ===================================================================
+//  GPU 초기화
+// ===================================================================
+bool DgBoolean::initializeGPU()
+{
+    if (sInitialized) return true;
+
+    sComputeShader = loadComputeShader(".\\shaders\\boolean.comp");
+    if (sComputeShader == 0) {
+        std::cerr << "Boolean Compute Shader 초기화 실패" << std::endl;
+        return false;
+    }
+
+    sInitialized = true;
+    return true;
+}
+
+
+// ===================================================================
+//  GPU Boolean: 2-입력 이항 연산 (핵심)
+//
+//  이 함수가 실제로 Compute Shader를 디스패치하는 단위.
+//  volA와 volB 각각의 3D 텍스처를 바인딩하고,
+//  결과 볼륨의 모든 복셀을 병렬 계산한다.
+// ===================================================================
+DgVolume* DgBoolean::booleanGPU_pair(
+    DgVolume* volA, DgVolume* volB,
+    BooleanMode mode, int dim,
+    const glm::vec3& combinedMin, const glm::vec3& combinedMax)
+{
+    glUseProgram(sComputeShader);
+
+    // ----- 결과 3D 텍스처 생성 -----
+    GLuint resultTexture;
+    glGenTextures(1, &resultTexture);
+    glBindTexture(GL_TEXTURE_3D, resultTexture);
+
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+        dim, dim, dim,
+        0, GL_RED, GL_FLOAT, nullptr);
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    // ----- 입력 SDF 텍스처 바인딩 -----
+
+    // 볼륨 A: 텍스처 유닛 0
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_3D, volA->mTextureID);
+    glUniform1i(glGetUniformLocation(sComputeShader, "uSdfA"), 0);
+
+    // 볼륨 B: 텍스처 유닛 1
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_3D, volB->mTextureID);
+    glUniform1i(glGetUniformLocation(sComputeShader, "uSdfB"), 1);
+
+    // 결과 텍스처: 이미지 유닛 2 (쓰기)
+    glBindImageTexture(2, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
+
+    // ----- Uniform 설정 -----
+
+    // 결과 볼륨 AABB & 해상도
+    glUniform3f(glGetUniformLocation(sComputeShader, "uResultMin"),
+        combinedMin.x, combinedMin.y, combinedMin.z);
+    glUniform3f(glGetUniformLocation(sComputeShader, "uResultMax"),
+        combinedMax.x, combinedMax.y, combinedMax.z);
+    glUniform3i(glGetUniformLocation(sComputeShader, "uResolution"),
+        dim, dim, dim);
+
+    // 볼륨 A: 로컬 AABB + 역변환
+    glm::vec3 minA = volA->getLocalMin();
+    glm::vec3 maxA = volA->getLocalMax();
+    glm::mat4 invModelA = glm::inverse(volA->getModelMatrix());
+
+    glUniform3f(glGetUniformLocation(sComputeShader, "uMinA"), minA.x, minA.y, minA.z);
+    glUniform3f(glGetUniformLocation(sComputeShader, "uMaxA"), maxA.x, maxA.y, maxA.z);
+    glUniformMatrix4fv(glGetUniformLocation(sComputeShader, "uInvModelA"),
+        1, GL_FALSE, glm::value_ptr(invModelA));
+
+    // 볼륨 B: 로컬 AABB + 역변환
+    glm::vec3 minB = volB->getLocalMin();
+    glm::vec3 maxB = volB->getLocalMax();
+    glm::mat4 invModelB = glm::inverse(volB->getModelMatrix());
+
+    glUniform3f(glGetUniformLocation(sComputeShader, "uMinB"), minB.x, minB.y, minB.z);
+    glUniform3f(glGetUniformLocation(sComputeShader, "uMaxB"), maxB.x, maxB.y, maxB.z);
+    glUniformMatrix4fv(glGetUniformLocation(sComputeShader, "uInvModelB"),
+        1, GL_FALSE, glm::value_ptr(invModelB));
+
+    // Boolean 모드
+    int modeInt = 0;
+    if (mode == BooleanMode::Intersection) modeInt = 1;
+    else if (mode == BooleanMode::Difference) modeInt = 2;
+    glUniform1i(glGetUniformLocation(sComputeShader, "uBooleanMode"), modeInt);
+
+    // ----- Dispatch -----
+    int numGroups = (dim + 7) / 8;
+    glDispatchCompute(numGroups, numGroups, numGroups);
+
+    // GPU 완료 대기
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    // ----- 결과 볼륨 생성 -----
     DgVolume* result = new DgVolume();
-    result->mName = generateName(mode);
-
-    // 해상도 설정
+    result->mName = generateName(mode) + " (GPU)";
     result->mDim[0] = dim;
     result->mDim[1] = dim;
     result->mDim[2] = dim;
 
-    // 바운딩 박스 설정
     result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
     result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
 
-    // 격자 간격 계산
     glm::vec3 range = combinedMax - combinedMin;
     result->mSpacing[0] = range.x / (dim - 1);
     result->mSpacing[1] = range.y / (dim - 1);
     result->mSpacing[2] = range.z / (dim - 1);
 
-    // SDF 데이터 생성
+    // GPU → CPU 데이터 복사 (레이마칭 등 CPU 측 활용을 위해)
     int totalSize = dim * dim * dim;
     result->mData.resize(totalSize);
+    glBindTexture(GL_TEXTURE_3D, resultTexture);
+    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
-    // 역행렬 계산
-    std::vector<glm::mat4> invModels;
-    for (DgVolume* vol : volumes) {
-        invModels.push_back(glm::inverse(vol->getModelMatrix()));
-    }
+    // 텍스처 ID를 결과에 직접 할당 (createTexture 불필요)
+    result->mTextureID = resultTexture;
 
-    for (int k = 0; k < dim; ++k) {
-        for (int j = 0; j < dim; ++j) {
-            for (int i = 0; i < dim; ++i) {
-                // 격자점의 월드 좌표 계산
-                glm::vec3 worldPos(
-                    combinedMin.x + i * result->mSpacing[0],
-                    combinedMin.y + j * result->mSpacing[1],
-                    combinedMin.z + k * result->mSpacing[2]
-                );
-
-                // 첫 번째 볼륨의 SDF
-                float resultSDF = resampleSDF(volumes[0], invModels[0], worldPos);
-
-                // 나머지 볼륨들과 연산
-                for (size_t v = 1; v < volumes.size(); ++v) {
-                    float sdf = resampleSDF(volumes[v], invModels[v], worldPos);
-
-                    switch (mode) {
-                    case BooleanMode::Union:
-                        resultSDF = std::min(resultSDF, sdf);
-                        break;
-                    case BooleanMode::Intersection:
-                        resultSDF = std::max(resultSDF, sdf);
-                        break;
-                    case BooleanMode::Difference:
-                        resultSDF = std::max(resultSDF, -sdf);
-                        break;
-                    }
-                }
-                int index = i + j * dim + k * dim * dim;
-                result->mData[index] = resultSDF;
-            }
-        }
-    }
-	finish = clock();
-    duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    cout << duration << "초" << endl;
-
-    // 텍스처 및 메쉬 생성
-    result->createTexture();
+    // 바운딩 박스 메쉬
     result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
     result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
+    glUseProgram(0);
     return result;
+}
+
+
+// ===================================================================
+//  GPU Boolean: 체이닝 (3개 이상 볼륨 지원)
+//
+//  A ∪ B ∪ C → (A ∪ B) = temp → temp ∪ C = result
+//  이항 연산을 순차 적용하는 방식.
+//  각 중간 결과는 이미 텍스처를 갖고 있으므로 다음 단계의 입력으로 즉시 사용 가능.
+// ===================================================================
+DgVolume* DgBoolean::BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim)
+{
+    if (!initializeGPU()) return nullptr;
+
+    clock_t start = clock();
+
+    // 전체 AABB 계산 (CPU에서 미리)
+    glm::vec3 combinedMin, combinedMax;
+    computeAABB(volumes, combinedMin, combinedMax, mode);
+
+    // --- 2개일 때: 단일 디스패치 ---
+    if (volumes.size() == 2)
+    {
+        DgVolume* result = booleanGPU_pair(
+            volumes[0], volumes[1], mode, dim,
+            combinedMin, combinedMax);
+
+        clock_t finish = clock();
+        double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+        std::cout << "Boolean GPU: " << duration << "초" << std::endl;
+
+        return result;
+    }
+
+    // --- 3개 이상일 때: 순차 체이닝 ---
+    //
+    //  Difference의 경우: A - B - C = (A - B) - C
+    //  각 단계의 AABB는 전체 통합 AABB를 그대로 사용.
+    //  (중간 결과의 AABB를 다시 계산하면 더 타이트하지만,
+    //   GPU 디스패치 비용 대비 이득이 미미하므로 통합 AABB 재활용)
+
+    DgVolume* accumulated = booleanGPU_pair(
+        volumes[0], volumes[1], mode, dim,
+        combinedMin, combinedMax);
+
+    for (size_t i = 2; i < volumes.size(); ++i)
+    {
+        DgVolume* next = booleanGPU_pair(
+            accumulated, volumes[i], mode, dim,
+            combinedMin, combinedMax);
+
+        // 중간 결과 정리
+        delete accumulated;
+        accumulated = next;
+    }
+
+    clock_t finish = clock();
+    double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+    std::cout << "Boolean GPU (" << volumes.size() << "개 볼륨): " << duration << "초" << std::endl;
+
+    return accumulated;
 }
 
 void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,

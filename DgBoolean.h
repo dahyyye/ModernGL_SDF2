@@ -81,5 +81,38 @@ private:
 	 */
 	static std::string generateName(BooleanMode mode);
 
-	
+	// ===== GPU 관련 =====
+	static GLuint sComputeShader;
+	static bool   sInitialized;
+
+	/*!
+	 *  \brief  GPU Compute Shader 초기화
+	 */
+	static bool initializeGPU();
+
+	/*!
+	 *  \brief  GPU Boolean 연산 (내부)
+	 *
+	 *  2개 입력 → 1개 출력의 이항 연산을 수행.
+	 *  3개 이상의 볼륨은 BooleanGPU에서 체이닝으로 처리.
+	 *
+	 *  \param[in]  volA        첫 번째 입력 (SDF 텍스처 필요)
+	 *  \param[in]  volB        두 번째 입력 (SDF 텍스처 필요)
+	 *  \param[in]  mode        Boolean 모드
+	 *  \param[in]  dim         결과 해상도
+	 *  \param[in]  combinedMin 결과 AABB 최소점
+	 *  \param[in]  combinedMax 결과 AABB 최대점
+	 *
+	 *  \return     결과 볼륨 (텍스처 + CPU 데이터 모두 포함)
+	 */
+	static DgVolume* booleanGPU_pair(
+		DgVolume* volA, DgVolume* volB,
+		BooleanMode mode, int dim,
+		const glm::vec3& combinedMin, const glm::vec3& combinedMax);
+
+	/*!
+	 *  \brief  GPU Boolean 연산 (외부 진입점, 체이닝 처리)
+	 */
+	static DgVolume* BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim);
+
 };
