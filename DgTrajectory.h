@@ -129,6 +129,8 @@ public:
             glm::vec3 pos = cubicBezier(
                 controlPoints[0].position, controlPoints[1].position,
                 controlPoints[2].position, controlPoints[3].position, t);
+
+            glm::quat rot = glm::slerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
             frames.emplace_back(pos, baseRot);
         }
     }

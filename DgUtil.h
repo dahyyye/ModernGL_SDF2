@@ -1,16 +1,5 @@
 #pragma once
 
-/*!
- *  \file   DgUtil.h
- *  \brief  프로젝트 공통 유틸리티 함수
- *
- *  텍스처 로딩, ImGui 변환 등 여러 파일에서 공통으로 사용하는
- *  헬퍼 함수를 한 곳에 모아둔다.
- *
- *  주의: stb_image 구현부(STB_IMAGE_IMPLEMENTATION)는 프로젝트 내
- *        단 하나의 .cpp에서만 정의해야 한다. 이 헤더는 stb_image.h를
- *        include하지 않으므로, 사용하는 쪽의 .cpp에서 include한다.
- */
 namespace DgUtil
 {
     /*!

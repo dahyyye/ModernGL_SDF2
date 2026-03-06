@@ -1,4 +1,4 @@
-#include "DgViewer.h"
+ï»¿#include "DgViewer.h"
 #include "DgSweep.h"
 #include "DgBoolean.h"
 #include <algorithm>
@@ -12,13 +12,13 @@ GLuint DgSweep::sBrentComputeShader = 0;
 GLuint DgSweep::sBrentTransformSSBO = 0;
 bool DgSweep::sBrentInitialized = false;
 
-// Brent's method·Î ¼±ºĞ À§ SDF ÃÖ¼Ò°ª Å½»ö
+// Brent's methodë¡œ ì„ ë¶„ ìœ„ SDF ìµœì†Œê°’ íƒìƒ‰
 static float brentMinimize(DgVolume* brush,
     const glm::vec3& p0, const glm::vec3& p1,
     float& outAlpha,
     int maxIter = 20, float tol = 1e-4f)
 {
-    // SDF Æò°¡ ¶÷´Ù
+    // SDF í‰ê°€ ëŒë‹¤
     auto f = [&](float alpha) -> float {
         return DgBoolean::sampleLocalSDF(brush, glm::mix(p0, p1, alpha));
         };
@@ -28,14 +28,14 @@ static float brentMinimize(DgVolume* brush,
     // Golden ratio
     const float golden = 0.381966f;  // (3 - sqrt(5)) / 2
 
-    // ÃÊ±â ³»ºÎÁ¡: ±¸°£ÀÇ golden section À§Ä¡
+    // ì´ˆê¸° ë‚´ë¶€ì : êµ¬ê°„ì˜ golden section ìœ„ì¹˜
     float x = a + golden * (b - a);
     float w = x, v = x;
     float fx = f(x);
     float fw = fx, fv = fx;
 
-    float d = 0.0f;   // ÀÌÀü ½ºÅÜ Å©±â
-    float e = 0.0f;   // ±× ÀÌÀü ½ºÅÜ Å©±â
+    float d = 0.0f;   // ì´ì „ ìŠ¤í… í¬ê¸°
+    float e = 0.0f;   // ê·¸ ì´ì „ ìŠ¤í… í¬ê¸°
 
     for (int iter = 0; iter < maxIter; ++iter)
     {
@@ -43,17 +43,17 @@ static float brentMinimize(DgVolume* brush,
         float tol1 = tol * std::abs(x) + 1e-10f;
         float tol2 = 2.0f * tol1;
 
-        // ¼ö·Å È®ÀÎ
+        // ìˆ˜ë ´ í™•ì¸
         if (std::abs(x - mid) <= (tol2 - 0.5f * (b - a)))
             break;
 
         bool useParabolic = false;
         float u = 0.0f;
 
-        // Æ÷¹°¼± º¸°£ ½Ãµµ
+        // í¬ë¬¼ì„  ë³´ê°„ ì‹œë„
         if (std::abs(e) > tol1)
         {
-            // x, w, v ¼¼ Á¡À¸·Î Æ÷¹°¼± ÇÇÆÃ
+            // x, w, v ì„¸ ì ìœ¼ë¡œ í¬ë¬¼ì„  í”¼íŒ…
             float r = (x - w) * (fx - fv);
             float q = (x - v) * (fx - fw);
             float p = (x - v) * q - (x - w) * r;
@@ -65,16 +65,16 @@ static float brentMinimize(DgVolume* brush,
             float etemp = e;
             e = d;
 
-            // Æ÷¹°¼± ½ºÅÜÀÌ À¯È¿ÇÑÁö È®ÀÎ
+            // í¬ë¬¼ì„  ìŠ¤í…ì´ ìœ íš¨í•œì§€ í™•ì¸
             if (std::abs(p) < std::abs(0.5f * q * etemp)
                 && p > q * (a - x)
                 && p < q * (b - x))
             {
-                // Æ÷¹°¼± ½ºÅÜ Ã¤ÅÃ
+                // í¬ë¬¼ì„  ìŠ¤í… ì±„íƒ
                 d = p / q;
                 u = x + d;
 
-                // °æ°è¿¡ ³Ê¹« °¡±î¿ì¸é º¸Á¤
+                // ê²½ê³„ì— ë„ˆë¬´ ê°€ê¹Œìš°ë©´ ë³´ì •
                 if ((u - a) < tol2 || (b - u) < tol2)
                     d = (x < mid) ? tol1 : -tol1;
 
@@ -82,15 +82,15 @@ static float brentMinimize(DgVolume* brush,
             }
         }
 
-        // Æ÷¹°¼± ½ÇÆĞ ¡æ Golden Section
+        // í¬ë¬¼ì„  ì‹¤íŒ¨ â†’ Golden Section
         if (!useParabolic)
         {
-            // x(0.382) < mid(0.5)? ¡æ YES ¡æ ¿À¸¥ÂÊÀÌ ³ĞÀ½
+            // x(0.382) < mid(0.5)? â†’ YES â†’ ì˜¤ë¥¸ìª½ì´ ë„“ìŒ
             e = (x < mid) ? (b - x) : (a - x); // e = 1 - 0.382 = 0.618
 			d = golden * e;                    // d = 0.382 * 0.618 = 0.236
         }
 
-        // »õ Æò°¡Á¡
+        // ìƒˆ í‰ê°€ì 
         if (std::abs(d) >= tol1)
             u = x + d;                         // u = 0.382 + 0.236 = 0.618
         else
@@ -98,7 +98,7 @@ static float brentMinimize(DgVolume* brush,
 
         float fu = f(u);
 
-        // ±¸°£ ¹× ÃÖÀûÁ¡ ¾÷µ¥ÀÌÆ®
+        // êµ¬ê°„ ë° ìµœì ì  ì—…ë°ì´íŠ¸
         if (fu <= fx)
         {
             if (u < x) b = x;
@@ -140,7 +140,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
 
-    // ÀüÃ¼ ¹Ù¿îµù ¹Ú½º °è»ê
+    // ì „ì²´ ë°”ìš´ë”© ë°•ìŠ¤ ê³„ì‚°
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -172,7 +172,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
 
-    // ¿ªº¯È¯ »çÀü °è»ê
+    // ì—­ë³€í™˜ ì‚¬ì „ ê³„ì‚°
     std::vector<glm::mat4> invTransforms(samplingSteps);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -180,11 +180,11 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
         invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
     }
 
-    // Åë°è
+    // í†µê³„
     int skipCount = 0;
     int brentCount = 0;
 
-    // --- ¸ŞÀÎ ·çÇÁ: ¼¼±×¸ÕÆ® ¼øÈ¸ ---
+    // --- ë©”ì¸ ë£¨í”„: ì„¸ê·¸ë¨¼íŠ¸ ìˆœíšŒ ---
     for (int seg = 0; seg < samplingSteps - 1; ++seg)
     {
         for (int k = 0; k < resolution; ++k)
@@ -201,16 +201,16 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
 
                     int index = i + j * resolution + k * resolution * resolution;
 
-                    // ¿ª±ËÀû ¼±ºĞ »ı¼º
+                    // ì—­ê¶¤ì  ì„ ë¶„ ìƒì„±
                     glm::vec3 p0 = glm::vec3(invTransforms[seg] * glm::vec4(worldPos, 1.0f));
                     glm::vec3 p1 = glm::vec3(invTransforms[seg + 1] * glm::vec4(worldPos, 1.0f));
 
-                    // ¾ç ³¡Á¡ SDF
+                    // ì–‘ ëì  SDF
                     float sdf0 = DgBoolean::sampleLocalSDF(brush, p0);
                     float sdf1 = DgBoolean::sampleLocalSDF(brush, p1);
                     float segLength = glm::length(p1 - p0);
 
-                    // ¿ÜºÎ ÆÇº°
+                    // ì™¸ë¶€ íŒë³„
                     if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength)
                     {
                         result->mData[index] = std::min(result->mData[index],
@@ -219,11 +219,11 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
                         continue;
                     }
 
-                    // Brent's method·Î ÃÖ¼Ò°ª Å½»ö
+                    // Brent's methodë¡œ ìµœì†Œê°’ íƒìƒ‰
                     float bestAlpha;
                     float bestSDF = brentMinimize(brush, p0, p1, bestAlpha);
 
-                    // ¾ç ³¡Á¡°úµµ ºñ±³
+                    // ì–‘ ëì ê³¼ë„ ë¹„êµ
                     bestSDF = std::min(bestSDF, std::min(sdf0, sdf1));
 
                     result->mData[index] = std::min(result->mData[index], bestSDF);
@@ -265,7 +265,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     clock_t start = clock();
 
-    // ¹Ù¿îµù ¹Ú½º °è»ê
+    // ë°”ìš´ë”© ë°•ìŠ¤ ê³„ì‚°
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
@@ -284,7 +284,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // ¿ªº¯È¯ Çà·Ä
+    // ì—­ë³€í™˜ í–‰ë ¬
     std::vector<glm::mat4> invTransforms(samplingSteps);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -292,10 +292,10 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
     }
 
-    // Compute Shader ½ÇÇà
+    // Compute Shader ì‹¤í–‰
     glUseProgram(sBrentComputeShader);
 
-    // SSBO¿¡ º¯È¯ Çà·Ä ¾÷·Îµå
+    // SSBOì— ë³€í™˜ í–‰ë ¬ ì—…ë¡œë“œ
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
         invTransforms.size() * sizeof(glm::mat4),
@@ -303,7 +303,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 
-    // °á°ú 3D ÅØ½ºÃ³ »ı¼º
+    // ê²°ê³¼ 3D í…ìŠ¤ì²˜ ìƒì„±
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
@@ -318,15 +318,15 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    // brush SDF ÅØ½ºÃ³ (ÀĞ±â)
+    // brush SDF í…ìŠ¤ì²˜ (ì½ê¸°)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, brush->mTextureID);
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uBrushSDF"), 0);
 
-    // °á°ú ÅØ½ºÃ³ (¾²±â)
+    // ê²°ê³¼ í…ìŠ¤ì²˜ (ì“°ê¸°)
     glBindImageTexture(1, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-    // Uniform Àü´Ş
+    // Uniform ì „ë‹¬
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMax"),
@@ -345,10 +345,10 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     int numGroups = (resolution + 7) / 8;
     glDispatchCompute(numGroups, numGroups, numGroups);
 
-    // GPU ¿Ï·á ´ë±â
+    // GPU ì™„ë£Œ ëŒ€ê¸°
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // °á°ú º¼·ı »ı¼º
+    // ê²°ê³¼ ë³¼ë¥¨ ìƒì„±
     DgVolume* result = new DgVolume();
     result->mName = "Swept Volume (Brent GPU)";
     result->mDim[0] = resolution;
@@ -363,7 +363,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     result->mSpacing[1] = range.y / (resolution - 1);
     result->mSpacing[2] = range.z / (resolution - 1);
 
-    // GPU ¡æ CPU º¹»ç
+    // GPU â†’ CPU ë³µì‚¬
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
@@ -400,7 +400,7 @@ DgVolume* DgSweep::generateSweptVolume(
     }
 }
 
-// CPU ±â¹İ ½ºÅÆÇÎ ¹æ½Ä
+// CPU ê¸°ë°˜ ìŠ¤íƒ¬í•‘ ë°©ì‹
 DgVolume* DgSweep::generateCPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
@@ -408,12 +408,12 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
 {
     clock_t start = clock();
 
-    // ºê·¯½Ã ·ÎÄÃ Á¤º¸
+    // ë¸ŒëŸ¬ì‹œ ë¡œì»¬ ì •ë³´
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
     
-    // ±ËÀû Áß½ÉÁ¡µéÀÇ AABB °è»ê
+    // ê¶¤ì  ì¤‘ì‹¬ì ë“¤ì˜ AABB ê³„ì‚°
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
     for (int step = 0; step < samplingSteps; ++step)
@@ -426,13 +426,13 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    // ¹İ°æ¸¸Å­ ÆĞµù
+    // ë°˜ê²½ë§Œí¼ íŒ¨ë”©
     float radius = glm::length(localMax - localCenter);
 
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // °á°ú º¼·ı »ı¼º
+    // ê²°ê³¼ ë³¼ë¥¨ ìƒì„±
     DgVolume* result = new DgVolume();
     result->mName = "Swept Volume (CPU)";
     result->mDim[0] = resolution;
@@ -447,11 +447,11 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     result->mSpacing[1] = range.y / (resolution - 1);
     result->mSpacing[2] = range.z / (resolution - 1);
 
-    // SDF ÃÊ±âÈ­
+    // SDF ì´ˆê¸°í™”
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
 
-    // ½ºÅÆÇÎ
+    // ìŠ¤íƒ¬í•‘
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
@@ -484,9 +484,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    std::cout << "Swept Volume »ı¼º ¿Ï·á: " << duration << "ÃÊ" << std::endl;
+    std::cout << "Swept Volume ìƒì„± ì™„ë£Œ: " << duration << "ì´ˆ" << std::endl;
 
-    // ÅØ½ºÃ³ ¹× º¼·ı »ı¼º
+    // í…ìŠ¤ì²˜ ë° ë³¼ë¥¨ ìƒì„±
     result->createTexture();
     result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
@@ -495,7 +495,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     return result;
 }
 
-// GPU ±â¹İ ½ºÅÆÇÎ ¹æ½Ä
+// GPU ê¸°ë°˜ ìŠ¤íƒ¬í•‘ ë°©ì‹
 DgVolume* DgSweep::generateGPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
@@ -505,7 +505,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
 
     clock_t start = clock();
 
-    // 1. ¹Ù¿îµù ¹Ú½º °è»ê
+    // 1. ë°”ìš´ë”© ë°•ìŠ¤ ê³„ì‚°
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
@@ -526,7 +526,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // º¯È¯ Çà·Ä
+    // ë³€í™˜ í–‰ë ¬
     std::vector<glm::mat4> invTransforms(samplingSteps);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -535,41 +535,41 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         invTransforms[step] = glm::inverse(transform);
     }
 
-    // Compute Shader ½ÇÇà
+    // Compute Shader ì‹¤í–‰
     glUseProgram(sComputeShader);
 
-	// SSBO¿¡ º¯È¯ Çà·Ä ¾÷·Îµå
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);         // SSBO ¹ÙÀÎµù
+	// SSBOì— ë³€í™˜ í–‰ë ¬ ì—…ë¡œë“œ
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);         // SSBO ë°”ì¸ë”©
     glBufferData(GL_SHADER_STORAGE_BUFFER, 
-		invTransforms.size() * sizeof(glm::mat4),       //Å©±â: Çà·Ä °³¼ö * Çà·Ä Å©±â
-        invTransforms.data(),                           // CPU ¸Ş¸ğ¸® ÁÖ¼Ò
-		GL_DYNAMIC_DRAW);                               // »ç¿ë ºóµµ: µ¿Àû ¾÷µ¥ÀÌÆ®
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);  // ¹ÙÀÎµù Æ÷ÀÎÆ® 2¿¡ ¿¬°á
+		invTransforms.size() * sizeof(glm::mat4),       //í¬ê¸°: í–‰ë ¬ ê°œìˆ˜ * í–‰ë ¬ í¬ê¸°
+        invTransforms.data(),                           // CPU ë©”ëª¨ë¦¬ ì£¼ì†Œ
+		GL_DYNAMIC_DRAW);                               // ì‚¬ìš© ë¹ˆë„: ë™ì  ì—…ë°ì´íŠ¸
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);  // ë°”ì¸ë”© í¬ì¸íŠ¸ 2ì— ì—°ê²°
 
-    // °á°ú 3D ÅØ½ºÃ³ »ı¼º
+    // ê²°ê³¼ 3D í…ìŠ¤ì²˜ ìƒì„±
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
-    glBindTexture(GL_TEXTURE_3D, resultTexture);    // ÀÛ¾÷ ´ë»óÀ¸·Î ÁöÁ¤
+    glBindTexture(GL_TEXTURE_3D, resultTexture);    // ì‘ì—… ëŒ€ìƒìœ¼ë¡œ ì§€ì •
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,         // ºó 3D ÅØ½ºÃ³ »ı¼º
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,         // ë¹ˆ 3D í…ìŠ¤ì²˜ ìƒì„±
         resolution, resolution, resolution,
         0, GL_RED, GL_FLOAT, nullptr);
 
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       // ÅØ½ºÃ³ »ùÇÃ¸µ ¼³Á¤
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //ÅØ½ºÃ³ È£Ãâ ½Ã ÁÖº¯ °ªÀ» º¸°£ÇØ¼­ ¹İÈ¯ÇÏµµ·Ï ÇÔ
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       // í…ìŠ¤ì²˜ ìƒ˜í”Œë§ ì„¤ì •
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //í…ìŠ¤ì²˜ í˜¸ì¶œ ì‹œ ì£¼ë³€ ê°’ì„ ë³´ê°„í•´ì„œ ë°˜í™˜í•˜ë„ë¡ í•¨
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    // ºê·¯½Ã SDF ÅØ½ºÃ³ (ÀĞ±â)
+    // ë¸ŒëŸ¬ì‹œ SDF í…ìŠ¤ì²˜ (ì½ê¸°)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, brush->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uBrushSDF"), 0);
 
-    // °á°ú ÅØ½ºÃ³ (¾²±â)
+    // ê²°ê³¼ í…ìŠ¤ì²˜ (ì“°ê¸°)
     glBindImageTexture(1, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-    // Uniform Àü´Ş
+    // Uniform ì „ë‹¬
     glUniform3f(glGetUniformLocation(sComputeShader, "uVolumeMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uVolumeMax"),
@@ -585,13 +585,13 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sComputeShader, "uSamplingSteps"), samplingSteps);
 
     // Dispatch
-	int numGroups = (resolution + 7) / 8;       // ³ª´©¾î¶³¾îÁöÁö ¾ÊÀ» ¶§¸¦ ´ëºñÇØ ¿Ã¸²Ã³¸®
-	glDispatchCompute(numGroups, numGroups, numGroups); // ¿öÅ© ±×·ì µ¿½Ã ½ÇÇà
+	int numGroups = (resolution + 7) / 8;       // ë‚˜ëˆ„ì–´ë–¨ì–´ì§€ì§€ ì•Šì„ ë•Œë¥¼ ëŒ€ë¹„í•´ ì˜¬ë¦¼ì²˜ë¦¬
+	glDispatchCompute(numGroups, numGroups, numGroups); // ì›Œí¬ ê·¸ë£¹ ë™ì‹œ ì‹¤í–‰
 
-    // GPU ¿Ï·á ´ë±â
+    // GPU ì™„ë£Œ ëŒ€ê¸°
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // 5. °á°ú º¼·ı »ı¼º
+    // 5. ê²°ê³¼ ë³¼ë¥¨ ìƒì„±
     DgVolume* result = new DgVolume();
     result->mName = "Swept Volume (GPU)";
     result->mDim[0] = resolution;
@@ -606,42 +606,42 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     result->mSpacing[1] = range.y / (resolution - 1);
     result->mSpacing[2] = range.z / (resolution - 1);
 
-    // GPU ¡æ CPU º¹»ç
+    // GPU â†’ CPU ë³µì‚¬
     int totalSize = resolution * resolution * resolution;
 
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
-    // ÅØ½ºÃ³ ID Á÷Á¢ »ç¿ë     
+    // í…ìŠ¤ì²˜ ID ì§ì ‘ ì‚¬ìš©     
     result->mTextureID = resultTexture;
 
-    // ¹Ú½º ¸Ş½¬ »ı¼º
+    // ë°•ìŠ¤ ë©”ì‰¬ ìƒì„±
     result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
     result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    std::cout << "GPU Swept Volume ¿Ï·á: " << duration << "ÃÊ" << std::endl;
+    std::cout << "GPU Swept Volume ì™„ë£Œ: " << duration << "ì´ˆ" << std::endl;
 
     glUseProgram(0);
     return result;
 }
 
-// GPU ÃÊ±âÈ­
+// GPU ì´ˆê¸°í™”
 bool DgSweep::initializeGPU()
 {
     if (sInitialized) return true;
 
-    // Compute Shader ·Îµå
+    // Compute Shader ë¡œë“œ
     sComputeShader = loadComputeShader(".\\shaders\\sweeping.comp");
     if (sComputeShader == 0) {
-        std::cerr << "Sweep Compute Shader ÃÊ±âÈ­ ½ÇÆĞ" << std::endl;
+        std::cerr << "Sweep Compute Shader ì´ˆê¸°í™” ì‹¤íŒ¨" << std::endl;
         return false;
     }
 
-    // SSBO »ı¼º
+    // SSBO ìƒì„±
     glGenBuffers(1, &sTransformSSBO);
 
     sInitialized = true;
@@ -654,7 +654,7 @@ bool DgSweep::initializeBrentGPU()
 
     sBrentComputeShader = loadComputeShader(".\\shaders\\sweeping_brent.comp");
     if (sBrentComputeShader == 0) {
-        std::cerr << "Brent Compute Shader ÃÊ±âÈ­ ½ÇÆĞ" << std::endl;
+        std::cerr << "Brent Compute Shader ì´ˆê¸°í™” ì‹¤íŒ¨" << std::endl;
         return false;
     }
 
@@ -662,4 +662,214 @@ bool DgSweep::initializeBrentGPU()
 
     sBrentInitialized = true;
     return true;
+}
+
+void DgSweep::fastSweeping(DgVolume* vol)
+{
+    // ì¤€ë¹„: ê·¸ë¦¬ë“œ í¬ê¸° / spacing ì½ê¸°
+    const int nx = vol->mDim[0];
+    const int ny = vol->mDim[1];
+    const int nz = vol->mDim[2];
+
+    // mData ë ˆì´ì•„ì›ƒ: idx = x + y*nx + z*nx*ny  (x-major)
+    // spacingì€ ì¶•ë³„ë¡œ ë‹¤ë¥¼ ìˆ˜ ìˆìœ¼ë¯€ë¡œ ê°ê° ì½ìŒ
+    const float hx = (float)vol->mSpacing[0];
+    const float hy = (float)vol->mSpacing[1];
+    const float hz = (float)vol->mSpacing[2];
+
+    std::vector<float>& data = vol->mData;
+    const int total = nx * ny * nz;
+
+    // ---------------------------------------------------------
+    // Step 1. ë¶€í˜¸ ì¶”ì¶œ â†’ unsigned distance grid ì´ˆê¸°í™”
+    //
+    //   pseudo-SDFëŠ” ë‚´ë¶€ ìŒìˆ˜ / ì™¸ë¶€ ì–‘ìˆ˜ë¥¼ ê°€ì§.
+    //   FSMì€ unsigned distanceë¥¼ ì „íŒŒí•˜ëŠ” ì•Œê³ ë¦¬ì¦˜ì´ë¯€ë¡œ
+    //   ë¶€í˜¸ë¥¼ ë¶„ë¦¬í•´ ì €ì¥í•˜ê³  ì ˆëŒ“ê°’ìœ¼ë¡œ ì‘ì—…í•œë‹¤.
+    //   (ë™ë£Œ ì½”ë“œì˜ í•µì‹¬ ëˆ„ë½ ë¶€ë¶„)
+    // ---------------------------------------------------------
+    std::vector<float> signGrid(total);
+    for (int i = 0; i < total; ++i)
+    {
+        signGrid[i] = (data[i] >= 0.0f) ? 1.0f : -1.0f;
+        data[i] = std::abs(data[i]);
+    }
+
+    // ---------------------------------------------------------
+    // Step 2. Zero-crossing seed ì´ˆê¸°í™”
+    //
+    //   FSMì˜ ê²½ê³„ì¡°ê±´ = zero level set ìœ„ì˜ ì°¸ ê±°ë¦¬ê°’.
+    //   pseudo-SDFì˜ ì ˆëŒ“ê°’ì„ ê·¸ëŒ€ë¡œ ì“°ë©´ ë¶€ì •í™•í•œ ê²½ê³„ì¡°ê±´ì´ ë˜ë¯€ë¡œ,
+    //   ë¶€í˜¸ê°€ ë°”ë€ŒëŠ” ì´ì›ƒ ìŒì„ ì°¾ì•„ ì„ í˜•ë³´ê°„ìœ¼ë¡œ
+    //   ì •í™•í•œ zero-crossing ê±°ë¦¬ë¥¼ ì‹¬ëŠ”ë‹¤.
+    //
+    //   ë³´ê°„ ê³µì‹ (xì¶• ì˜ˆì‹œ):
+    //     d = |f(x)| / (|f(x)| + |f(x+1)|) * hx
+    //   â†’ í˜„ì¬ ë³µì…€ì—ì„œ zero crossingê¹Œì§€ì˜ ê±°ë¦¬
+    // ---------------------------------------------------------
+    std::vector<float> fsm(total, FLT_MAX);  // FSM ì‘ì—… ë°°ì—´
+
+    auto idx = [&](int x, int y, int z) -> int {
+        return x + y * nx + z * nx * ny;
+        };
+
+    // X ë°©í–¥ ì´ì›ƒ
+    for (int z = 0; z < nz; ++z)
+        for (int y = 0; y < ny; ++y)
+            for (int x = 0; x < nx - 1; ++x)
+            {
+                int i0 = idx(x, y, z);
+                int i1 = idx(x + 1, y, z);
+                if (signGrid[i0] != signGrid[i1])  // ë¶€í˜¸ ë³€í™” = zero crossing
+                {
+                    float a = std::abs(data[i0]);
+                    float b = std::abs(data[i1]);
+                    float t = a / (a + b);         // ë³´ê°„ ë¹„ìœ¨
+                    fsm[i0] = std::min(fsm[i0], t * hx);
+                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hx);
+                }
+            }
+
+    // Y ë°©í–¥ ì´ì›ƒ
+    for (int z = 0; z < nz; ++z)
+        for (int y = 0; y < ny - 1; ++y)
+            for (int x = 0; x < nx; ++x)
+            {
+                int i0 = idx(x, y, z);
+                int i1 = idx(x, y + 1, z);
+                if (signGrid[i0] != signGrid[i1])
+                {
+                    float a = std::abs(data[i0]);
+                    float b = std::abs(data[i1]);
+                    float t = a / (a + b);
+                    fsm[i0] = std::min(fsm[i0], t * hy);
+                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hy);
+                }
+            }
+
+    // Z ë°©í–¥ ì´ì›ƒ
+    for (int z = 0; z < nz - 1; ++z)
+        for (int y = 0; y < ny; ++y)
+            for (int x = 0; x < nx; ++x)
+            {
+                int i0 = idx(x, y, z);
+                int i1 = idx(x, y, z + 1);
+                if (signGrid[i0] != signGrid[i1])
+                {
+                    float a = std::abs(data[i0]);
+                    float b = std::abs(data[i1]);
+                    float t = a / (a + b);
+                    fsm[i0] = std::min(fsm[i0], t * hz);
+                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hz);
+                }
+            }
+
+    // ---------------------------------------------------------
+    // Step 3. Fast Sweeping (Zhao 2005 â€” 3D Godunov upwind)
+    //
+    //   8ë°©í–¥ Gauss-Seidel sweepì„ ìˆ˜í–‰í•œë‹¤.
+    //   ê° ë°©í–¥ì—ì„œ upwind ì´ì›ƒ (a, b, c) ì„ ì½ê³ 
+    //   Godunov schemeìœ¼ë¡œ ìƒˆ ê±°ë¦¬ê°’ì„ ì œì•ˆí•œë‹¤:
+    //
+    //   ì •ë ¬ í›„ v1 â‰¤ v2 â‰¤ v3 ì— ëŒ€í•´:
+    //     1D: u = v1 + h
+    //     2D: u = (v1+v2 + sqrt(2hÂ²-(v1-v2)Â²)) / 2   (v1+h > v2 ì¼ ë•Œ)
+    //     3D: u = (v1+v2+v3 + sqrt(...)) / 3           (2D sol > v3 ì¼ ë•Œ)
+    //
+    //   spacingì´ ì¶•ë³„ë¡œ ë‹¤ë¥´ë¯€ë¡œ h ëŒ€ì‹  hx/hy/hzë¥¼ ì‚¬ìš©í•˜ëŠ”
+    //   anisotropic Godunov ìˆ˜ì‹ì„ ì ìš©í•œë‹¤.
+    // ---------------------------------------------------------
+
+    // anisotropic 3D Godunov solver
+    // v[0..2]: ì •ë ¬ëœ upwind ê°’, h[0..2]: ëŒ€ì‘í•˜ëŠ” spacing
+    // ì •ë ¬ ì‹œ (ê°’, spacing) ìŒì„ í•¨ê»˜ ì •ë ¬í•´ì•¼ í•¨
+    auto godunov3D = [](float va, float vb, float vc,
+        float ha, float hb, float hc) -> float
+        {
+            // (ê°’, spacing) ìŒìœ¼ë¡œ ë¬¶ì–´ ê°’ ê¸°ì¤€ ì •ë ¬
+            struct VS { float v, h; };
+            VS s[3] = { {va, ha}, {vb, hb}, {vc, hc} };
+            // ë²„ë¸” ì •ë ¬ (3ê°œ)
+            if (s[0].v > s[1].v) std::swap(s[0], s[1]);
+            if (s[1].v > s[2].v) std::swap(s[1], s[2]);
+            if (s[0].v > s[1].v) std::swap(s[0], s[1]);
+
+            float v1 = s[0].v, h1 = s[0].h;
+            float v2 = s[1].v, h2 = s[1].h;
+            float v3 = s[2].v, h3 = s[2].h;
+
+            // 1D ì‹œë„
+            float u = v1 + h1;
+            if (u <= v2) return u;
+
+            // 2D ì‹œë„: (u-v1)Â²/h1Â² + (u-v2)Â²/h2Â² = 1
+            float A2 = 1.0f / (h1 * h1) + 1.0f / (h2 * h2);
+            float B2 = -2.0f * (v1 / (h1 * h1) + v2 / (h2 * h2));
+            float C2 = v1 * v1 / (h1 * h1) + v2 * v2 / (h2 * h2) - 1.0f;
+            float disc2 = B2 * B2 - 4.0f * A2 * C2;
+            if (disc2 >= 0.0f) {
+                u = (-B2 + std::sqrt(disc2)) / (2.0f * A2);
+                if (u <= v3) return u;
+            }
+
+            // 3D: (u-v1)Â²/h1Â² + (u-v2)Â²/h2Â² + (u-v3)Â²/h3Â² = 1
+            float A3 = 1.0f / (h1 * h1) + 1.0f / (h2 * h2) + 1.0f / (h3 * h3);
+            float B3 = -2.0f * (v1 / (h1 * h1) + v2 / (h2 * h2) + v3 / (h3 * h3));
+            float C3 = v1 * v1 / (h1 * h1) + v2 * v2 / (h2 * h2) + v3 * v3 / (h3 * h3) - 1.0f;
+            float disc3 = B3 * B3 - 4.0f * A3 * C3;
+            if (disc3 >= 0.0f) {
+                return (-B3 + std::sqrt(disc3)) / (2.0f * A3);
+            }
+
+            // fallback (ìˆ˜ì¹˜ ì˜¤ì°¨ ë°©ì–´)
+            return u;
+        };
+
+    // 8ë°©í–¥ sweep
+    for (int sweep = 0; sweep < 8; ++sweep)
+    {
+        int sx = (sweep & 1) ? -1 : 1;
+        int sy = (sweep & 2) ? -1 : 1;
+        int sz = (sweep & 4) ? -1 : 1;
+
+        int x0 = (sx == 1) ? 0 : nx - 1;
+        int y0 = (sy == 1) ? 0 : ny - 1;
+        int z0 = (sz == 1) ? 0 : nz - 1;
+        int xe = (sx == 1) ? nx : -1;
+        int ye = (sy == 1) ? ny : -1;
+        int ze = (sz == 1) ? nz : -1;
+
+        for (int z = z0; z != ze; z += sz)
+            for (int y = y0; y != ye; y += sy)
+                for (int x = x0; x != xe; x += sx)
+                {
+                    int i = idx(x, y, z);
+
+                    // upwind ì´ì›ƒ (í˜„ì¬ sweep ë°©í–¥ì—ì„œ "ì´ë¯¸ ì—…ë°ì´íŠ¸ëœ" ìª½)
+                    float va = (x - sx >= 0 && x - sx < nx)
+                        ? fsm[idx(x - sx, y, z)] : FLT_MAX;
+                    float vb = (y - sy >= 0 && y - sy < ny)
+                        ? fsm[idx(x, y - sy, z)] : FLT_MAX;
+                    float vc = (z - sz >= 0 && z - sz < nz)
+                        ? fsm[idx(x, y, z - sz)] : FLT_MAX;
+
+                    // FLT_MAX ì´ì›ƒì´ ìˆìœ¼ë©´ ìœ íš¨í•œ 1D/2D/3D ì‹œë„ë§Œ í•  ìˆ˜ ìˆìŒ
+                    // godunov3D ë‚´ë¶€ì—ì„œ ì •ë ¬ í›„ ì²˜ë¦¬í•˜ë¯€ë¡œ ê·¸ëŒ€ë¡œ ë„˜ê²¨ë„ ì•ˆì „
+                    // (FLT_MAX + h â‰ˆ FLT_MAX â†’ ìë™ìœ¼ë¡œ ë‚®ì€ ì°¨ìˆ˜ ì„ íƒ)
+                    float u_new = godunov3D(va, vb, vc, hx, hy, hz);
+                    fsm[i] = std::min(fsm[i], u_new);
+                }
+    }
+
+    // Step 4. ë¶€í˜¸ ë³µì› + mData ê°±ì‹  + GPU í…ìŠ¤ì²˜ ì¬ì—…ë¡œë“œ
+    for (int i = 0; i < total; ++i)
+    {
+        data[i] = signGrid[i] * fsm[i];
+    }
+
+    // GPU í…ìŠ¤ì²˜ì— ë°˜ì˜ (createTextureëŠ” mDataë¥¼ ì½ì–´ ì¬ì—…ë¡œë“œ)
+    vol->createTexture();
+
+    std::cout << "[FastSweeping] Done. ("
+        << nx << "x" << ny << "x" << nz << ")" << std::endl;
 }

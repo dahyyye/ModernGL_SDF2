@@ -205,7 +205,7 @@ void main()
     }
     
     // 조명 계산
-    vec3 baseColor = vec3(0.8, 0.6, 0.4);
+    vec3 baseColor = vec3(0.6, 0.6, 0.6);
     float diff = max(NdotL, 0.0);
     float spec = pow(max(dot(N, H), 0.0), 32.0);
     

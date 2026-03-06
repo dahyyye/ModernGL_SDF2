@@ -20,6 +20,7 @@ public:
 
     static DgVolume* generateBrentGPU(DgVolume* brush, const DgTrajectory& trajectory,
         int resolution, int samplingSteps);
+    static void fastSweeping(DgVolume* vol);
 
 private:
     static GLuint sComputeShader;

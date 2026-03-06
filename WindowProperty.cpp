@@ -40,7 +40,6 @@ void OpenProperty() {
 			icon_tex_id[i] = DgUtil::loadTexture2D(icon_files[i]);
 	}
 
-	// 기본 모델 정보를 출력한다.
 	if (ImGui::CollapsingHeader("Boolean"))
 	{
 		// 선택된 볼륨 수집
@@ -209,6 +208,26 @@ void OpenProperty() {
 
 		DgTrajectory& traj = DgScene::instance().mTrajectory;
 
+		if (!traj.controlPoints.empty())
+		{
+			ImGui::Separator();
+			ImGui::Text("Curve Rotation");
+
+			static glm::vec3 startEuler(0.f);  // degrees
+			static glm::vec3 endEuler(0.f);
+
+			bool changed = false;
+			changed |= ImGui::SliderFloat3("Start (deg)", glm::value_ptr(startEuler), -180.f, 180.f);
+			changed |= ImGui::SliderFloat3("End   (deg)", glm::value_ptr(endEuler), -180.f, 180.f);
+
+			if (changed)
+			{
+				traj.controlPoints[0].rotation = glm::quat(glm::radians(startEuler));
+				traj.controlPoints[3].rotation = glm::quat(glm::radians(endEuler));
+				traj.rebuild();  // 슬라이더 움직일 때마다 frames 재생성
+			}
+		}
+
 		if (traj.size() >= 2)
 		{
 			ImGui::Separator();
@@ -234,6 +253,7 @@ void OpenProperty() {
 
 					if (swept)
 					{
+						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						swept->mSelected = true;
 						brush->mSelected = false;
@@ -255,6 +275,7 @@ void OpenProperty() {
 
 					if (swept)
 					{
+						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						swept->mSelected = true;
 						brush->mSelected = false;
@@ -276,6 +297,7 @@ void OpenProperty() {
 
 					if (swept)
 					{
+						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						swept->mSelected = true;
 						brush->mSelected = false;
@@ -297,6 +319,7 @@ void OpenProperty() {
 
 					if (swept)
 					{
+						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						swept->mSelected = true;
 						brush->mSelected = false;
