@@ -335,5 +335,16 @@ void OpenProperty() {
 				DgScene::instance().exitTrajectoryMode();
 			}
 		}
+
+		ImGui::Separator();
+		if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
+		{
+			DgVolume* brush = DgScene::instance().mDrawingVolume;
+			if (brush)
+			{
+				DgSweep::fastSweeping(brush);
+				std::cout << "Fast Sweeping Àû¿ë (Drawing Volume)" << std::endl;
+			}
+		}
 	}
 }

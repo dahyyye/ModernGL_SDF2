@@ -666,210 +666,56 @@ bool DgSweep::initializeBrentGPU()
 
 void DgSweep::fastSweeping(DgVolume* vol)
 {
-    // 준비: 그리드 크기 / spacing 읽기
-    const int nx = vol->mDim[0];
-    const int ny = vol->mDim[1];
-    const int nz = vol->mDim[2];
-
-    // mData 레이아웃: idx = x + y*nx + z*nx*ny  (x-major)
-    // spacing은 축별로 다를 수 있으므로 각각 읽음
-    const float hx = (float)vol->mSpacing[0];
-    const float hy = (float)vol->mSpacing[1];
-    const float hz = (float)vol->mSpacing[2];
-
-    std::vector<float>& data = vol->mData;
-    const int total = nx * ny * nz;
-
-    // ---------------------------------------------------------
-    // Step 1. 부호 추출 → unsigned distance grid 초기화
-    //
-    //   pseudo-SDF는 내부 음수 / 외부 양수를 가짐.
-    //   FSM은 unsigned distance를 전파하는 알고리즘이므로
-    //   부호를 분리해 저장하고 절댓값으로 작업한다.
-    //   (동료 코드의 핵심 누락 부분)
-    // ---------------------------------------------------------
-    std::vector<float> signGrid(total);
-    for (int i = 0; i < total; ++i)
-    {
-        signGrid[i] = (data[i] >= 0.0f) ? 1.0f : -1.0f;
-        data[i] = std::abs(data[i]);
+    glm::ivec3 res(vol->mDim[0], vol->mDim[1], vol->mDim[2]);
+    float space = (float)vol->mSpacing[0];
+    std::vector<float>& grid = vol->mData;
+ 
+    int start[3], end[3], step[3];
+    for (int i = 0; i < 8; ++i) {
+        step[0] = (i & 1) ? -1 : 1;
+        step[1] = (i & 2) ? -1 : 1;
+        step[2] = (i & 4) ? -1 : 1;
+        start[0] = (step[0] == 1) ? 0 : res.x - 1;
+        start[1] = (step[1] == 1) ? 0 : res.y - 1;
+        start[2] = (step[2] == 1) ? 0 : res.z - 1;
+        end[0] = (step[0] == 1) ? res.x : -1;
+        end[1] = (step[1] == 1) ? res.y : -1;
+        end[2] = (step[2] == 1) ? res.z : -1;
+        for (int z = start[2]; z != end[2]; z += step[2]) {
+            for (int y = start[1]; y != end[1]; y += step[1]) {
+                for (int x = start[0]; x != end[0]; x += step[0]) {
+                    size_t idx = (size_t)z * res.y * res.x + y * res.x + x;
+                    float a = (x - step[0] >= 0 && x - step[0] < res.x) ? grid[idx - step[0]] : FLT_MAX;
+                    float b = (y - step[1] >= 0 && y - step[1] < res.y) ? grid[idx - (size_t)step[1] * res.x] : FLT_MAX;
+                    float c = (z - step[2] >= 0 && z - step[2] < res.z) ? grid[idx - (size_t)step[2] * res.x * res.y] : FLT_MAX;
+                    float u_new = grid[idx];
+                    float h = space;
+                    float v[3] = { a, b, c };
+                    std::sort(v, v + 3);
+                    float v1 = v[0], v2 = v[1], v3 = v[2];
+                    float x_sol = v1 + h;
+                    if (x_sol <= v2) {
+                        u_new = x_sol;
+                    }
+                    else {
+                        x_sol = (v1 + v2 + sqrt(2.0f * h * h - pow(v1 - v2, 2))) / 2.0f;
+                        if (x_sol <= v3) {
+                            u_new = x_sol;
+                        }
+                        else {
+                            float b_sum = v1 + v2 + v3;
+                            float c_sum = v1 * v1 + v2 * v2 + v3 * v3 - h * h;
+                            u_new = (b_sum + sqrt(b_sum * b_sum - 3.0f * c_sum)) / 3.0f;
+                        }
+                    }
+                    grid[idx] = std::min(grid[idx], u_new);
+                }
+            }
+        }
     }
-
-    // ---------------------------------------------------------
-    // Step 2. Zero-crossing seed 초기화
-    //
-    //   FSM의 경계조건 = zero level set 위의 참 거리값.
-    //   pseudo-SDF의 절댓값을 그대로 쓰면 부정확한 경계조건이 되므로,
-    //   부호가 바뀌는 이웃 쌍을 찾아 선형보간으로
-    //   정확한 zero-crossing 거리를 심는다.
-    //
-    //   보간 공식 (x축 예시):
-    //     d = |f(x)| / (|f(x)| + |f(x+1)|) * hx
-    //   → 현재 복셀에서 zero crossing까지의 거리
-    // ---------------------------------------------------------
-    std::vector<float> fsm(total, FLT_MAX);  // FSM 작업 배열
-
-    auto idx = [&](int x, int y, int z) -> int {
-        return x + y * nx + z * nx * ny;
-        };
-
-    // X 방향 이웃
-    for (int z = 0; z < nz; ++z)
-        for (int y = 0; y < ny; ++y)
-            for (int x = 0; x < nx - 1; ++x)
-            {
-                int i0 = idx(x, y, z);
-                int i1 = idx(x + 1, y, z);
-                if (signGrid[i0] != signGrid[i1])  // 부호 변화 = zero crossing
-                {
-                    float a = std::abs(data[i0]);
-                    float b = std::abs(data[i1]);
-                    float t = a / (a + b);         // 보간 비율
-                    fsm[i0] = std::min(fsm[i0], t * hx);
-                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hx);
-                }
-            }
-
-    // Y 방향 이웃
-    for (int z = 0; z < nz; ++z)
-        for (int y = 0; y < ny - 1; ++y)
-            for (int x = 0; x < nx; ++x)
-            {
-                int i0 = idx(x, y, z);
-                int i1 = idx(x, y + 1, z);
-                if (signGrid[i0] != signGrid[i1])
-                {
-                    float a = std::abs(data[i0]);
-                    float b = std::abs(data[i1]);
-                    float t = a / (a + b);
-                    fsm[i0] = std::min(fsm[i0], t * hy);
-                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hy);
-                }
-            }
-
-    // Z 방향 이웃
-    for (int z = 0; z < nz - 1; ++z)
-        for (int y = 0; y < ny; ++y)
-            for (int x = 0; x < nx; ++x)
-            {
-                int i0 = idx(x, y, z);
-                int i1 = idx(x, y, z + 1);
-                if (signGrid[i0] != signGrid[i1])
-                {
-                    float a = std::abs(data[i0]);
-                    float b = std::abs(data[i1]);
-                    float t = a / (a + b);
-                    fsm[i0] = std::min(fsm[i0], t * hz);
-                    fsm[i1] = std::min(fsm[i1], (1.0f - t) * hz);
-                }
-            }
-
-    // ---------------------------------------------------------
-    // Step 3. Fast Sweeping (Zhao 2005 — 3D Godunov upwind)
-    //
-    //   8방향 Gauss-Seidel sweep을 수행한다.
-    //   각 방향에서 upwind 이웃 (a, b, c) 을 읽고
-    //   Godunov scheme으로 새 거리값을 제안한다:
-    //
-    //   정렬 후 v1 ≤ v2 ≤ v3 에 대해:
-    //     1D: u = v1 + h
-    //     2D: u = (v1+v2 + sqrt(2h²-(v1-v2)²)) / 2   (v1+h > v2 일 때)
-    //     3D: u = (v1+v2+v3 + sqrt(...)) / 3           (2D sol > v3 일 때)
-    //
-    //   spacing이 축별로 다르므로 h 대신 hx/hy/hz를 사용하는
-    //   anisotropic Godunov 수식을 적용한다.
-    // ---------------------------------------------------------
-
-    // anisotropic 3D Godunov solver
-    // v[0..2]: 정렬된 upwind 값, h[0..2]: 대응하는 spacing
-    // 정렬 시 (값, spacing) 쌍을 함께 정렬해야 함
-    auto godunov3D = [](float va, float vb, float vc,
-        float ha, float hb, float hc) -> float
-        {
-            // (값, spacing) 쌍으로 묶어 값 기준 정렬
-            struct VS { float v, h; };
-            VS s[3] = { {va, ha}, {vb, hb}, {vc, hc} };
-            // 버블 정렬 (3개)
-            if (s[0].v > s[1].v) std::swap(s[0], s[1]);
-            if (s[1].v > s[2].v) std::swap(s[1], s[2]);
-            if (s[0].v > s[1].v) std::swap(s[0], s[1]);
-
-            float v1 = s[0].v, h1 = s[0].h;
-            float v2 = s[1].v, h2 = s[1].h;
-            float v3 = s[2].v, h3 = s[2].h;
-
-            // 1D 시도
-            float u = v1 + h1;
-            if (u <= v2) return u;
-
-            // 2D 시도: (u-v1)²/h1² + (u-v2)²/h2² = 1
-            float A2 = 1.0f / (h1 * h1) + 1.0f / (h2 * h2);
-            float B2 = -2.0f * (v1 / (h1 * h1) + v2 / (h2 * h2));
-            float C2 = v1 * v1 / (h1 * h1) + v2 * v2 / (h2 * h2) - 1.0f;
-            float disc2 = B2 * B2 - 4.0f * A2 * C2;
-            if (disc2 >= 0.0f) {
-                u = (-B2 + std::sqrt(disc2)) / (2.0f * A2);
-                if (u <= v3) return u;
-            }
-
-            // 3D: (u-v1)²/h1² + (u-v2)²/h2² + (u-v3)²/h3² = 1
-            float A3 = 1.0f / (h1 * h1) + 1.0f / (h2 * h2) + 1.0f / (h3 * h3);
-            float B3 = -2.0f * (v1 / (h1 * h1) + v2 / (h2 * h2) + v3 / (h3 * h3));
-            float C3 = v1 * v1 / (h1 * h1) + v2 * v2 / (h2 * h2) + v3 * v3 / (h3 * h3) - 1.0f;
-            float disc3 = B3 * B3 - 4.0f * A3 * C3;
-            if (disc3 >= 0.0f) {
-                return (-B3 + std::sqrt(disc3)) / (2.0f * A3);
-            }
-
-            // fallback (수치 오차 방어)
-            return u;
-        };
-
-    // 8방향 sweep
-    for (int sweep = 0; sweep < 8; ++sweep)
-    {
-        int sx = (sweep & 1) ? -1 : 1;
-        int sy = (sweep & 2) ? -1 : 1;
-        int sz = (sweep & 4) ? -1 : 1;
-
-        int x0 = (sx == 1) ? 0 : nx - 1;
-        int y0 = (sy == 1) ? 0 : ny - 1;
-        int z0 = (sz == 1) ? 0 : nz - 1;
-        int xe = (sx == 1) ? nx : -1;
-        int ye = (sy == 1) ? ny : -1;
-        int ze = (sz == 1) ? nz : -1;
-
-        for (int z = z0; z != ze; z += sz)
-            for (int y = y0; y != ye; y += sy)
-                for (int x = x0; x != xe; x += sx)
-                {
-                    int i = idx(x, y, z);
-
-                    // upwind 이웃 (현재 sweep 방향에서 "이미 업데이트된" 쪽)
-                    float va = (x - sx >= 0 && x - sx < nx)
-                        ? fsm[idx(x - sx, y, z)] : FLT_MAX;
-                    float vb = (y - sy >= 0 && y - sy < ny)
-                        ? fsm[idx(x, y - sy, z)] : FLT_MAX;
-                    float vc = (z - sz >= 0 && z - sz < nz)
-                        ? fsm[idx(x, y, z - sz)] : FLT_MAX;
-
-                    // FLT_MAX 이웃이 있으면 유효한 1D/2D/3D 시도만 할 수 있음
-                    // godunov3D 내부에서 정렬 후 처리하므로 그대로 넘겨도 안전
-                    // (FLT_MAX + h ≈ FLT_MAX → 자동으로 낮은 차수 선택)
-                    float u_new = godunov3D(va, vb, vc, hx, hy, hz);
-                    fsm[i] = std::min(fsm[i], u_new);
-                }
-    }
-
-    // Step 4. 부호 복원 + mData 갱신 + GPU 텍스처 재업로드
-    for (int i = 0; i < total; ++i)
-    {
-        data[i] = signGrid[i] * fsm[i];
-    }
-
-    // GPU 텍스처에 반영 (createTexture는 mData를 읽어 재업로드)
+ 
     vol->createTexture();
-
+ 
     std::cout << "[FastSweeping] Done. ("
-        << nx << "x" << ny << "x" << nz << ")" << std::endl;
+        << res.x << "x" << res.y << "x" << res.z << ")" << std::endl;
 }
