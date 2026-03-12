@@ -134,6 +134,29 @@ public:
             frames.emplace_back(pos, baseRot);
         }
     }
+
+    void saveToFile(const char* filename) const
+    {
+        std::ofstream f(filename);
+        f << controlPoints.size() << "\n";
+        for (auto& cp : controlPoints)
+            f << cp.position.x << " " << cp.position.y << " " << cp.position.z << " "
+            << cp.rotation.w << " " << cp.rotation.x << " " << cp.rotation.y << " " << cp.rotation.z << "\n";
+        std::cout << filename << " 저장 완료" << std::endl;
+    }
+
+    void loadFromFile(const char* filename)
+    {
+        std::ifstream f(filename);
+        int n; f >> n;
+        controlPoints.clear();
+        for (int i = 0; i < n; ++i) {
+            glm::vec3 pos; glm::quat rot;
+            f >> pos.x >> pos.y >> pos.z >> rot.w >> rot.x >> rot.y >> rot.z;
+            controlPoints.emplace_back(pos, rot);
+        }
+        rebuild();
+    }
 };
 
 

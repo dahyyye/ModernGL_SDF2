@@ -1016,6 +1016,7 @@ void DgScene::resetScene()
 		delete v;  // 소멸자에서 mMesh와 mTextureID도 정리됨
 	}
 	mSDFList.clear();
+	mSavedTrajectories.clear();
 
 	// 2. 카메라 초기화
 	mZoom = -45.0f;

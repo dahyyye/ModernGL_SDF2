@@ -1,4 +1,6 @@
 #include "DgViewer.h"
+#include <vtkXMLImageDataWriter.h>
+#include <vtkFloatArray.h>
 
 DgVolume::DgVolume()
 {
@@ -356,4 +358,27 @@ void DgVolume::createTexture()
 	glBindTexture(GL_TEXTURE_3D, 0);
 
 	std::cout << "볼륨 텍스처 생성 완료 ID: " << mTextureID << std::endl;
+}
+
+bool DgVolume::saveToVTI(const char* filename)
+{
+	auto imageData = vtkSmartPointer<vtkImageData>::New();
+	imageData->SetDimensions(mDim[0], mDim[1], mDim[2]);
+	imageData->SetSpacing(mSpacing[0], mSpacing[1], mSpacing[2]);
+	imageData->SetOrigin(mMin.mPos[0], mMin.mPos[1], mMin.mPos[2]);
+
+	auto array = vtkSmartPointer<vtkFloatArray>::New();
+	array->SetName("SDF");
+	array->SetNumberOfValues(mData.size());
+	for (size_t i = 0; i < mData.size(); ++i)
+		array->SetValue(i, mData[i]);
+	imageData->GetPointData()->SetScalars(array);
+
+	auto writer = vtkSmartPointer<vtkXMLImageDataWriter>::New();
+	writer->SetFileName(filename);
+	writer->SetInputData(imageData);
+
+	std::cout << filename << " 저장 완료" << std::endl;
+
+	return writer->Write() != 0;
 }

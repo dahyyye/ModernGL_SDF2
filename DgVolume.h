@@ -52,6 +52,9 @@ public:
 	/*! \brief 볼륨 회전 (쿼터니언) */
 	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
 
+	/*! \brief VTI 저장 함수 */ 
+	bool saveToVTI(const char* filename);
+
 public:
 
 	DgVolume();

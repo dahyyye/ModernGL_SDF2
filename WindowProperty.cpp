@@ -255,6 +255,7 @@ void OpenProperty() {
 					{
 						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
+						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -277,6 +278,7 @@ void OpenProperty() {
 					{
 						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
+						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -299,6 +301,7 @@ void OpenProperty() {
 					{
 						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
+						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -321,6 +324,7 @@ void OpenProperty() {
 					{
 						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
+						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
