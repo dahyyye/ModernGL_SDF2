@@ -138,8 +138,9 @@ public:
     void saveToFile(const char* filename) const
     {
         std::ofstream f(filename);
-        f << controlPoints.size() << "\n";
-        for (auto& cp : controlPoints)
+        const auto& data = controlPoints.empty() ? frames : controlPoints;
+        f << data.size() << "\n";
+        for (auto& cp : data)
             f << cp.position.x << " " << cp.position.y << " " << cp.position.z << " "
             << cp.rotation.w << " " << cp.rotation.x << " " << cp.rotation.y << " " << cp.rotation.z << "\n";
         std::cout << filename << " 저장 완료" << std::endl;
