@@ -67,7 +67,7 @@ void ShowWindowSceneLayer(bool* p_open)
 						ImGui::EndPopup();
 						break;
 					}
-					if (ImGui::MenuItem("Export VTI"))
+					if (ImGui::MenuItem("Export"))
 					{
 						char path[256];
 						snprintf(path, sizeof(path), "volume%zu.vti", i + 1);

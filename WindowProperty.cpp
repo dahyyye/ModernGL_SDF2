@@ -322,7 +322,7 @@ void OpenProperty() {
 
 					if (swept)
 					{
-						DgSweep::fastSweeping(swept);
+						//DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;

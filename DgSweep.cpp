@@ -675,24 +675,31 @@ void DgSweep::fastSweeping(DgVolume* vol)
         step[0] = (i & 1) ? -1 : 1;
         step[1] = (i & 2) ? -1 : 1;
         step[2] = (i & 4) ? -1 : 1;
+
         start[0] = (step[0] == 1) ? 0 : res.x - 1;
         start[1] = (step[1] == 1) ? 0 : res.y - 1;
         start[2] = (step[2] == 1) ? 0 : res.z - 1;
+
         end[0] = (step[0] == 1) ? res.x : -1;
         end[1] = (step[1] == 1) ? res.y : -1;
         end[2] = (step[2] == 1) ? res.z : -1;
+
         for (int z = start[2]; z != end[2]; z += step[2]) {
             for (int y = start[1]; y != end[1]; y += step[1]) {
                 for (int x = start[0]; x != end[0]; x += step[0]) {
                     size_t idx = (size_t)z * res.y * res.x + y * res.x + x;
+
                     float a = (x - step[0] >= 0 && x - step[0] < res.x) ? grid[idx - step[0]] : FLT_MAX;
                     float b = (y - step[1] >= 0 && y - step[1] < res.y) ? grid[idx - (size_t)step[1] * res.x] : FLT_MAX;
                     float c = (z - step[2] >= 0 && z - step[2] < res.z) ? grid[idx - (size_t)step[2] * res.x * res.y] : FLT_MAX;
+                    
                     float u_new = grid[idx];
                     float h = space;
+                    
                     float v[3] = { a, b, c };
                     std::sort(v, v + 3);
                     float v1 = v[0], v2 = v[1], v3 = v[2];
+                    
                     float x_sol = v1 + h;
                     if (x_sol <= v2) {
                         u_new = x_sol;
