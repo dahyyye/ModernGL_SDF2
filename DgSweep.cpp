@@ -284,22 +284,29 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // 역변환 행렬
-    std::vector<glm::mat4> invTransforms(samplingSteps);
-    for (int step = 0; step < samplingSteps; ++step)
+    // 제어점 4개를 GPU에 넘기기 위한 구조체 (shader layout과 일치: vec4 + vec4)
+    struct GpuControlPoint {
+        glm::vec4 position; // xyz = position, w = 0
+        glm::vec4 rotation; // quaternion (x, y, z, w)
+    };
+
+    std::vector<GpuControlPoint> gpuCPs(4);
+    for (int i = 0; i < 4; ++i)
     {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
+        const auto& cp = trajectory.controlPoints[i];
+        gpuCPs[i].position = glm::vec4(cp.position, 0.0f);
+        gpuCPs[i].rotation = glm::vec4(cp.rotation.x, cp.rotation.y,
+            cp.rotation.z, cp.rotation.w);
     }
 
     // Compute Shader 실행
     glUseProgram(sBrentComputeShader);
 
-    // SSBO에 변환 행렬 업로드
+    // SSBO에 제어점 업로드
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-        invTransforms.size() * sizeof(glm::mat4),
-        invTransforms.data(),
+        4 * sizeof(GpuControlPoint),
+        gpuCPs.data(),
         GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 

@@ -2,16 +2,19 @@
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-// 입력 : brush SDF, 출력 : 결과 볼륨
 layout(binding = 0) uniform sampler3D uBrushSDF;
 layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
 
-// 변환 행렬 배열 (SSBO)
-layout(std430, binding = 2) buffer TransformBuffer {
-    mat4 invTransforms[];
+// Control points: position(xyz) + rotation quaternion(xyzw)
+struct ControlPoint {
+    vec4 position; // xyz = position, w unused
+    vec4 rotation; // quaternion (x, y, z, w)
 };
 
-// Uniform
+layout(std430, binding = 2) buffer ControlPointBuffer {
+    ControlPoint controlPoints[4];
+};
+
 uniform vec3 uVolumeMin;
 uniform vec3 uVolumeMax;
 uniform ivec3 uResolution;
@@ -22,7 +25,6 @@ uniform vec3 uBrushMax;
 uniform int uSamplingSteps;
 
 
-// 로컬 좌표에서 SDF 샘플링 (역변환 없이)
 float sampleLocalSDF(vec3 localPos)
 {
     vec3 brushRange = uBrushMax - uBrushMin;
@@ -41,8 +43,47 @@ float sampleLocalSDF(vec3 localPos)
 }
 
 
-// Brent's method: 구간 [0,1]에서 f(α) = SDF(mix(p0,p1,α))의 최소값
-float brentMinimize(vec3 p0, vec3 p1)
+// Cubic bezier position from control points
+vec3 cubicBezierPos(float t)
+{
+    float u = 1.0 - t;
+    return u*u*u * controlPoints[0].position.xyz
+         + 3.0*u*u*t * controlPoints[1].position.xyz
+         + 3.0*u*t*t * controlPoints[2].position.xyz
+         + t*t*t     * controlPoints[3].position.xyz;
+}
+
+// Quaternion SLERP
+vec4 quatSlerp(vec4 q1, vec4 q2, float t)
+{
+    float cosA = clamp(dot(q1, q2), -1.0, 1.0);
+    if (cosA < 0.0) { q2 = -q2; cosA = -cosA; }
+    if (cosA > 0.9995) return normalize(mix(q1, q2, t));
+    float angle = acos(cosA);
+    float sinA = sin(angle);
+    return (sin((1.0 - t) * angle) / sinA) * q1
+         + (sin(t * angle)          / sinA) * q2;
+}
+
+// Rotate vector by quaternion
+vec3 quatRotate(vec4 q, vec3 v)
+{
+    vec3 qv = q.xyz;
+    return v + 2.0 * cross(qv, cross(qv, v) + q.w * v);
+}
+
+// T^{-1}(t) * worldPos — rigid body inverse: R^T * (worldPos - pos)
+vec3 evalInvTransformAt(float t, vec3 worldPos)
+{
+    vec3 pos = cubicBezierPos(t);
+    vec4 rot  = quatSlerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
+    vec4 invRot = vec4(-rot.xyz, rot.w); // conjugate = inverse for unit quaternion
+    return quatRotate(invRot, worldPos - pos);
+}
+
+
+// Brent's method: f(alpha) = SDF(T^{-1}(mix(t0,t1,alpha)) * worldPos)
+float brentMinimize(float t0, float t1, vec3 worldPos)
 {
     const float golden = 0.381966;
     const int maxIter = 20;
@@ -52,26 +93,23 @@ float brentMinimize(vec3 p0, vec3 p1)
 
     float x = a + golden * (b - a);
     float w = x, v = x;
-    float fx = sampleLocalSDF(mix(p0, p1, x));
+    float fx = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, x), worldPos));
     float fw = fx, fv = fx;
 
-    float d = 0.0;
-    float e = 0.0;
+    float d = 0.0, e = 0.0;
 
     for (int iter = 0; iter < maxIter; ++iter)
     {
-        float mid = 0.5 * (a + b);
+        float mid  = 0.5 * (a + b);
         float tol1 = tol * abs(x) + 1e-10;
         float tol2 = 2.0 * tol1;
 
-        // 수렴 확인
         if (abs(x - mid) <= (tol2 - 0.5 * (b - a)))
             break;
 
         bool useParabolic = false;
         float u = 0.0;
 
-        // 포물선 보간 시도
         if (abs(e) > tol1)
         {
             float r = (x - w) * (fx - fv);
@@ -79,11 +117,9 @@ float brentMinimize(vec3 p0, vec3 p1)
             float p = (x - v) * q - (x - w) * r;
             q = 2.0 * (q - r);
 
-            if (q > 0.0) p = -p;
-            else q = -q;
+            if (q > 0.0) p = -p; else q = -q;
 
-            float etemp = e;
-            e = d;
+            float etemp = e; e = d;
 
             if (abs(p) < abs(0.5 * q * etemp)
                 && p > q * (a - x)
@@ -91,53 +127,34 @@ float brentMinimize(vec3 p0, vec3 p1)
             {
                 d = p / q;
                 u = x + d;
-
                 if ((u - a) < tol2 || (b - u) < tol2)
                     d = (x < mid) ? tol1 : -tol1;
-
                 useParabolic = true;
             }
         }
 
-        // 포물선 실패 → Golden Section
         if (!useParabolic)
         {
             e = (x < mid) ? (b - x) : (a - x);
             d = golden * e;
         }
 
-        // 새 평가점
-        if (abs(d) >= tol1)
-            u = x + d;
-        else
-            u = x + ((d > 0.0) ? tol1 : -tol1);
+        u = (abs(d) >= tol1) ? x + d : x + ((d > 0.0) ? tol1 : -tol1);
 
-        float fu = sampleLocalSDF(mix(p0, p1, u));
+        float fu = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, u), worldPos));
 
-        // 구간 및 최적점 업데이트
         if (fu <= fx)
         {
-            if (u < x) b = x;
-            else a = x;
-
-            v = w;  fv = fw;
-            w = x;  fw = fx;
-            x = u;  fx = fu;
+            if (u < x) b = x; else a = x;
+            v = w; fv = fw;
+            w = x; fw = fx;
+            x = u; fx = fu;
         }
         else
         {
-            if (u < x) a = u;
-            else b = u;
-
-            if (fu <= fw || w == x)
-            {
-                v = w;  fv = fw;
-                w = u;  fw = fu;
-            }
-            else if (fu <= fv || v == x || v == w)
-            {
-                v = u;  fv = fu;
-            }
+            if (u < x) a = u; else b = u;
+            if (fu <= fw || w == x)      { v = w; fv = fw; w = u; fw = fu; }
+            else if (fu <= fv || v == x || v == w) { v = u; fv = fu; }
         }
     }
 
@@ -145,43 +162,40 @@ float brentMinimize(vec3 p0, vec3 p1)
 }
 
 
-// 메인
 void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
-
-    if (any(greaterThanEqual(id, uResolution)))
-        return;
+    if (any(greaterThanEqual(id, uResolution))) return;
 
     vec3 volumeRange = uVolumeMax - uVolumeMin;
-    vec3 spacing = volumeRange / vec3(uResolution - 1);
-    vec3 worldPos = uVolumeMin + vec3(id) * spacing;
+    vec3 spacing     = volumeRange / vec3(uResolution - 1);
+    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;
 
     float minSDF = 1e10;
 
     for (int seg = 0; seg < uSamplingSteps - 1; ++seg)
     {
-        // 역궤적 선분 생성
-        vec3 p0 = (invTransforms[seg]     * vec4(worldPos, 1.0)).xyz;
-        vec3 p1 = (invTransforms[seg + 1] * vec4(worldPos, 1.0)).xyz;
+        float t0 = float(seg)     / float(uSamplingSteps - 1);
+        float t1 = float(seg + 1) / float(uSamplingSteps - 1);
 
-        // 양 끝점 SDF 평가
+        // Segment endpoints on actual curve
+        vec3 p0 = evalInvTransformAt(t0, worldPos);
+        vec3 p1 = evalInvTransformAt(t1, worldPos);
+
         float sdf0 = sampleLocalSDF(p0);
         float sdf1 = sampleLocalSDF(p1);
         float segLength = length(p1 - p0);
 
-        // Lipschitz 바운드로 외부 판별
+        // Lipschitz early exit
         if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
             continue;
         }
 
-        // Brent's method로 최소값 탐색
-        float bestSDF = brentMinimize(p0, p1);
+        float bestSDF = brentMinimize(t0, t1, worldPos);
         bestSDF = min(bestSDF, min(sdf0, sdf1));
-
-        minSDF = min(minSDF, bestSDF);
+        minSDF  = min(minSDF, bestSDF);
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
