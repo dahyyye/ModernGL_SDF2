@@ -33,6 +33,7 @@
 #include "./include/ImGui/imgui_file_dlg.h"
 #include "./include/ImGui/imgui_console.h"
 #include "./include/STB/stb_image.h"
+#include "ImGuizmo.h"
 
 // 자체 헤더 파일
 #include "ImGuiManager.h"

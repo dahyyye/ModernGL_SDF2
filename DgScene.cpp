@@ -382,62 +382,6 @@ void DgScene::processMouseEvent()
 			mStartPos[1] = pos[1];
 		}
 
-		// 이동 모드에서 좌클릭 드래그: 선택된 볼륨 이동
-		else if (!io.KeyCtrl && mEditMode == EditMode::Move && hasSelectedVolumes())
-		{
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-			{
-				mIsMoving = true;
-				mMoveStartPos = pos;
-			}
-			else if (mIsMoving && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-			{
-				// 마우스 이동량 계산
-				float dx = (pos.x - mMoveStartPos.x) * 0.02f;
-				float dy = (mMoveStartPos.y - pos.y) * 0.02f;
-
-				// 카메라 회전을 고려하여 월드 좌표로 변환
-				glm::vec3 worldDelta = glm::inverse(glm::mat3(mRotMat)) * glm::vec3(dx, dy, 0.0f);
-
-				// 선택된 볼륨들 이동
-				moveSelectedVolumes(worldDelta);
-
-				mMoveStartPos = pos;
-			}
-			else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-			{
-				mIsMoving = false;
-			}
-		}
-
-		// 회전 모드에서 좌클릭 드래그: 선택된 볼륨 회전
-		else if (!io.KeyCtrl && mEditMode == EditMode::Rotate && hasSelectedVolumes())
-		{
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-			{
-				mIsMoving = true;  // 같은 플래그 재사용
-				mMoveStartPos = pos;
-			}
-			else if (mIsMoving && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-			{
-				// 마우스 이동량을 회전량으로 변환 (라디안)
-				float dx = (pos.x - mMoveStartPos.x) * 0.01f;
-				float dy = (pos.y - mMoveStartPos.y) * 0.01f;
-
-				// X 드래그 → Y축 회전, Y 드래그 → X축 회전
-				glm::vec3 rotDelta(dy, dx, 0.0f);
-
-				// 선택된 볼륨들 회전
-				rotateSelectedVolumes(rotDelta);
-
-				mMoveStartPos = pos;
-			}
-			else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-			{
-				mIsMoving = false;
-			}
-		}
-
 		// 좌클릭 (Ctrl 없이): 드래그 선택 시작
 		else if (!io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
 		{
@@ -887,6 +831,59 @@ void DgScene::renderScene()
 
 	ImTextureID textureID = (void*)(uintptr_t)mFrameBuf.getFrameTexture();
 	ImGui::Image(textureID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
+	
+	// ImGuizmo 렌더링 (ImGui::Image 위에 오버레이)
+	if (hasSelectedVolumes() && mEditMode != EditMode::Select && mEditMode != EditMode::Trajectory)
+	{
+		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
+		glm::mat4 viewMat(1.0f);
+		viewMat = glm::translate(viewMat, glm::vec3(0.0f, 0.0f, mZoom));
+		viewMat = viewMat * mRotMat;
+		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));
+
+		ImGuizmo::SetOrthographic(false);
+		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+
+		ImVec2 winPos = ImGui::GetWindowPos();
+		ImVec2 winSize = ImGui::GetWindowSize();
+		ImGuizmo::SetRect(winPos.x, winPos.y, winSize.x, winSize.y);
+
+		// 조작 모드 결정
+		ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
+		if (mEditMode == EditMode::Rotate) op = ImGuizmo::ROTATE;
+		if (mEditMode == EditMode::Scale)  op = ImGuizmo::SCALE;
+
+		// 선택된 첫 번째 볼륨에 기즈모 적용
+		for (DgVolume* vol : mSDFList)
+		{
+			if (!vol || !vol->mSelected) continue;
+
+			glm::mat4 modelMat = vol->getModelMatrix();
+
+			ImGuizmo::Manipulate(
+				glm::value_ptr(viewMat),
+				glm::value_ptr(projMat),
+				op,
+				ImGuizmo::WORLD,
+				glm::value_ptr(modelMat)
+			);
+
+			if (ImGuizmo::IsUsing())
+			{
+				// 기즈모 조작 결과를 볼륨에 반영
+				glm::vec3 translation, rotation, scale;
+				ImGuizmo::DecomposeMatrixToComponents(
+					glm::value_ptr(modelMat),
+					glm::value_ptr(translation),
+					glm::value_ptr(rotation),
+					glm::value_ptr(scale)
+				);
+				vol->mPosition = translation;
+				vol->mRotation = glm::quat(glm::radians(rotation));
+			}
+			break; // 첫 번째 선택 볼륨만
+		}
+	}
 }
 
 // FPS 및 마우스 좌표 출력 함수
