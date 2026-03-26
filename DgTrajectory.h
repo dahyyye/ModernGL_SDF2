@@ -122,7 +122,6 @@ public:
         if (controlPoints.size() < 4) return;
         frames.clear();
 
-        glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
         for (int i = 0; i < numSamples; ++i)
         {
             float t = (float)i / (numSamples - 1);
@@ -131,7 +130,7 @@ public:
                 controlPoints[2].position, controlPoints[3].position, t);
 
             glm::quat rot = glm::slerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
-            frames.emplace_back(pos, baseRot);
+            frames.emplace_back(pos, rot);
         }
     }
 

@@ -809,7 +809,7 @@ void DgScene::renderScene()
 
 			// 조명의 속성과 관측 위치 전달
 			glm::vec3 viewPos = glm::vec3(glm::inverse(viewMat)[3]);
-			glm::vec3 lightPos = glm::vec3(glm::inverse(viewMat)[3]);
+			glm::vec3 lightPos = viewPos;
 			glUniform3fv(glGetUniformLocation(shaderProgram, "uViewPos"), 1, glm::value_ptr(viewPos));
 			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightPos"), 1, glm::value_ptr(lightPos));
 			glUniform3fv(glGetUniformLocation(shaderProgram, "uLightColor"), 1, glm::value_ptr(glm::vec3(1.0f)));
@@ -822,13 +822,15 @@ void DgScene::renderScene()
 			GLint timeLoc = glGetUniformLocation(shaderProgram, "uTime");
 
 			// 유니폼에 값 전달
-			glUseProgram(shaderProgram);
 			glUniform1f(timeLoc, timeValue);
 
 			// 모델 렌더링 하기
 			pMesh->render();
 			glUseProgram(0);
 		}
+
+		glm::mat4 invViewMat = glm::inverse(viewMat);
+		glm::mat4 invProjMat = glm::inverse(projMat);
 
 		// SDF 볼륨 렌더링
 		for (DgVolume* pVolume : mSDFList)
@@ -845,8 +847,8 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(glm::inverse(viewMat)));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projMat)));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(invViewMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProjMat));
 			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
 
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용

@@ -58,6 +58,14 @@ DgVolume::DgVolume(DgVolume& cpy)
 
 	mPosition = cpy.mPosition;
 	mRotation = cpy.mRotation;
+
+	mData = cpy.mData;
+	mTextureID = 0;  // 텍스처는 새로 올려야 하므로 0으로
+	mIsSweptVolume = cpy.mIsSweptVolume;
+	mSweepResolution = cpy.mSweepResolution;
+	mSweepTimeSteps = cpy.mSweepTimeSteps;
+	mSweepMethod = cpy.mSweepMethod;
+	mOffset = cpy.mOffset;
 }
 
 DgVolume::~DgVolume()
@@ -150,21 +158,6 @@ void DgVolume::computeSDF()
 				mData[index] = distance.second;
 			}
 		}
-	}
-
-	// 디버그 출력
-	for (int k = 0; k < N_Z; k++) {
-		for (int j = 0; j < N_Y; j++) {
-			for (int i = 0; i < N_X; i++) {
-
-				// 4) mData에 부호거리 저장
-				int index = i + j * N_X + k * N_X * N_Y;
-
-				std::cout << mData[index] << " ";
-			}
-			std::cout << std::endl;
-		}
-		std::cout << std::endl;
 	}
 }
 
@@ -278,48 +271,16 @@ bool DgVolume::loadFromVTI(const char* filename)
 	}
 
 	int totalSize = dims[0] * dims[1] * dims[2];
+
 	mData.resize(totalSize);
-
-	for (int i = 0; i < totalSize; ++i) {
-		mData[i] = static_cast<float>(scalars->GetTuple1(i));
+	if (auto* fa = vtkFloatArray::SafeDownCast(scalars)) {
+		float* ptr = fa->GetPointer(0);
+		std::copy(ptr, ptr + totalSize, mData.data());
 	}
-
-	// 디버깅: mData 통계 출력
-	float minVal = mData[0];
-	float maxVal = mData[0];
-	int negCount = 0;   // 음수 개수 (내부)
-	int posCount = 0;   // 양수 개수 (외부)
-	int zeroCount = 0;  // 0에 가까운 값 (표면)
-
-	for (int i = 0; i < totalSize; ++i) {
-		float v = mData[i];
-		if (v < minVal) minVal = v;
-		if (v > maxVal) maxVal = v;
-
-		if (v < -0.001f) negCount++;
-		else if (v > 0.001f) posCount++;
-		else zeroCount++;
+	else {
+		for (int i = 0; i < totalSize; ++i)
+			mData[i] = static_cast<float>(scalars->GetTuple1(i));
 	}
-
-	std::cout << "========== mData 디버깅 ==========" << std::endl;
-	std::cout << "  총 복셀 수: " << totalSize << std::endl;
-	std::cout << "  최소값: " << minVal << std::endl;
-	std::cout << "  최대값: " << maxVal << std::endl;
-	std::cout << "  음수 개수 (내부): " << negCount << " (" << (100.0f * negCount / totalSize) << "%)" << std::endl;
-	std::cout << "  양수 개수 (외부): " << posCount << " (" << (100.0f * posCount / totalSize) << "%)" << std::endl;
-	std::cout << "  표면 근처 (|v|<0.001): " << zeroCount << std::endl;
-	std::cout << "==================================" << std::endl;
-
-	// 중앙 슬라이스 몇 개 값 출력
-	int midZ = dims[2] / 2;
-	int midY = dims[1] / 2;
-	std::cout << "  중앙 슬라이스 (z=" << midZ << ", y=" << midY << ") 값들:" << std::endl;
-	std::cout << "  ";
-	for (int x = 0; x < dims[0]; x += dims[0] / 8) {
-		int idx = x + midY * dims[0] + midZ * dims[0] * dims[1];
-		std::cout << mData[idx] << " ";
-	}
-	std::cout << std::endl;
 
 	return true;
 }

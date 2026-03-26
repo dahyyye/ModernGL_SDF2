@@ -140,7 +140,8 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
 
-    // 전체 바운딩 박스 계산
+    std::vector<glm::mat4> invTransforms(samplingSteps);
+
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -149,6 +150,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
         combinedMin = glm::min(combinedMin, worldCenter);
         combinedMax = glm::max(combinedMax, worldCenter);
+        invTransforms[step] = glm::inverse(transform);
     }
 
     float radius = glm::length(localMax - localCenter);
@@ -172,15 +174,6 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
 
-    // 역변환 사전 계산
-    std::vector<glm::mat4> invTransforms(samplingSteps);
-    for (int step = 0; step < samplingSteps; ++step)
-    {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
-    }
-
-    // 통계
     int skipCount = 0;
     int brentCount = 0;
 
@@ -285,30 +278,24 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMax += glm::vec3(radius);
 
     // 제어점 4개를 GPU에 넘기기 위한 구조체 (shader layout과 일치: vec4 + vec4)
-    struct GpuControlPoint {
-        glm::vec4 position; // xyz = position, w = 0
-        glm::vec4 rotation; // quaternion (x, y, z, w)
+    struct GPUControlPoint {
+        glm::vec4 position; // xyz = pos, w = 0
+        glm::vec4 rotation; // xyzw = quat
     };
 
-    std::vector<GpuControlPoint> gpuCPs(4);
-    for (int i = 0; i < 4; ++i)
-    {
-        const auto& cp = trajectory.controlPoints[i];
-        gpuCPs[i].position = glm::vec4(cp.position, 0.0f);
-        gpuCPs[i].rotation = glm::vec4(cp.rotation.x, cp.rotation.y,
-            cp.rotation.z, cp.rotation.w);
+    GPUControlPoint gpuCPs[4];
+    for (int i = 0; i < 4; i++) {
+        gpuCPs[i].position = glm::vec4(trajectory.controlPoints[i].position, 0.0f);
+        glm::quat q = trajectory.controlPoints[i].rotation;
+        gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
     }
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(gpuCPs), gpuCPs, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 
     // Compute Shader 실행
     glUseProgram(sBrentComputeShader);
-
-    // SSBO에 제어점 업로드
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER,
-        4 * sizeof(GpuControlPoint),
-        gpuCPs.data(),
-        GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 
     // 결과 3D 텍스처 생성
     GLuint resultTexture;
