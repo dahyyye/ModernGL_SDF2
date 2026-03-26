@@ -7,6 +7,7 @@ enum class EditMode {
 	Select,		// 선택 모드 (기본)
 	Move,		// 이동 모드
 	Rotate,		// 회전 모드
+	Scale,		// 스케일 모드
 	Trajectory	// 궤적 모드
 };
 

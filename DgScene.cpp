@@ -163,12 +163,14 @@ void DgScene::renderEditToolbar()
 	// 아이콘 텍스처 로딩 (최초 1회만)
 	static GLuint moveIcon = 0;
 	static GLuint rotateIcon = 0;
+	static GLuint scaleIcon = 0;
 	static bool iconsLoaded = false;
 
 	if (!iconsLoaded)
 	{
 		moveIcon = DgUtil::loadTexture2D(".\\res\\icons\\move.png");
 		rotateIcon = DgUtil::loadTexture2D(".\\res\\icons\\rotation.png");
+		scaleIcon = DgUtil::loadTexture2D(".\\res\\icons\\scale.png");
 		iconsLoaded = true;
 	}
 
@@ -176,59 +178,51 @@ void DgScene::renderEditToolbar()
 
 	const ImVec2 iconSize(28, 28);
 
-	// 이동 모드 버튼 (move.png 아이콘 사용)
+	// Move 버튼
 	bool isMoveMode = (mEditMode == EditMode::Move);
-	if (isMoveMode)
-	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.9f, 0.5f, 0.2f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.6f, 0.3f, 1.0f));
-	}
-
-	if (moveIcon != 0)
-	{
+	if (isMoveMode) { ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.9f, 0.5f, 0.2f, 1.0f)); ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.6f, 0.3f, 1.0f)); }
+	if (moveIcon != 0) {
 		if (ImGui::ImageButton("MoveMode", DgUtil::toImTextureID(moveIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
-		{
-			// 토글: Move <-> Select
 			mEditMode = (mEditMode == EditMode::Move) ? EditMode::Select : EditMode::Move;
-		}
 	}
-	else
-	{
+	else {
 		if (ImGui::Button("Move", ImVec2(50, 30)))
-		{
 			mEditMode = (mEditMode == EditMode::Move) ? EditMode::Select : EditMode::Move;
-		}
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Move Tool (Toggle)");
 	if (isMoveMode) ImGui::PopStyleColor(2);
 
 	ImGui::SameLine();
 
-	// 회전 모드 버튼 (토글 방식)
+	// Rotate 버튼
 	bool isRotateMode = (mEditMode == EditMode::Rotate);
-	if (isRotateMode)
-	{
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.9f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 1.0f, 1.0f));
-	}
-
-	if (rotateIcon != 0)
-	{
+	if (isRotateMode) { ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.7f, 0.9f, 1.0f)); ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.8f, 1.0f, 1.0f)); }
+	if (rotateIcon != 0) {
 		if (ImGui::ImageButton("RotateMode", DgUtil::toImTextureID(rotateIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
-		{
-			// 토글: Rotate <-> Select
 			mEditMode = (mEditMode == EditMode::Rotate) ? EditMode::Select : EditMode::Rotate;
-		}
 	}
-	else
-	{
+	else {
 		if (ImGui::Button("Rotate", ImVec2(50, 30)))
-		{
 			mEditMode = (mEditMode == EditMode::Rotate) ? EditMode::Select : EditMode::Rotate;
-		}
 	}
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rotate Tool (Toggle)");
 	if (isRotateMode) ImGui::PopStyleColor(2);
+
+	ImGui::SameLine();
+
+	// Scale 버튼
+	bool isScaleMode = (mEditMode == EditMode::Scale);
+	if (isScaleMode) { ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.2f, 0.8f, 0.4f, 1.0f)); ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.9f, 0.5f, 1.0f)); }
+	if (scaleIcon != 0) {
+		if (ImGui::ImageButton("ScaleMode", DgUtil::toImTextureID(scaleIcon), iconSize, ImVec2(0, 1), ImVec2(1, 0)))
+			mEditMode = (mEditMode == EditMode::Scale) ? EditMode::Select : EditMode::Scale;
+	}
+	else {
+		if (ImGui::Button("Scale", ImVec2(50, 30)))
+			mEditMode = (mEditMode == EditMode::Scale) ? EditMode::Select : EditMode::Scale;
+	}
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Scale Tool (Toggle)");
+	if (isScaleMode) ImGui::PopStyleColor(2);
 
 	ImGui::EndGroup();
 	ImGui::Separator();
