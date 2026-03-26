@@ -2,6 +2,8 @@
 #include "DgMesh.h"
 #include <vector>
 
+class DgTrajectory;
+
 // VTK 사용
 #include <vtkSmartPointer.h>
 #include <vtkXMLImageDataReader.h>
@@ -51,6 +53,14 @@ public:
 
 	/*! \brief 볼륨 회전 (쿼터니언) */
 	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
+
+	// Swept volume metadata
+	bool           mIsSweptVolume = false;
+	DgTrajectory* mSourceTrajectory = nullptr;  // owned
+	DgVolume* mBrushVolume = nullptr;  // owned copy (브러시 삭제돼도 안전)
+	int            mSweepResolution = 128;
+	int            mSweepTimeSteps = 100;
+	int            mSweepMethod = 3;
 
 	/*! \brief VTI 저장 함수 */ 
 	bool saveToVTI(const char* filename);

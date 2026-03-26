@@ -69,6 +69,9 @@ DgVolume::~DgVolume()
 	if (mTextureID != 0) {
         glDeleteTextures(1, &mTextureID);
     }
+
+	if (mSourceTrajectory) { delete mSourceTrajectory; mSourceTrajectory = nullptr; }
+	if (mBrushVolume) { delete mBrushVolume;      mBrushVolume = nullptr; }
 }
 
 void DgVolume::setDimensions(int dimX, int dimY, int dimZ)

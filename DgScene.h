@@ -59,6 +59,9 @@ public:
 	int  mDraggingCP = -1;				// 드래그 중인 CP 인덱스 (-1 = 없음)
 	std::vector<DgTrajectory> mSavedTrajectories;   // 저장된 궤적 목록
 
+	DgVolume* mSelectedSweptVolume = nullptr;
+	int       mDraggingSweptCP = -1;
+
 	// 궤적 시각화용
 	GLuint mTrajectoryVAO = 0;
 	GLuint mTrajectoryVBO = 0;
@@ -200,4 +203,7 @@ public:
 	void Drawing();
 	glm::vec3 mouseToWorld(ImVec2 mouse, float planeY);
 	void renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
+
+	void renderSweptVolumeTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
+	void resweepVolume(DgVolume* vol, bool preview = false);
 };

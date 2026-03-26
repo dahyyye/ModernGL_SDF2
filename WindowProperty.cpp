@@ -322,6 +322,25 @@ void OpenProperty() {
 
 					if (swept)
 					{
+						// brush deep copy
+						DgVolume* brushCopy = new DgVolume();
+						brushCopy->mData = brush->mData;
+						brushCopy->mDim[0] = brush->mDim[0];
+						brushCopy->mDim[1] = brush->mDim[1];
+						brushCopy->mDim[2] = brush->mDim[2];
+						brushCopy->mSpacing[0] = brush->mSpacing[0];
+						brushCopy->mSpacing[1] = brush->mSpacing[1];
+						brushCopy->mSpacing[2] = brush->mSpacing[2];
+						brushCopy->mMin = brush->mMin;
+						brushCopy->mMax = brush->mMax;
+						brushCopy->createTexture();
+
+						swept->mIsSweptVolume = true;
+						swept->mSourceTrajectory = new DgTrajectory(traj);
+						swept->mBrushVolume = brushCopy;
+						swept->mSweepResolution = sweepResolution;
+						swept->mSweepTimeSteps = timeSteps;
+						swept->mSweepMethod = 3;  // 버튼마다 0/1/2/3
 						//DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
