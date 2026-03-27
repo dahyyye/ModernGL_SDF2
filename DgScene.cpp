@@ -133,6 +133,8 @@ void DgScene::showWindow()
 		return;
 	}
 
+	ImGuizmo::BeginFrame();
+
 	// 윈도우 위치 저장 (드래그 선택 좌표 계산용)
 	mWindowPos = ImGui::GetWindowPos();
 
