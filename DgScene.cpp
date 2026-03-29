@@ -398,7 +398,7 @@ void DgScene::processMouseEvent()
 			mDragEndPos = ImGui::GetMousePos();
 		}
 
-		else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))		// 클릭했던 왼쪽 버튼을 놓는 경우
+		else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
 		{
 			// 드래그 선택 완료: 선택 수행
 			if (mIsDragSelecting)
@@ -834,7 +834,7 @@ void DgScene::renderScene()
 	ImTextureID textureID = (void*)(uintptr_t)mFrameBuf.getFrameTexture();
 	ImGui::Image(textureID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 	
-	// ImGuizmo 렌더링 (ImGui::Image 위에 오버레이)
+	// ImGuizmo 렌더링
 	if (hasSelectedVolumes() && mEditMode != EditMode::Select && mEditMode != EditMode::Trajectory)
 	{
 		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
@@ -850,7 +850,7 @@ void DgScene::renderScene()
 		ImVec2 winSize = ImGui::GetWindowSize();
 		ImGuizmo::SetRect(winPos.x, winPos.y, winSize.x, winSize.y);
 
-		// 조작 모드 결정
+		// 조작 모드 결정(버튼이랑 연결)
 		ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
 		if (mEditMode == EditMode::Rotate) op = ImGuizmo::ROTATE;
 		if (mEditMode == EditMode::Scale)  op = ImGuizmo::SCALE;
@@ -870,9 +870,9 @@ void DgScene::renderScene()
 				glm::value_ptr(modelMat)
 			);
 
-			if (ImGuizmo::IsUsing())
+			if (ImGuizmo::IsUsing())		// 기즈모 조작 결과를 볼륨에 반영
 			{
-				// 기즈모 조작 결과를 볼륨에 반영
+				// 수정된 modelMat을 translation / rotation(euler) / scale 로 분해
 				glm::vec3 translation, rotation, scale;
 				ImGuizmo::DecomposeMatrixToComponents(
 					glm::value_ptr(modelMat),
@@ -1414,9 +1414,9 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 {
 	if (!vol || !vol->mIsSweptVolume || !vol->mSourceTrajectory || !vol->mBrushVolume) return;
 
-	int res = preview ? 32 : vol->mSweepResolution;
-	int steps = preview ? 20 : vol->mSweepTimeSteps;
-	int method = preview ? 3 : vol->mSweepMethod;  // preview는 항상 BrentGPU (제일 빠름)
+	int res = preview ? 128 : vol->mSweepResolution;
+	int steps = preview ? 50 : vol->mSweepTimeSteps;
+	int method = preview ? 3 : vol->mSweepMethod;
 
 	const DgTrajectory& traj = *vol->mSourceTrajectory;
 	DgVolume* newVol = nullptr;
@@ -1428,7 +1428,7 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	}
 	if (!newVol) return;
 
-	if (!preview) DgSweep::fastSweeping(newVol);  // preview는 FSM 스킵
+	if (!preview) DgSweep::fastSweeping(newVol);
 
 	vol->mData = std::move(newVol->mData);
 	for (int i = 0; i < 3; ++i) {
