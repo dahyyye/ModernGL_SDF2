@@ -21,7 +21,7 @@ public:
 	/*! \brief SDF의 기본 메쉬 */
 	DgMesh* mMesh = nullptr;
 
-	/*! \brief 볼륨 이름 (sphere, bunny 등) */
+	/*! \brief 볼륨 이름 */
 	std::string mName;
 
 	/*! \brief 격자 해상도 */
@@ -36,7 +36,7 @@ public:
 	/*! \brief 격자 간격 */
 	double mSpacing[3] = { 0.0, 0.0, 0.0 };
 
-	/*! \brief 부호거리장 데이터(격자 샘플별 부호거리 값) */
+	/*! \brief 부호거리장 데이터 */
 	std::vector<float> mData;
 
 	/* 볼륨의 텍스쳐 id */
@@ -51,16 +51,16 @@ public:
 	/*! \brief 볼륨 위치 */
 	glm::vec3 mPosition = glm::vec3(0.0f);
 
-	/*! \brief 볼륨 회전 (쿼터니언) */
+	/*! \brief 볼륨 회전 */
 	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
 
 	// Swept volume metadata
-	bool           mIsSweptVolume = false;
+	bool mIsSweptVolume = false;
 	DgTrajectory* mSourceTrajectory = nullptr;  // owned
 	DgVolume* mBrushVolume = nullptr;  // owned copy (브러시 삭제돼도 안전)
-	int            mSweepResolution = 128;
-	int            mSweepTimeSteps = 100;
-	int            mSweepMethod = 3;
+	int mSweepResolution;
+	int mSweepTimeSteps;
+	int mSweepMethod;
 
 	/*! \brief VTI 저장 함수 */ 
 	bool saveToVTI(const char* filename);

@@ -125,8 +125,6 @@ public:
 		mMtlIdx = mtlIdx;
 	}
 	~DgFace() {}
-
-	DgPos getVertexPos(int vidx);
 };
 
 /*!
