@@ -250,7 +250,7 @@ void DgScene::processMouseEvent()
 		}
 
 		// Bezier 컨트롤 포인트 드래그 (자동생성 커브에서도 동작)
-		if (mEditMode == EditMode::Trajectory && !mTrajectory.controlPoints.empty())
+		if (mEditMode == EditMode::Trajectory && !mTrajectory.keyframes.empty())
 		{
 			// View / Projection 행렬 재구성
 			glm::mat4 proj = glm::perspective(glm::radians(30.0f),
@@ -273,9 +273,9 @@ void DgScene::processMouseEvent()
 			{
 				float bestDist = kPickRadius;
 				int   bestIdx = -1;
-				for (int i = 0; i < (int)mTrajectory.controlPoints.size(); ++i)
+				for (int i = 0; i < (int)mTrajectory.keyframes.size(); ++i)
 				{
-					glm::vec3 cpPos = mTrajectory.controlPoints[i].position;
+					glm::vec3 cpPos = mTrajectory.keyframes[i].position;
 					// 마우스를 해당 CP의 Y 평면에 투영
 					glm::vec3 mouseWorld = mouseToWorld(mouse, cpPos.y);
 					// XZ 평면 거리만 비교
@@ -290,9 +290,9 @@ void DgScene::processMouseEvent()
 			// ② 드래그 중: CP를 Y = 고정 평면에서 마우스 월드 좌표로 이동
 			if (mDraggingCP >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left))
 			{
-				float planeY = mTrajectory.controlPoints[mDraggingCP].position.y;
+				float planeY = mTrajectory.keyframes[mDraggingCP].position.y;
 				glm::vec3 newPos = mouseToWorld(mouse, planeY);
-				mTrajectory.controlPoints[mDraggingCP].position = newPos;
+				mTrajectory.keyframes[mDraggingCP].position = newPos;
 				mTrajectory.rebuild();  // 커브 즉시 재계산
 				return;
 			}
@@ -308,15 +308,15 @@ void DgScene::processMouseEvent()
 		if (mEditMode != EditMode::Trajectory
 			&& mSelectedSweptVolume != nullptr
 			&& mSelectedSweptVolume->mSourceTrajectory != nullptr
-			&& (int)mSelectedSweptVolume->mSourceTrajectory->controlPoints.size() >= 4)
+			&& (int)mSelectedSweptVolume->mSourceTrajectory->keyframes.size() >= 2)
 		{
 			auto& srcTraj = *mSelectedSweptVolume->mSourceTrajectory;
 			ImVec2 mouse = ImGui::GetMousePos();
 
 			if (mDraggingSweptCP >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left))
 			{
-				float planeY = srcTraj.controlPoints[mDraggingSweptCP].position.y;
-				srcTraj.controlPoints[mDraggingSweptCP].position = mouseToWorld(mouse, planeY);
+				float planeY = srcTraj.keyframes[mDraggingSweptCP].position.y;
+				srcTraj.keyframes[mDraggingSweptCP].position = mouseToWorld(mouse, planeY);
 				srcTraj.rebuild();
 				resweepVolume(mSelectedSweptVolume, true);  // ← true = preview 모드
 				return;
@@ -327,9 +327,9 @@ void DgScene::processMouseEvent()
 				const float kPickRadius = 2.5f;
 				float bestDist = kPickRadius;
 				int   bestIdx = -1;
-				for (int i = 0; i < (int)srcTraj.controlPoints.size(); ++i)
+				for (int i = 0; i < (int)srcTraj.keyframes.size(); ++i)
 				{
-					glm::vec3 cp = srcTraj.controlPoints[i].position;
+					glm::vec3 cp = srcTraj.keyframes[i].position;
 					glm::vec3 mw = mouseToWorld(mouse, cp.y);
 					float dist = sqrtf(powf(mw.x - cp.x, 2) + powf(mw.z - cp.z, 2));
 					if (dist < bestDist) { bestDist = dist; bestIdx = i; }
@@ -1274,49 +1274,27 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 	glLineWidth(3.0f);
 	glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)mTrajectory.size());
 
-	// 노란색 점으로 프레임 위치 표시
-	//glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
-	//glPointSize(6.0f);
-	//glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());
-
-	if (!mTrajectory.controlPoints.empty() && mTrajectory.controlPoints.size() >= 4)
+	if (!mTrajectory.keyframes.empty())
 	{
-		auto& cp = mTrajectory.controlPoints;
 		GLint colorLoc = glGetUniformLocation(mBBoxShader, "uColor");
 
-		// ── ① 핸들 라인: p0→p1, p2→p3 (얇은 회백색 점선 느낌) ──────────
-		float handleVerts[] = {
-			cp[0].position.x, cp[0].position.y, cp[0].position.z,
-			cp[1].position.x, cp[1].position.y, cp[1].position.z,
-			cp[2].position.x, cp[2].position.y, cp[2].position.z,
-			cp[3].position.x, cp[3].position.y, cp[3].position.z,
-		};
-		glBufferData(GL_ARRAY_BUFFER, sizeof(handleVerts), handleVerts, GL_DYNAMIC_DRAW);
-		glUniform3f(colorLoc, 0.75f, 0.75f, 0.75f);
-		glLineWidth(1.5f);
-		glDrawArrays(GL_LINE_STRIP, 0, 2);  // p0 → p1
-		glDrawArrays(GL_LINE_STRIP, 2, 2);  // p2 → p3
-
-		// ── ② 컨트롤 포인트 (개별 색상) ───────────────────────────────────
-		for (int i = 0; i < 4; ++i)
+		for (int i = 0; i < (int)mTrajectory.keyframes.size(); ++i)
 		{
-			float pt[3] = { cp[i].position.x, cp[i].position.y, cp[i].position.z };
+			glm::vec3 kfPos = mTrajectory.keyframes[i].position;
+			float pt[3] = { kfPos.x, kfPos.y, kfPos.z };
 			glBufferData(GL_ARRAY_BUFFER, sizeof(pt), pt, GL_DYNAMIC_DRAW);
 
 			if (i == mDraggingCP) {
-				// 드래그 중: 밝은 빨강 + 가장 큰 포인트
-				glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f);
+				glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f);  // 드래그 중: 빨강
 				glPointSize(18.0f);
 			}
-			else if (i == 0 || i == 3) {
-				// 끝점 (P0, P3): 금색 - 이미지의 오렌지 다이아몬드
-				glUniform3f(colorLoc, 1.0f, 0.78f, 0.1f);
+			else if (i == 0 || i == (int)mTrajectory.keyframes.size() - 1) {
+				glUniform3f(colorLoc, 1.0f, 0.78f, 0.1f);   // 시작/끝: 노랑
 				glPointSize(14.0f);
 			}
 			else {
-				// 핸들 (P1, P2): 흰색 - 이미지의 작은 흰 원
-				glUniform3f(colorLoc, 0.9f, 0.9f, 0.9f);
-				glPointSize(10.0f);
+				glUniform3f(colorLoc, 0.4f, 0.8f, 1.0f);    // 중간 키프레임: 하늘색
+				glPointSize(12.0f);
 			}
 			glDrawArrays(GL_POINTS, 0, 1);
 		}
@@ -1377,28 +1355,28 @@ void DgScene::renderSweptVolumeTrajectory(const glm::mat4& viewMat,
 	glLineWidth(3.0f);
 	glDrawArrays(GL_LINE_STRIP, 0, (GLsizei)traj.size());
 
-	if ((int)traj.controlPoints.size() >= 4)
+	if (!traj.keyframes.empty())
 	{
-		const auto& cp = traj.controlPoints;
-		float handleVerts[12] = {
-			cp[0].position.x, cp[0].position.y, cp[0].position.z,
-			cp[1].position.x, cp[1].position.y, cp[1].position.z,
-			cp[2].position.x, cp[2].position.y, cp[2].position.z,
-			cp[3].position.x, cp[3].position.y, cp[3].position.z,
-		};
-		glBufferData(GL_ARRAY_BUFFER, sizeof(handleVerts), handleVerts, GL_DYNAMIC_DRAW);
-		glUniform3f(colorLoc, 0.3f, 0.6f, 0.6f);
-		glLineWidth(1.5f);
-		glDrawArrays(GL_LINE_STRIP, 0, 2);
-		glDrawArrays(GL_LINE_STRIP, 2, 2);
+		GLint colorLoc = glGetUniformLocation(mBBoxShader, "uColor");
 
-		for (int i = 0; i < 4; ++i)
+		for (int i = 0; i < (int)traj.keyframes.size(); ++i)
 		{
-			float pt[3] = { cp[i].position.x, cp[i].position.y, cp[i].position.z };
+			glm::vec3 kfPos = traj.keyframes[i].position;
+			float pt[3] = { kfPos.x, kfPos.y, kfPos.z };
 			glBufferData(GL_ARRAY_BUFFER, sizeof(pt), pt, GL_DYNAMIC_DRAW);
-			if (i == mDraggingSweptCP) { glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f); glPointSize(18.0f); }
-			else if (i == 0 || i == 3) { glUniform3f(colorLoc, 0.0f, 1.0f, 1.0f);  glPointSize(14.0f); }
-			else { glUniform3f(colorLoc, 0.5f, 0.85f, 0.85f); glPointSize(10.0f); }
+
+			if (i == mDraggingSweptCP) {
+				glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f);
+				glPointSize(18.0f);
+			}
+			else if (i == 0 || i == (int)traj.keyframes.size() - 1) {
+				glUniform3f(colorLoc, 0.0f, 1.0f, 1.0f);
+				glPointSize(14.0f);
+			}
+			else {
+				glUniform3f(colorLoc, 0.3f, 0.85f, 0.85f);
+				glPointSize(12.0f);
+			}
 			glDrawArrays(GL_POINTS, 0, 1);
 		}
 	}

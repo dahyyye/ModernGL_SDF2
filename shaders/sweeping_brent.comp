@@ -14,7 +14,7 @@ struct ControlPoint {
 };
 
 layout(std430, binding = 2) buffer ControlPointBuffer {
-    ControlPoint controlPoints[4];
+    ControlPoint controlPoints[];           // 크기 가변 (unsized array)
 };
 
 uniform vec3 uVolumeMin;    // 결과 볼륨의 최소 좌표
@@ -24,7 +24,9 @@ uniform ivec3 uResolution;  // 결과 볼륨의 해상도 (x, y, z)
 uniform vec3 uBrushMin;     // 브러시의 로컬 공간 최소 좌표
 uniform vec3 uBrushMax;     // 브러시의 로컬 공간 최대 좌표
 
-uniform int uSamplingSteps; //궤적을 몇개의 세그먼트로 나눌지
+uniform int uSamplingSteps; // 궤적을 몇개의 세그먼트로 나눌지
+
+uniform int uNumSegments;   
 
 // 브러시 SDF 샘플링 함수: 로컬 공간 좌표를 받아 SDF 값을 반환
 float sampleLocalSDF(vec3 localPos)
@@ -44,14 +46,26 @@ float sampleLocalSDF(vec3 localPos)
     return texture(uBrushSDF, uvw).r + outsideDist;     // 벗어난 만큼의 거리를 SDF에 추가
 }
 
+// 전역 t → (세그먼트 base index, 로컬 lt) 변환
+// base: controlPoints 배열에서 해당 세그먼트 시작 인덱스 (0, 4, 8, ...)
+int getSegBase(float t, out float lt)
+{
+    float scaled = clamp(t, 0.0, 1.0) * float(uNumSegments);
+    int seg      = clamp(int(scaled), 0, uNumSegments - 1);
+    lt           = scaled - float(seg);   // 세그먼트 내 로컬 t [0,1]
+    return seg * 4;                       // 배열 시작 인덱스
+}
+
 // 베지어 곡선에서 t에 해당하는 위치 계산
 vec3 cubicBezierPos(float t)
 {
-    float u = 1.0 - t;
-    return u*u*u * controlPoints[0].position.xyz
-         + 3.0*u*u*t * controlPoints[1].position.xyz
-         + 3.0*u*t*t * controlPoints[2].position.xyz
-         + t*t*t     * controlPoints[3].position.xyz;
+    float lt;
+    int base = getSegBase(t, lt);
+    float u = 1.0 - lt;
+    return u*u*u      * controlPoints[base+0].position.xyz
+         + 3.0*u*u*lt * controlPoints[base+1].position.xyz
+         + 3.0*u*lt*lt * controlPoints[base+2].position.xyz
+         + lt*lt*lt    * controlPoints[base+3].position.xyz;
 }
 
 // 구면 선형 보간 (Slerp) 함수: 두 쿼터니언과 t를 받아 보간된 쿼터니언을 반환
@@ -78,9 +92,15 @@ vec3 quatRotate(vec4 q, vec3 v)
 // 역변환 평가: t에 해당하는 위치와 회전을 계산하여, worldPos를 로컬 공간으로 변환
 vec3 evalInvTransformAt(float t, vec3 worldPos)
 {
-    vec3 pos = cubicBezierPos(t);
-    vec4 rot  = quatSlerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
-    vec4 invRot = vec4(-rot.xyz, rot.w); // conjugate = inverse for unit quaternion
+    float lt;
+    int base    = getSegBase(t, lt);
+
+    vec3 pos    = cubicBezierPos(t);   // 내부에서도 getSegBase 호출하지만 비용 무시 가능
+    vec4 rot    = quatSlerp(controlPoints[base+0].rotation,
+                            controlPoints[base+3].rotation, lt);
+    //                      ^^^^^^^^^^^^^^^^^^^             ^^^
+    //                      이 세그먼트의 시작 회전         이 세그먼트의 끝 회전
+    vec4 invRot = vec4(-rot.xyz, rot.w);
     return quatRotate(invRot, worldPos - pos);
 }
 

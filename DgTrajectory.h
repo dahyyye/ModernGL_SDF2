@@ -20,9 +20,10 @@ class DgTrajectory
 {
 public:
     std::vector<DgTrajectoryFrame> frames;
+    std::vector<DgTrajectoryFrame> keyframes;   // 컨트롤 포인트
     std::vector<DgTrajectoryFrame> controlPoints;   // 컨트롤 포인트
 
-    void clear() { frames.clear(); controlPoints.clear(); }
+    void clear() { frames.clear(); keyframes.clear();  controlPoints.clear(); }
     size_t size() const { return frames.size(); }
     bool empty() const { return frames.empty(); }
 
@@ -32,33 +33,38 @@ public:
 
     // t (0~1)에서의 변환 행렬 반환
     glm::mat4 getTransformAt(float t) const {
-        if (frames.empty()) return glm::mat4(1.0f);
+        
+		int numSegs = (int)controlPoints.size() / 4;
 
-        // 컨트롤 포인트가 있으면 베지어 곡선 직접 계산
-        if (controlPoints.size() >= 4) {
+        if (numSegs == 0)
+        {
+            if (frames.empty()) return glm::mat4(1.0f);
+            if (frames.size() == 1)
+                return glm::translate(glm::mat4(1.0f), frames[0].position) * glm::mat4_cast(frames[0].rotation);
+
             t = glm::clamp(t, 0.0f, 1.0f);
-            glm::vec3 pos = cubicBezier(
-                controlPoints[0].position, controlPoints[1].position,
-                controlPoints[2].position, controlPoints[3].position, t);
-            glm::quat rot = glm::slerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
+            float idx = t * (frames.size() - 1);
+            int   i0 = (int)floor(idx);
+            int   i1 = glm::min(i0 + 1, (int)frames.size() - 1);
+            float alpha = idx - i0;
+            glm::vec3 pos = glm::mix(frames[i0].position, frames[i1].position, alpha);
+            glm::quat rot = glm::slerp(frames[i0].rotation, frames[i1].rotation, alpha);
             return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
         }
 
-        if (frames.size() == 1) {
-            return glm::translate(glm::mat4(1.0f), frames[0].position)
-                * glm::mat4_cast(frames[0].rotation); // 이동 * 회전
-        }
-
-        // t를 프레임 인덱스로 변환
+        // 세그먼트 인덱싱
         t = glm::clamp(t, 0.0f, 1.0f);
-        float idx = t * (frames.size() - 1);
-        int i0 = (int)floor(idx);
-        int i1 = glm::min(i0 + 1, (int)frames.size() - 1);
-        float alpha = idx - i0;
+        float scaled = t * numSegs;
+        int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
+        float lt = scaled - (float)seg;
+        int   base = seg * 4;
 
-        // 선형 보간 (위치) + SLERP (회전)
-        glm::vec3 pos = glm::mix(frames[i0].position, frames[i1].position, alpha);
-        glm::quat rot = glm::slerp(frames[i0].rotation, frames[i1].rotation, alpha);
+        glm::vec3 pos = cubicBezier(
+            controlPoints[base + 0].position, controlPoints[base + 1].position,
+            controlPoints[base + 2].position, controlPoints[base + 3].position, lt);
+        glm::quat rot = glm::slerp(
+            controlPoints[base + 0].rotation,
+            controlPoints[base + 3].rotation, lt);
 
         return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
     }
@@ -95,23 +101,16 @@ public:
         return u * u * u * p0 + 3.0f * u * u * t * p1 + 3.0f * u * t * t * p2 + t * t * t * p3;
     }
 
-    // 컨트롤 포인트 4개로 베지어 곡선 생성
+    // 곡선 생성
     void generateCurve(const glm::vec3& center, int numSamples = 64)
     {
         clear();
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
 
-        // 컨트롤 포인트 4개 (S자 형태)
-        glm::vec3 p0 = center;
-        glm::vec3 p1 = center + glm::vec3(3.0f, 0.0f, 4.0f);
-        glm::vec3 p2 = center + glm::vec3(7.0f, 0.0f, -4.0f);
-        glm::vec3 p3 = center + glm::vec3(20.0f, 0.0f, 0.0f);
-
-		// 4개 컨트롤 포인트 저장 
-        controlPoints.emplace_back(p0, baseRot);
-        controlPoints.emplace_back(p1, baseRot);
-        controlPoints.emplace_back(p2, baseRot);
-        controlPoints.emplace_back(p3, baseRot);
+        keyframes.emplace_back(center, baseRot);
+        keyframes.emplace_back(center + glm::vec3(5.0f, 0.0f, 4.0f), baseRot);
+        keyframes.emplace_back(center + glm::vec3(13.0f, 0.0f, -3.0f), baseRot);
+        keyframes.emplace_back(center + glm::vec3(20.0f, 0.0f, 0.0f), baseRot);
 
         rebuild(numSamples);
     }
@@ -119,17 +118,25 @@ public:
     // controlPoints로부터 frames 재생성
     void rebuild(int numSamples = 64)
     {
-        if (controlPoints.size() < 4) return;
+        catmullRomToSegments();            // keyframes → controlPoints 자동 계산
+        int numSegs = (int)controlPoints.size() / 4;
+        if (numSegs == 0) return;
         frames.clear();
 
         for (int i = 0; i < numSamples; ++i)
         {
             float t = (float)i / (numSamples - 1);
-            glm::vec3 pos = cubicBezier(
-                controlPoints[0].position, controlPoints[1].position,
-                controlPoints[2].position, controlPoints[3].position, t);
+            float scaled = t * numSegs;
+            int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
+            float lt = scaled - (float)seg;     // 해당 세그먼트 내 로컬 t
+            int   base = seg * 4;
 
-            glm::quat rot = glm::slerp(controlPoints[0].rotation, controlPoints[3].rotation, t);
+            glm::vec3 pos = cubicBezier(
+                controlPoints[base + 0].position, controlPoints[base + 1].position,
+                controlPoints[base + 2].position, controlPoints[base + 3].position, lt);
+            glm::quat rot = glm::slerp(
+                controlPoints[base + 0].rotation,
+                controlPoints[base + 3].rotation, lt);
             frames.emplace_back(pos, rot);
         }
     }
@@ -137,11 +144,10 @@ public:
     void saveToFile(const char* filename) const
     {
         std::ofstream f(filename);
-        const auto& data = controlPoints.empty() ? frames : controlPoints;
-        f << data.size() << "\n";
-        for (auto& cp : data)
-            f << cp.position.x << " " << cp.position.y << " " << cp.position.z << " "
-            << cp.rotation.w << " " << cp.rotation.x << " " << cp.rotation.y << " " << cp.rotation.z << "\n";
+        f << keyframes.size() << "\n";
+        for (auto& kf : keyframes)
+            f << kf.position.x << " " << kf.position.y << " " << kf.position.z << " "
+            << kf.rotation.w << " " << kf.rotation.x << " " << kf.rotation.y << " " << kf.rotation.z << "\n";
         std::cout << filename << " 저장 완료" << std::endl;
     }
 
@@ -149,13 +155,55 @@ public:
     {
         std::ifstream f(filename);
         int n; f >> n;
-        controlPoints.clear();
+        keyframes.clear();
         for (int i = 0; i < n; ++i) {
             glm::vec3 pos; glm::quat rot;
             f >> pos.x >> pos.y >> pos.z >> rot.w >> rot.x >> rot.y >> rot.z;
-            controlPoints.emplace_back(pos, rot);
+            keyframes.emplace_back(pos, rot);
         }
-        rebuild();
+        rebuild();  // keyframes → controlPoints → frames 순으로 자동 계산
+    }
+
+    void catmullRomToSegments()
+    {
+        controlPoints.clear();
+        int N = (int)keyframes.size();
+        if (N < 2) return;
+
+        for (int i = 0; i < N - 1; ++i)
+        {
+            // Ki-1: 없으면 phantom
+            glm::vec3 km1 = (i == 0)
+                ? (2.0f * keyframes[0].position - keyframes[1].position)
+                : keyframes[i - 1].position;
+
+            glm::vec3 k0 = keyframes[i].position;
+            glm::vec3 k1 = keyframes[i + 1].position;
+
+            // Ki+2: 없으면 phantom
+            glm::vec3 k2 = (i + 2 < N)
+                ? keyframes[i + 2].position
+                : (2.0f * keyframes[N - 1].position - keyframes[N - 2].position);
+
+            // 베지어 제어점 계산
+            glm::vec3 p0 = k0;
+            glm::vec3 p1 = k0 + (k1 - km1) / 6.0f;
+            glm::vec3 p2 = k1 - (k2 - k0) / 6.0f;
+            glm::vec3 p3 = k1;
+
+            // 회전: 이 세그먼트의 시작/끝 키프레임 회전
+            glm::quat r0 = keyframes[i].rotation;
+            glm::quat r3 = keyframes[i + 1].rotation;
+
+            // 베지어 내부 제어점 회전은 1/3, 2/3 보간
+            glm::quat r1 = glm::slerp(r0, r3, 1.0f / 3.0f);
+            glm::quat r2 = glm::slerp(r0, r3, 2.0f / 3.0f);
+
+            controlPoints.emplace_back(p0, r0);
+            controlPoints.emplace_back(p1, r1);
+            controlPoints.emplace_back(p2, r2);
+            controlPoints.emplace_back(p3, r3);
+        }
     }
 };
 

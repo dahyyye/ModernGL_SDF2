@@ -208,7 +208,7 @@ void OpenProperty() {
 
 		DgTrajectory& traj = DgScene::instance().mTrajectory;
 
-		if (!traj.controlPoints.empty())
+		if (!traj.keyframes.empty())
 		{
 			ImGui::Separator();
 			ImGui::Text("Curve Rotation");
@@ -218,13 +218,29 @@ void OpenProperty() {
 
 			bool changed = false;
 			changed |= ImGui::SliderFloat3("Start (deg)", glm::value_ptr(startEuler), -180.f, 180.f);
-			changed |= ImGui::SliderFloat3("End   (deg)", glm::value_ptr(endEuler), -180.f, 180.f);
+			changed |= ImGui::SliderFloat3("End (deg)", glm::value_ptr(endEuler), -180.f, 180.f);
 
 			if (changed)
 			{
-				traj.controlPoints[0].rotation = glm::quat(glm::radians(startEuler));
-				traj.controlPoints[3].rotation = glm::quat(glm::radians(endEuler));
+				traj.keyframes.front().rotation = glm::quat(glm::radians(startEuler));
+				traj.keyframes.back().rotation = glm::quat(glm::radians(endEuler));
 				traj.rebuild();  // 슬라이더 움직일 때마다 frames 재생성
+			}
+
+			static int numKF = 4;
+			if (ImGui::SliderInt("Keyframes", &numKF, 2, 10))
+			{
+				// 현재 곡선(frames)을 따라 numKF개 위치로 재분배
+				std::vector<DgTrajectoryFrame> newKF(numKF);
+				for (int i = 0; i < numKF; ++i)
+				{
+					float t = (float)i / (numKF - 1);
+					glm::mat4 T = traj.getTransformAt(t);
+					newKF[i].position = glm::vec3(T[3]);
+					newKF[i].rotation = glm::quat_cast(T);
+				}
+				traj.keyframes = newKF;
+				traj.rebuild();
 			}
 		}
 

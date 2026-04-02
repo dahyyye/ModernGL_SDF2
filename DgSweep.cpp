@@ -277,22 +277,27 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    // 제어점 4개를 GPU에 넘기기 위한 구조체 (shader layout과 일치: vec4 + vec4)
-	struct GPUControlPoint { // shader에서 std140 레이아웃을 맞추기 위해 vec4로 정의
-        glm::vec4 position; // xyz = pos, w = 0
-        glm::vec4 rotation; // xyzw = quat
+    // GPU에 넘기기 위한 구조체
+    struct GPUControlPoint {
+        glm::vec4 position;
+        glm::vec4 rotation;
     };
 
-	// 메모리 레이아웃 맞춰서 4개의 제어점 데이터 준비
-    GPUControlPoint gpuCPs[4];
-	for (int i = 0; i < 4; i++) { //vec4로 패딩 맞추기 위해 w는 0으로 설정
+    // controlPoints.size()는 4 * numSegs (1번 변경 결과)
+    int numSegs = (int)trajectory.controlPoints.size() / 4;
+    std::vector<GPUControlPoint> gpuCPs(numSegs * 4);
+
+    for (int i = 0; i < numSegs * 4; ++i) {
         gpuCPs[i].position = glm::vec4(trajectory.controlPoints[i].position, 0.0f);
         glm::quat q = trajectory.controlPoints[i].rotation;
-		gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w); // GPU에서는 쿼터니언을 vec4로 전달 (x,y,z,w 순서)
+        gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(gpuCPs), gpuCPs, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+        gpuCPs.size() * sizeof(GPUControlPoint),  // 크기가 동적으로 결정됨
+        gpuCPs.data(),
+        GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 
     // Compute Shader 실행
@@ -334,7 +339,10 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMax"),
         localMax.x, localMax.y, localMax.z);
 
+	// 셰이더의 uSamplingSteps에 샘플링 스텝 수 전달
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uSamplingSteps"), samplingSteps);
+    // 셰이더의 uNumSegments에 세그먼트 수 전달
+    glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
 
     // Dispatch
     int numGroups = (resolution + 7) / 8;
