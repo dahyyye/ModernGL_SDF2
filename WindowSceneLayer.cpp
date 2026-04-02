@@ -103,8 +103,6 @@ void ShowWindowSceneLayer(bool* p_open)
 					{
 						DgScene::instance().mTrajectory = trajList[i];
 						DgScene::instance().mDrawingVolume = selectedVol;
-						DgScene::instance().mOriginalPos = selectedVol->mPosition;
-						DgScene::instance().mOriginalRot = selectedVol->mRotation;
 						DgScene::instance().setEditMode(EditMode::Trajectory);
 					}
 				}

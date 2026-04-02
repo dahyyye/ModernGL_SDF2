@@ -44,16 +44,11 @@ public:
 	bool mBBoxBufferInitialized;
 
 	// 편집 모드 관련 변수
-	EditMode mEditMode = EditMode::Select;	// 현재 편집 모드
-	bool mIsMoving = false;					// 이동 드래그 중인지
-	ImVec2 mMoveStartPos;					// 이동 시작 마우스 위치
+	EditMode mEditMode = EditMode::Select;	
 
 	// 궤적 모드 관련 변수
 	DgTrajectory mTrajectory;				// 현재 궤적
 	DgVolume* mDrawingVolume = nullptr;		// 궤적 생성 대상 볼륨
-	glm::quat mCurrentRot;					// 현재 회전
-	glm::vec3 mOriginalPos;					// 원래 위치
-	glm::quat mOriginalRot;					// 원래 회전
 	int  mDraggingCP = -1;				// 드래그 중인 CP 인덱스 (-1 = 없음)
 	std::vector<DgTrajectory> mSavedTrajectories;   // 저장된 궤적 목록
 

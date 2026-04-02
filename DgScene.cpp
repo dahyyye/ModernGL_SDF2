@@ -1061,21 +1061,12 @@ void DgScene::enterTrajectoryMode()
 
 	// 볼륨의 원래 상태 저장
 	mDrawingVolume = vol;						// 기록할 볼륨 설정
-	mOriginalPos = vol->mPosition;				// 위치
-	mOriginalRot = vol->mRotation;				// 회전
-	mCurrentRot = vol->mRotation;				// 현재 회전
 	mTrajectory.clear();						// 기존 궤적 초기화
 	mEditMode = EditMode::Trajectory;			// 편집 모드 변경
 }
 
 void DgScene::exitTrajectoryMode()
 {
-	// 볼륨 원래 위치로 복원
-	if (mDrawingVolume) {
-		mDrawingVolume->mPosition = mOriginalPos;
-		mDrawingVolume->mRotation = mOriginalRot;
-	}
-
 	mDrawingVolume = nullptr;
 	mTrajectory.clear();
 	mEditMode = EditMode::Select;
