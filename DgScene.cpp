@@ -846,6 +846,7 @@ void DgScene::renderScene()
 
 			glm::mat4 gizmoMat = glm::translate(glm::mat4(1.0f), worldCenter);
 			gizmoMat *= glm::mat4_cast(vol->mRotation);
+			gizmoMat = glm::scale(gizmoMat, vol->mScale);
 
 			ImGuizmo::Manipulate(
 				glm::value_ptr(viewMat),
@@ -866,6 +867,7 @@ void DgScene::renderScene()
 				);
 				vol->mPosition = translation - localCenter;
 				vol->mRotation = glm::quat(glm::radians(rotation));
+				vol->mScale = scale;
 			}
 			break; // 첫 번째 선택 볼륨만
 		}

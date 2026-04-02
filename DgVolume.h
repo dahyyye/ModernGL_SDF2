@@ -54,6 +54,9 @@ public:
 	/*! \brief 볼륨 회전 */
 	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
 
+	/*! \brief 볼륨 스케일 */
+	glm::vec3 mScale = glm::vec3(1.0f);
+
 	// Swept volume metadata
 	bool mIsSweptVolume = false;
 	DgTrajectory* mSourceTrajectory = nullptr;  // owned
@@ -144,6 +147,7 @@ public:
 		// 중심으로 이동 → 회전 → 원래 위치로
 		model = glm::translate(model, center);
 		model = model * glm::mat4_cast(mRotation);  // 쿼터니언 → 회전 행렬
+		model = glm::scale(model, mScale);			// 스케일 적용
 		model = glm::translate(model, -center);
 
 		return model;
