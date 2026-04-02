@@ -189,7 +189,6 @@ public:
 	bool hasSelectedVolumes() const;						// 선택된 볼륨 있는지 확인
 
 	// 궤적 기록 관련 함수
-	void enterTrajectoryMode();
 	void exitTrajectoryMode();
 	glm::vec3 mouseToWorld(ImVec2 mouse, float planeY);
 

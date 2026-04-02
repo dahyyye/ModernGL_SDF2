@@ -814,6 +814,7 @@ void DgScene::renderScene()
 	mFrameBuf.unbind();
 
 	ImTextureID textureID = (void*)(uintptr_t)mFrameBuf.getFrameTexture();
+	ImVec2 sceneImagePos = ImGui::GetCursorScreenPos();
 	ImGui::Image(textureID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 	
 	// ImGuizmo 렌더링
@@ -828,9 +829,7 @@ void DgScene::renderScene()
 		ImGuizmo::SetOrthographic(false);
 		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
 
-		ImVec2 winPos = ImGui::GetWindowPos();
-		ImVec2 winSize = ImGui::GetWindowSize();
-		ImGuizmo::SetRect(winPos.x, winPos.y, winSize.x, winSize.y);
+		ImGuizmo::SetRect(sceneImagePos.x, sceneImagePos.y, mSceneSize.x, mSceneSize.y);
 
 		// 조작 모드 결정(버튼이랑 연결)
 		ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
@@ -842,27 +841,30 @@ void DgScene::renderScene()
 		{
 			if (!vol || !vol->mSelected) continue;
 
-			glm::mat4 modelMat = vol->getModelMatrix();
+			glm::vec3 localCenter = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+			glm::vec3 worldCenter = vol->getCenter();
+
+			glm::mat4 gizmoMat = glm::translate(glm::mat4(1.0f), worldCenter);
+			gizmoMat *= glm::mat4_cast(vol->mRotation);
 
 			ImGuizmo::Manipulate(
 				glm::value_ptr(viewMat),
 				glm::value_ptr(projMat),
 				op,
 				ImGuizmo::WORLD,
-				glm::value_ptr(modelMat)
+				glm::value_ptr(gizmoMat)
 			);
 
-			if (ImGuizmo::IsUsing())		// 기즈모 조작 결과를 볼륨에 반영
+			if (ImGuizmo::IsUsing())
 			{
-				// 수정된 modelMat을 translation / rotation(euler) / scale 로 분해
 				glm::vec3 translation, rotation, scale;
 				ImGuizmo::DecomposeMatrixToComponents(
-					glm::value_ptr(modelMat),
+					glm::value_ptr(gizmoMat),
 					glm::value_ptr(translation),
 					glm::value_ptr(rotation),
 					glm::value_ptr(scale)
 				);
-				vol->mPosition = translation;
+				vol->mPosition = translation - localCenter;
 				vol->mRotation = glm::quat(glm::radians(rotation));
 			}
 			break; // 첫 번째 선택 볼륨만
@@ -1045,24 +1047,6 @@ void DgScene::resetScene()
 	mPan = glm::vec3(0.0f);
 	mEditMode = EditMode::Select;
 	std::cout << "장면 초기화 완료" << std::endl;
-}
-
-// 궤적 모드 진입 함수
-void DgScene::enterTrajectoryMode()
-{
-	// 선택된 볼륨 찾기
-	DgVolume* vol = nullptr;
-	int count = 0;
-	for (DgVolume* v : mSDFList) {
-		if (v && v->mSelected) { 
-			vol = v; 
-		}
-	}
-
-	// 볼륨의 원래 상태 저장
-	mDrawingVolume = vol;						// 기록할 볼륨 설정
-	mTrajectory.clear();						// 기존 궤적 초기화
-	mEditMode = EditMode::Trajectory;			// 편집 모드 변경
 }
 
 void DgScene::exitTrajectoryMode()
