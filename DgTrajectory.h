@@ -20,10 +20,17 @@ class DgTrajectory
 {
 public:
     std::vector<DgTrajectoryFrame> frames;
-    std::vector<DgTrajectoryFrame> keyframes;   // 컨트롤 포인트
-    std::vector<DgTrajectoryFrame> controlPoints;   // 컨트롤 포인트
+    std::vector<DgTrajectoryFrame> keyframes; 
+    std::vector<DgTrajectoryFrame> controlPoints; 
+	bool mIsLinear = false; // 선형 궤적 여부
 
-    void clear() { frames.clear(); keyframes.clear();  controlPoints.clear(); }
+    void clear() { 
+        frames.clear(); 
+        keyframes.clear();  
+        controlPoints.clear(); 
+        mIsLinear = false;
+     }
+
     size_t size() const { return frames.size(); }
     bool empty() const { return frames.empty(); }
 
@@ -77,9 +84,11 @@ public:
     void generateLinear(const glm::vec3& startPos, const glm::vec3& endPos)
     {
         clear();
+        mIsLinear = true; 
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
-        addFrame(startPos, baseRot);
-        addFrame(endPos, baseRot);
+        keyframes.emplace_back(startPos, baseRot);
+        keyframes.emplace_back(endPos, baseRot);
+        rebuild();
     }
 
     /*!
@@ -169,6 +178,23 @@ public:
         controlPoints.clear();
         int N = (int)keyframes.size();
         if (N < 2) return;
+
+        if (mIsLinear)   // ← 추가: 직선 제어점 생성
+        {
+            for (int i = 0; i < N - 1; ++i)
+            {
+                glm::vec3 k0 = keyframes[i].position;
+                glm::vec3 k1 = keyframes[i + 1].position;
+                glm::quat r0 = keyframes[i].rotation;
+                glm::quat r1 = keyframes[i + 1].rotation;
+
+                controlPoints.emplace_back(k0, r0);
+                controlPoints.emplace_back(k0 + (k1 - k0) / 3.0f, glm::slerp(r0, r1, 1.0f / 3.0f));
+                controlPoints.emplace_back(k0 + (k1 - k0) * 2.0f / 3.0f, glm::slerp(r0, r1, 2.0f / 3.0f));
+                controlPoints.emplace_back(k1, r1);
+            }
+            return;
+        }
 
         for (int i = 0; i < N - 1; ++i)
         {
