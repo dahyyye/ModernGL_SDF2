@@ -19,11 +19,14 @@ struct DgTrajectoryFrame
 class DgTrajectory
 {
 public:
-    std::vector<DgTrajectoryFrame> frames;
-    std::vector<DgTrajectoryFrame> keyframes; 
-    std::vector<DgTrajectoryFrame> controlPoints; 
-	bool mIsLinear = false; // 선형 궤적 여부
+	std::vector<DgTrajectoryFrame> frames;          // 균일 샘플링된 최종 궤적 프레임
+	std::vector<DgTrajectoryFrame> keyframes;       // 사용자가 지정한 키프레임
+	std::vector<DgTrajectoryFrame> controlPoints;   // 베지어 곡선 제어점
+	bool mIsLinear = false;                         // 선형 궤적 여부
 
+    /*!
+     *  \brief  모든 데이터 초기화
+     */
     void clear() { 
         frames.clear(); 
         keyframes.clear();  
@@ -31,10 +34,16 @@ public:
         mIsLinear = false;
      }
 
-    size_t size() const { return frames.size(); }
-    bool empty() const { return frames.empty(); }
+	size_t size() const { return frames.size(); }   // 샘플링된 프레임 수 반환
+	bool empty() const { return frames.empty(); }   // 프레임이 없는지 여부 반환
 
-    // t (0~1)에서의 변환 행렬 반환
+    /*!
+     *  \brief  t (0~1) 에서의 변환 행렬 반환
+     *  \param  t   0~1 범위의 궤적 파라미터
+     *  \return t에서의 위치 + 회전을 담은 4x4 변환 행렬
+     *  \note   controlPoints가 채워져 있어야 유효한 결과를 반환한다.
+     *          rebuild() 호출 이후에 사용할 것.
+     */
     glm::mat4 getTransformAt(float t) const {
         
 		int numSegs = (int)controlPoints.size() / 4;
@@ -57,9 +66,10 @@ public:
     }
 
     /*!
-     *  \brief  직선 궤적 생성 (시작점, 끝점 2개만 저장)
+     *  \brief  직선 궤적 생성
      *  \param  startPos  시작 위치
      *  \param  endPos    끝 위치
+     *  \note   mIsLinear = true로 설정되어 keyframe 추가 시에도 직선을 유지한다.
      */
     void generateLinear(const glm::vec3& startPos, const glm::vec3& endPos)
     {
@@ -72,25 +82,10 @@ public:
     }
 
     /*!
-	 *  \brief  4개 컨트롤 포인트로 S자 형태의 베지어 곡선 생성
-	 *  \param  p0  시작 위치
-	 *  \param  p1  컨트롤 포인트 1
-	 *  \param  p2  컨트롤 포인트 2
-	 *  \param  p3  끝 위치
-     *  \param  t   0~1 사이의 보간 인자
-     * 
-     *  \return t에서의 위치
-     * 
-	 *  \note   회전은 선형 보간으로 고정 (baseRot)
-    */
-    static glm::vec3 cubicBezier(const glm::vec3& p0, const glm::vec3& p1,
-        const glm::vec3& p2, const glm::vec3& p3, float t)
-    {
-        float u = 1.0f - t;
-        return u * u * u * p0 + 3.0f * u * u * t * p1 + 3.0f * u * t * t * p2 + t * t * t * p3;
-    }
-
-    // 곡선 생성
+     *  \brief  S자 형태의 Catmull-Rom 곡선 궤적 생성
+     *  \param  center      궤적의 시작 위치
+     *  \param  numSamples  frames 샘플링 수 (기본값 64, 스탬핑에만 해당)
+     */
     void generateCurve(const glm::vec3& center, int numSamples = 64)
     {
         clear();
@@ -104,7 +99,27 @@ public:
         rebuild(numSamples);
     }
 
-    // controlPoints로부터 frames 재생성
+    /*!
+     *  \brief  3차 Bezier 곡선 위의 점 계산
+     *  \param  p0  시작점
+     *  \param  p1  제어점 1
+     *  \param  p2  제어점 2
+     *  \param  p3  끝점
+     *  \param  t   0~1 범위의 파라미터
+     *  \return t에서의 Bezier 곡선 위 위치
+     */
+    static glm::vec3 cubicBezier(const glm::vec3& p0, const glm::vec3& p1,
+        const glm::vec3& p2, const glm::vec3& p3, float t)
+    {
+        float u = 1.0f - t;
+        return u * u * u * p0 + 3.0f * u * u * t * p1 + 3.0f * u * t * t * p2 + t * t * t * p3;
+    }
+
+    /*!
+     *  \brief  keyframes로부터 controlPoints와 frames를 재생성
+     *  \param  numSamples  frames 샘플링 수 (기본값 64)
+     *  \note   keyframes 변경 후 반드시 호출해야 세 표현이 동기화된다.
+     */
     void rebuild(int numSamples = 64)
     {
         catmullRomToSegments();            // keyframes → controlPoints 자동 계산
@@ -130,6 +145,10 @@ public:
         }
     }
 
+    /*!
+     *  \brief  궤적을 파일에 저장 (keyframes만 저장)
+     *  \param  filename  저장할 파일 경로
+     */
     void saveToFile(const char* filename) const
     {
         std::ofstream f(filename);
@@ -140,6 +159,10 @@ public:
         std::cout << filename << " 저장 완료" << std::endl;
     }
 
+    /*!
+     *  \brief  파일에서 궤적 로드 후 rebuild() 실행
+     *  \param  filename  로드할 파일 경로
+     */
     void loadFromFile(const char* filename)
     {
         std::ifstream f(filename);
@@ -153,6 +176,19 @@ public:
         rebuild();  // keyframes → controlPoints → frames 순으로 자동 계산
     }
 
+    /*!
+     *  \brief  keyframes를 Cubic Bezier 제어점(controlPoints)으로 변환
+     *
+     *  mIsLinear == true 인 경우:
+     *    각 세그먼트의 제어점을 p0, p0+1/3*(p1-p0), p0+2/3*(p1-p0), p1 로 설정하여
+     *    cubicBezier 평가 시 직선이 되도록 한다.
+     *
+     *  mIsLinear == false 인 경우:
+     *    Catmull-Rom → Cubic Bezier 변환 공식을 적용한다.
+     *    경계 세그먼트에서는 phantom point를 사용하여 자연스러운 접선을 유지한다.
+     *      p1 = k0 + (k1 - km1) / 6
+     *      p2 = k1 - (k2  - k0) / 6
+     */
     void catmullRomToSegments()
     {
         controlPoints.clear();
