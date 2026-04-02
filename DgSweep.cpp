@@ -278,16 +278,17 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMax += glm::vec3(radius);
 
     // 제어점 4개를 GPU에 넘기기 위한 구조체 (shader layout과 일치: vec4 + vec4)
-    struct GPUControlPoint {
+	struct GPUControlPoint { // shader에서 std140 레이아웃을 맞추기 위해 vec4로 정의
         glm::vec4 position; // xyz = pos, w = 0
         glm::vec4 rotation; // xyzw = quat
     };
 
+	// 메모리 레이아웃 맞춰서 4개의 제어점 데이터 준비
     GPUControlPoint gpuCPs[4];
-    for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 4; i++) { //vec4로 패딩 맞추기 위해 w는 0으로 설정
         gpuCPs[i].position = glm::vec4(trajectory.controlPoints[i].position, 0.0f);
         glm::quat q = trajectory.controlPoints[i].rotation;
-        gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
+		gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w); // GPU에서는 쿼터니언을 vec4로 전달 (x,y,z,w 순서)
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
