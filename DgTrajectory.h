@@ -82,9 +82,9 @@ public:
     }
 
     /*!
-     *  \brief  S자 형태의 Catmull-Rom 곡선 궤적 생성
+     *  \brief  Catmull-Rom 곡선 궤적 생성
      *  \param  center      궤적의 시작 위치
-     *  \param  numSamples  frames 샘플링 수 (기본값 64, 스탬핑에만 해당)
+     *  \param  numSamples  frames 샘플링 수 (기본값 64, 렌더링용)
      */
     void generateCurve(const glm::vec3& center, int numSamples = 64)
     {
@@ -186,7 +186,7 @@ public:
      *  mIsLinear == false 인 경우:
      *    Catmull-Rom → Cubic Bezier 변환 공식을 적용한다.
      *    경계 세그먼트에서는 phantom point를 사용하여 자연스러운 접선을 유지한다.
-     *      p1 = k0 + (k1 - km1) / 6
+     *      p1 = k0 + (k1 - k00) / 6
      *      p2 = k1 - (k2  - k0) / 6
      */
     void catmullRomToSegments()
@@ -195,41 +195,22 @@ public:
         int N = (int)keyframes.size();
         if (N < 2) return;
 
-        if (mIsLinear)   // ← 추가: 직선 제어점 생성
-        {
-            for (int i = 0; i < N - 1; ++i)
-            {
-                glm::vec3 k0 = keyframes[i].position;
-                glm::vec3 k1 = keyframes[i + 1].position;
-                glm::quat r0 = keyframes[i].rotation;
-                glm::quat r1 = keyframes[i + 1].rotation;
-
-                controlPoints.emplace_back(k0, r0);
-                controlPoints.emplace_back(k0 + (k1 - k0) / 3.0f, glm::slerp(r0, r1, 1.0f / 3.0f));
-                controlPoints.emplace_back(k0 + (k1 - k0) * 2.0f / 3.0f, glm::slerp(r0, r1, 2.0f / 3.0f));
-                controlPoints.emplace_back(k1, r1);
-            }
-            return;
-        }
-
         for (int i = 0; i < N - 1; ++i)
         {
-            // Ki-1: 없으면 phantom
-            glm::vec3 km1 = (i == 0)
-                ? (2.0f * keyframes[0].position - keyframes[1].position)
+            // i=0 이면 이전 정보가 없어서 임의로 만들어줌
+            glm::vec3 k00 = (i == 0) ? (2.0f * keyframes[0].position - keyframes[1].position)
                 : keyframes[i - 1].position;
 
             glm::vec3 k0 = keyframes[i].position;
             glm::vec3 k1 = keyframes[i + 1].position;
 
-            // Ki+2: 없으면 phantom
-            glm::vec3 k2 = (i + 2 < N)
-                ? keyframes[i + 2].position
+			// 마지막 세그먼트면 다음 정보가 없어서 임의로 만들어줌
+            glm::vec3 k2 = (i + 2 < N) ? keyframes[i + 2].position
                 : (2.0f * keyframes[N - 1].position - keyframes[N - 2].position);
 
             // 베지어 제어점 계산
             glm::vec3 p0 = k0;
-            glm::vec3 p1 = k0 + (k1 - km1) / 6.0f;
+            glm::vec3 p1 = k0 + (k1 - k00) / 6.0f;
             glm::vec3 p2 = k1 - (k2 - k0) / 6.0f;
             glm::vec3 p3 = k1;
 
@@ -245,6 +226,23 @@ public:
             controlPoints.emplace_back(p1, r1);
             controlPoints.emplace_back(p2, r2);
             controlPoints.emplace_back(p3, r3);
+        }
+
+        if (mIsLinear)   // 직선 제어점 생성
+        {
+            for (int i = 0; i < N - 1; ++i)
+            {
+                glm::vec3 k0 = keyframes[i].position;
+                glm::vec3 k1 = keyframes[i + 1].position;
+                glm::quat r0 = keyframes[i].rotation;
+                glm::quat r1 = keyframes[i + 1].rotation;
+
+                controlPoints.emplace_back(k0, r0);
+                controlPoints.emplace_back(k0 + (k1 - k0) / 3.0f, glm::slerp(r0, r1, 1.0f / 3.0f));
+                controlPoints.emplace_back(k0 + (k1 - k0) * 2.0f / 3.0f, glm::slerp(r0, r1, 2.0f / 3.0f));
+                controlPoints.emplace_back(k1, r1);
+            }
+            return;
         }
     }
 };

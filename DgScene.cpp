@@ -826,9 +826,10 @@ void DgScene::renderScene()
 		viewMat = viewMat * mRotMat;
 		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));
 
-		ImGuizmo::SetOrthographic(false);
-		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+		ImGuizmo::SetOrthographic(false); // 원근 투영 사용
+		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());	// Scene 창의 DrawList 사용
 
+		// ImGuizmo의 조작 영역을 Scene 창의 이미지 영역으로 설정 (콘텐츠 영역 기준)
 		ImGuizmo::SetRect(sceneImagePos.x, sceneImagePos.y, mSceneSize.x, mSceneSize.y);
 
 		// 조작 모드 결정(버튼이랑 연결)
@@ -841,14 +842,18 @@ void DgScene::renderScene()
 		{
 			if (!vol || !vol->mSelected) continue;
 
+			// 볼륨 데이터 공간에서의 중심 (로드된 VTI 바운딩박스 중심)
 			glm::vec3 localCenter = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+			
+			// 이동이 반영된 월드 공간에서의 실제 중심
 			glm::vec3 worldCenter = vol->getCenter();
 
+			// 기즈모 행렬을 worldCenter 기준으로 구성
 			glm::mat4 gizmoMat = glm::translate(glm::mat4(1.0f), worldCenter);
 			gizmoMat *= glm::mat4_cast(vol->mRotation);
 			gizmoMat = glm::scale(gizmoMat, vol->mScale);
 
-			ImGuizmo::Manipulate(
+			ImGuizmo::Manipulate(		// 기즈모 렌더링 및 입력 처리
 				glm::value_ptr(viewMat),
 				glm::value_ptr(projMat),
 				op,
@@ -856,7 +861,7 @@ void DgScene::renderScene()
 				glm::value_ptr(gizmoMat)
 			);
 
-			if (ImGuizmo::IsUsing())
+			if (ImGuizmo::IsUsing())	// 기즈모를 실제로 드래그 중일 때만 볼륨에 반영
 			{
 				glm::vec3 translation, rotation, scale;
 				ImGuizmo::DecomposeMatrixToComponents(
