@@ -278,25 +278,26 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMax += glm::vec3(radius);
 
     // GPU에 넘기기 위한 구조체
-    struct GPUControlPoint {
-        glm::vec4 position;
-        glm::vec4 rotation;
+    struct GPUKeyFrame {
+        glm::vec4 position; // xyz = 위치, w = 0 (패딩)
+        glm::vec4 rotation; // xyzw = 쿼터니언
     };
 
-    // controlPoints.size()는 4 * numSegs (1번 변경 결과)
-    int numSegs = (int)trajectory.controlPoints.size() / 4;
-    std::vector<GPUControlPoint> gpuCPs(numSegs * 4);
+    // Catmull-Rom 키프레임을 직접 GPU에 전송
+    int numKeyframes = (int)trajectory.keyframes.size();
+    int numSegs = numKeyframes - 1; // 세그먼트 수 = 키프레임 수 - 1
+    std::vector<GPUKeyFrame> gpuKFs(numKeyframes);
 
-    for (int i = 0; i < numSegs * 4; ++i) {
-        gpuCPs[i].position = glm::vec4(trajectory.controlPoints[i].position, 0.0f);
-        glm::quat q = trajectory.controlPoints[i].rotation;
-        gpuCPs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
+    for (int i = 0; i < numKeyframes; ++i) {
+        gpuKFs[i].position = glm::vec4(trajectory.keyframes[i].position, 0.0f);
+        glm::quat q = trajectory.keyframes[i].rotation;
+        gpuKFs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
-        gpuCPs.size() * sizeof(GPUControlPoint),  // 크기가 동적으로 결정됨
-        gpuCPs.data(),
+        gpuKFs.size() * sizeof(GPUKeyFrame),
+        gpuKFs.data(),
         GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
 

@@ -7,14 +7,15 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 layout(binding = 0) uniform sampler3D uBrushSDF;
 layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
 
-// SSBO 구조체 정의: 제어점은 위치(xyz)와 회전 쿼터니언(xyzw)으로 구성
-struct ControlPoint {
+// Catmull-Rom 키프레임 구조체: 위치(xyz)와 회전 쿼터니언(xyzw)
+struct KeyFrame {
     vec4 position; // xyz = position, w unused
     vec4 rotation; // quaternion (x, y, z, w)
 };
 
-layout(std430, binding = 2) buffer ControlPointBuffer {
-    ControlPoint controlPoints[];           // 크기 가변 (unsized array)
+// GPU로 전달된 키프레임 배열 (크기 가변)
+layout(std430, binding = 2) buffer KeyFrameBuffer {
+    KeyFrame keyframes[];
 };
 
 uniform vec3 uVolumeMin;    // 결과 볼륨의 최소 좌표
@@ -46,26 +47,42 @@ float sampleLocalSDF(vec3 localPos)
     return texture(uBrushSDF, uvw).r + outsideDist;     // 벗어난 만큼의 거리를 SDF에 추가
 }
 
-// 전역 t → (세그먼트 base index, 로컬 lt) 변환
-// base: controlPoints 배열에서 해당 세그먼트 시작 인덱스 (0, 4, 8, ...)
-int getSegBase(float t, out float lt)
+// Catmull-Rom은 keyframes를 직접 인덱싱하므로 seg 인덱스만 반환
+int getSegIdx(float t, out float lt)
 {
     float scaled = clamp(t, 0.0, 1.0) * float(uNumSegments);
     int seg      = clamp(int(scaled), 0, uNumSegments - 1);
-    lt           = scaled - float(seg);   // 세그먼트 내 로컬 t [0,1]
-    return seg * 4;                       // 배열 시작 인덱스
+    lt           = scaled - float(seg); // 세그먼트 내 로컬 t [0,1]
+    return seg;
 }
 
-// 베지어 곡선에서 t에 해당하는 위치 계산
-vec3 cubicBezierPos(float t)
+// Catmull-Rom 곡선에서 t에 해당하는 위치 계산
+// 경계에서는 phantom point(반사점)를 사용해 자연스러운 곡선 유지
+vec3 catmullRomPos(float t)
 {
     float lt;
-    int base = getSegBase(t, lt);
-    float u = 1.0 - lt;
-    return u*u*u      * controlPoints[base+0].position.xyz
-         + 3.0*u*u*lt * controlPoints[base+1].position.xyz
-         + 3.0*u*lt*lt * controlPoints[base+2].position.xyz
-         + lt*lt*lt    * controlPoints[base+3].position.xyz;
+    int seg = getSegIdx(t, lt);
+
+    // 양 끝 경계: 존재하지 않는 이웃 키프레임을 반사점으로 대체
+    vec3 k00 = (seg == 0)
+        ? (2.0 * keyframes[0].position.xyz - keyframes[1].position.xyz)
+        : keyframes[seg - 1].position.xyz;
+
+    vec3 k0 = keyframes[seg].position.xyz;
+    vec3 k1 = keyframes[seg + 1].position.xyz;
+
+    vec3 k2 = (seg + 2 <= uNumSegments)
+        ? keyframes[seg + 2].position.xyz
+        : (2.0 * keyframes[uNumSegments].position.xyz - keyframes[uNumSegments - 1].position.xyz);
+
+    // Catmull-Rom 공식 (Cubic Hermite 형태)
+    float lt2 = lt * lt;
+    float lt3 = lt2 * lt;
+
+    return 0.5 * ((2.0 * k0)
+        + (-k00 + k1)                        * lt
+        + (2.0*k00 - 5.0*k0 + 4.0*k1 - k2)  * lt2
+        + (-k00 + 3.0*k0 - 3.0*k1 + k2)     * lt3);
 }
 
 // 구면 선형 보간 (Slerp) 함수: 두 쿼터니언과 t를 받아 보간된 쿼터니언을 반환
@@ -89,18 +106,18 @@ vec3 quatRotate(vec4 q, vec3 v)
     return v + 2.0 * cross(qv, cross(qv, v) + q.w * v);
 }
 
-// 역변환 평가: t에 해당하는 위치와 회전을 계산하여, worldPos를 로컬 공간으로 변환
+// 역변환 평가: t에 해당하는 위치(Catmull-Rom)와 회전(Slerp)을 계산하여
+// worldPos를 브러시 로컬 공간으로 역변환
 vec3 evalInvTransformAt(float t, vec3 worldPos)
 {
     float lt;
-    int base    = getSegBase(t, lt);
+    int seg = getSegIdx(t, lt);
 
-    vec3 pos    = cubicBezierPos(t);   // 내부에서도 getSegBase 호출하지만 비용 무시 가능
-    vec4 rot    = quatSlerp(controlPoints[base+0].rotation,
-                            controlPoints[base+3].rotation, lt);
-    //                      ^^^^^^^^^^^^^^^^^^^             ^^^
-    //                      이 세그먼트의 시작 회전         이 세그먼트의 끝 회전
-    vec4 invRot = vec4(-rot.xyz, rot.w);
+    vec3 pos    = catmullRomPos(t);
+    
+    vec4 rot    = quatSlerp(keyframes[seg].rotation,                // 회전은 인접 키프레임 사이를 Slerp으로 보간
+                            keyframes[seg + 1].rotation, lt);
+    vec4 invRot = vec4(-rot.xyz, rot.w);                            // 단위 쿼터니언의 역 = 켤레
     return quatRotate(invRot, worldPos - pos);
 }
 

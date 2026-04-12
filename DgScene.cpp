@@ -588,7 +588,7 @@ void DgScene::performDragSelection(const glm::mat4& viewMat, const glm::mat4& pr
 	for (DgVolume* v : mSDFList) {
 		if (v && v->mSelected && v->mIsSweptVolume
 			&& v->mSourceTrajectory != nullptr
-			&& (int)v->mSourceTrajectory->controlPoints.size() >= 4) {
+			&& (int)v->mSourceTrajectory->keyframes.size() >= 2) {
 			mSelectedSweptVolume = v;
 			break;
 		}

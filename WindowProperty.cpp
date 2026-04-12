@@ -26,7 +26,7 @@ void OpenProperty() {
 		".\\res\\icons\\Intersection-A-B.png",
 		".\\res\\icons\\Difference-A-B.png",
 		".\\res\\icons\\create_linear.png",
-		".\\res\\icons\\create_Bezier_crv.png"
+		".\\res\\icons\\create_crv.png"
 	};
 
 	static GLuint icon_tex_id[NumIcons] = { 0 };
@@ -163,7 +163,7 @@ void OpenProperty() {
 		}
 		ImGui::SameLine();
 
-		// Bezier 
+		// Catmull-Rom
 		if (ImGui::ImageButton("create_Curve", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(84, 84), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selectedVol) {
