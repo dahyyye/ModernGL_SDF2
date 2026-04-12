@@ -249,7 +249,7 @@ void DgScene::processMouseEvent()
 			return;
 		}
 
-		// Bezier 컨트롤 포인트 드래그 (자동생성 커브에서도 동작)
+		// controlPoints 없는 경우 (polyline 용): 기본 색상 적용
 		if (mEditMode == EditMode::Trajectory && !mTrajectory.keyframes.empty())
 		{
 			// View / Projection 행렬 재구성
@@ -1167,7 +1167,7 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 	}
 	else
 	{
-		// controlPoints 없는 경우 (polyline 모드): 기본 노란 점
+		// keyframes 기본 색상 적용
 		glUniform3f(glGetUniformLocation(mBBoxShader, "uColor"), 1.0f, 1.0f, 0.0f);
 		glPointSize(8.0f);
 		glDrawArrays(GL_POINTS, 0, (GLsizei)mTrajectory.size());

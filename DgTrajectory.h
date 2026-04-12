@@ -21,10 +21,12 @@ class DgTrajectory
 public:
     std::vector<DgTrajectoryFrame> frames;      // 렌더링/시각화용 샘플링된 프레임
     std::vector<DgTrajectoryFrame> keyframes;   // 사용자가 정의한 키프레임
+    bool mIsLinear = false; // true면 키프레임 사이를 직선 보간
 
     void clear() {
         frames.clear();
         keyframes.clear();
+        mIsLinear = false;
     }
 
     size_t size() const { return frames.size(); }
@@ -73,15 +75,18 @@ public:
     glm::mat4 getTransformAt(float t) const
     {
         int numSegs = (int)keyframes.size() - 1;
-
         t = glm::clamp(t, 0.0f, 1.0f);
         float scaled = t * numSegs;
         int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
         float lt = scaled - (float)seg;
 
-        glm::vec3 pos = catmullRomEval(keyframes, seg, lt);
-        glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
+        glm::vec3 pos;
+        if (mIsLinear)
+            pos = glm::mix(keyframes[seg].position, keyframes[seg + 1].position, lt);
+        else
+            pos = catmullRomEval(keyframes, seg, lt);
 
+        glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
         return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
     }
 
@@ -93,6 +98,7 @@ public:
     void generateLinear(const glm::vec3& startPos, const glm::vec3& endPos)
     {
         clear();
+        mIsLinear = true;  // 직선 플래그 설정
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
         keyframes.emplace_back(startPos, baseRot);
         keyframes.emplace_back(endPos, baseRot);
@@ -135,6 +141,14 @@ public:
             float lt = scaled - (float)seg;
 
             glm::vec3 pos = catmullRomEval(keyframes, seg, lt);
+
+            if (mIsLinear)
+                // 직선: 키프레임 사이를 선형 보간
+                pos = glm::mix(keyframes[seg].position, keyframes[seg + 1].position, lt);
+            else
+                // 곡선: Catmull-Rom 보간
+                pos = catmullRomEval(keyframes, seg, lt);
+
             glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
             frames.emplace_back(pos, rot);
         }
