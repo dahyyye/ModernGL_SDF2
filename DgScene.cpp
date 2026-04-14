@@ -1276,12 +1276,11 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	vol->mMin = newVol->mMin;
 	vol->mMax = newVol->mMax;
 
-	if (preview) {
-		if (vol->mTextureID != 0) glDeleteTextures(1, &vol->mTextureID);
-		vol->mTextureID = newVol->mTextureID;
-		newVol->mTextureID = 0;
-	}
-	else {
+	if (vol->mTextureID != 0) glDeleteTextures(1, &vol->mTextureID);
+	vol->mTextureID = newVol->mTextureID;
+	newVol->mTextureID = 0;
+
+	if (!preview) {
 		vol->mData = std::move(newVol->mData);
 	}
 

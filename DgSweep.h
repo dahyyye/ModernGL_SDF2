@@ -19,7 +19,7 @@ public:
         int resolution, int samplingSteps);
 
     static DgVolume* generateBrentGPU(DgVolume* brush, const DgTrajectory& trajectory,
-        int resolution, int samplingSteps, bool skipreadback);
+        int resolution, int samplingSteps, bool skipReadback);
     static void fastSweeping(DgVolume* vol);
 
 private:
