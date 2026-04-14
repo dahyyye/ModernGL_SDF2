@@ -1263,22 +1263,29 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	DgVolume* newVol = nullptr;
 	switch (method) {
 	case 0: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, false); break;
-	case 1: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, true);  break;
-	case 2: newVol = DgSweep::generateBrentCPU(vol->mBrushVolume, traj, res, steps);        break;
-	default:newVol = DgSweep::generateBrentGPU(vol->mBrushVolume, traj, res, steps);        break;
+	case 1: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, true); break;
+	case 2: newVol = DgSweep::generateBrentCPU(vol->mBrushVolume, traj, res, steps); break;
+	default:newVol = DgSweep::generateBrentGPU(vol->mBrushVolume, traj, res, steps, preview); break;
 	}
 	if (!newVol) return;
 
-	if (!preview) DgSweep::fastSweeping(newVol);
-
-	vol->mData = std::move(newVol->mData);
 	for (int i = 0; i < 3; ++i) {
 		vol->mDim[i] = newVol->mDim[i];
 		vol->mSpacing[i] = newVol->mSpacing[i];
 	}
 	vol->mMin = newVol->mMin;
 	vol->mMax = newVol->mMax;
-	vol->createTexture();
+
+	if (preview) {
+		if (vol->mTextureID != 0) glDeleteTextures(1, &vol->mTextureID);
+		vol->mTextureID = newVol->mTextureID;
+		newVol->mTextureID = 0;
+	}
+	else {
+		vol->mData = std::move(newVol->mData);
+		vol->createTexture();
+	}
+
 	delete vol->mMesh;
 	vol->mMesh = newVol->mMesh;
 	newVol->mMesh = nullptr;

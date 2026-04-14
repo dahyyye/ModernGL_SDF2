@@ -237,7 +237,6 @@ void OpenProperty() {
 
 					if (swept)
 					{
-						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
@@ -260,7 +259,6 @@ void OpenProperty() {
 
 					if (swept)
 					{
-						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
@@ -283,7 +281,6 @@ void OpenProperty() {
 
 					if (swept)
 					{
-						DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
@@ -301,7 +298,7 @@ void OpenProperty() {
 				if (brush)
 				{
 					DgVolume* swept = DgSweep::generateBrentGPU(
-						brush, traj, sweepResolution, timeSteps
+						brush, traj, sweepResolution, timeSteps, false
 					);
 
 					if (swept)

@@ -252,7 +252,8 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
 DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
-    int samplingSteps)
+    int samplingSteps,
+    bool skipReadback)
 {
     if (!initializeBrentGPU()) return nullptr;
 
@@ -367,11 +368,13 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     result->mSpacing[1] = range.y / (resolution - 1);
     result->mSpacing[2] = range.z / (resolution - 1);
 
-    // GPU → CPU 복사
-    int totalSize = resolution * resolution * resolution;
-    result->mData.resize(totalSize);
-    glBindTexture(GL_TEXTURE_3D, resultTexture);
-    glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
+    // preview모드 아닐 땐 GPU → CPU 복사
+    if (!skipReadback) {
+        int totalSize = resolution * resolution * resolution;
+        result->mData.resize(totalSize);
+        glBindTexture(GL_TEXTURE_3D, resultTexture);
+        glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
+    }
 
     result->mTextureID = resultTexture;
 
