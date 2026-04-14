@@ -49,11 +49,11 @@ public:
 	// 궤적 모드 관련 변수
 	DgTrajectory mTrajectory;				// 현재 궤적
 	DgVolume* mDrawingVolume = nullptr;		// 궤적 생성 대상 볼륨
-	int  mDraggingCP = -1;				// 드래그 중인 CP 인덱스 (-1 = 없음)
 	std::vector<DgTrajectory> mSavedTrajectories;   // 저장된 궤적 목록
 
 	DgVolume* mSelectedSweptVolume = nullptr;
-	int       mDraggingSweptCP = -1;
+	int       mSelectedKeyframeIdx = -1;
+	bool      mKeyframeGizmoWasUsing = false;
 
 	// 궤적 시각화용
 	GLuint mTrajectoryVAO = 0;

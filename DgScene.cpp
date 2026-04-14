@@ -233,97 +233,22 @@ void DgScene::renderEditToolbar()
 // 마우스 이벤트 처리
 void DgScene::processMouseEvent()
 {
-	if (mDraggingSweptCP >= 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-	{
-		resweepVolume(mSelectedSweptVolume, false);  // ← false = 풀 해상도
-		mDraggingSweptCP = -1;
-		return;
-	}
-
 	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None))
 	{
-		if (mDraggingSweptCP >= 0 && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-		{
-			resweepVolume(mSelectedSweptVolume);
-			mDraggingSweptCP = -1;
-			return;
-		}
+		if (ImGuizmo::IsUsing()) return;    // ← 이 줄 추가
 
-		// controlPoints 없는 경우 (polyline 용): 기본 색상 적용
-		if (mEditMode == EditMode::Trajectory && !mTrajectory.keyframes.empty())
-		{
-			// View / Projection 행렬 재구성
-			glm::mat4 proj = glm::perspective(glm::radians(30.0f),
-				mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
-			glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0, 0, mZoom));
-			view = view * mRotMat;
-			view = glm::translate(view, mPan);
-			glm::mat4 vp = proj * view;
-
-			// 콘텐츠 영역 오프셋 (ImGui 타이틀바 높이 포함)
-			ImVec2 content = mWindowPos + ImGui::GetStyle().WindowPadding;
-			content.y += ImGui::GetFrameHeight();
-
-			ImVec2 mouse = ImGui::GetMousePos();
-			// 피킹 임계값: 월드 단위 (카메라 거리에 따라 조정 가능)
-			const float kPickRadius = 2.0f;
-
-			// ① 클릭 시 가장 가까운 CP 피킹 (월드 공간 XZ 거리 비교)
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && mDraggingCP < 0)
-			{
-				float bestDist = kPickRadius;
-				int   bestIdx = -1;
-				for (int i = 0; i < (int)mTrajectory.keyframes.size(); ++i)
-				{
-					glm::vec3 cpPos = mTrajectory.keyframes[i].position;
-					// 마우스를 해당 CP의 Y 평면에 투영
-					glm::vec3 mouseWorld = mouseToWorld(mouse, cpPos.y);
-					// XZ 평면 거리만 비교
-					float dx = mouseWorld.x - cpPos.x;
-					float dz = mouseWorld.z - cpPos.z;
-					float dist = sqrtf(dx * dx + dz * dz);
-					if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-				}
-				mDraggingCP = bestIdx;
-			}
-
-			// ② 드래그 중: CP를 Y = 고정 평면에서 마우스 월드 좌표로 이동
-			if (mDraggingCP >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left))
-			{
-				float planeY = mTrajectory.keyframes[mDraggingCP].position.y;
-				glm::vec3 newPos = mouseToWorld(mouse, planeY);
-				mTrajectory.keyframes[mDraggingCP].position = newPos;
-				mTrajectory.rebuild();  // 커브 즉시 재계산
-				return;
-			}
-
-			// ③ 마우스 놓기: 드래그 해제
-			if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && mDraggingCP >= 0)
-			{
-				mDraggingCP = -1;
-				return;
-			}
-		}
-		
+		// 키프레임 클릭 선택
 		if (mEditMode != EditMode::Trajectory
+			&& mEditMode != EditMode::Select
 			&& mSelectedSweptVolume != nullptr
 			&& mSelectedSweptVolume->mSourceTrajectory != nullptr
 			&& (int)mSelectedSweptVolume->mSourceTrajectory->keyframes.size() >= 2)
 		{
-			auto& srcTraj = *mSelectedSweptVolume->mSourceTrajectory;
-			ImVec2 mouse = ImGui::GetMousePos();
-
-			if (mDraggingSweptCP >= 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+				&& !ImGuizmo::IsOver() && !ImGuizmo::IsUsing())
 			{
-				float planeY = srcTraj.keyframes[mDraggingSweptCP].position.y;
-				srcTraj.keyframes[mDraggingSweptCP].position = mouseToWorld(mouse, planeY);
-				srcTraj.rebuild();
-				resweepVolume(mSelectedSweptVolume, true);  // ← true = preview 모드
-				return;
-			}
-
-			if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && mDraggingSweptCP < 0)
-			{
+				auto& srcTraj = *mSelectedSweptVolume->mSourceTrajectory;
+				ImVec2 mouse = ImGui::GetMousePos();
 				const float kPickRadius = 2.5f;
 				float bestDist = kPickRadius;
 				int   bestIdx = -1;
@@ -334,7 +259,10 @@ void DgScene::processMouseEvent()
 					float dist = sqrtf(powf(mw.x - cp.x, 2) + powf(mw.z - cp.z, 2));
 					if (dist < bestDist) { bestDist = dist; bestIdx = i; }
 				}
-				if (bestIdx >= 0) { mDraggingSweptCP = bestIdx; return; }
+				if (bestIdx >= 0) {
+					mSelectedKeyframeIdx = bestIdx;
+					return;
+				}
 			}
 		}
 
@@ -367,7 +295,8 @@ void DgScene::processMouseEvent()
 		}
 
 		// 좌클릭 (Ctrl 없이): 드래그 선택 시작
-		else if (!io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+		else if (!io.KeyCtrl && ImGui::IsMouseClicked(ImGuiMouseButton_Left)
+			&& !ImGuizmo::IsOver())
 		{
 			mIsDragSelecting = true;
 			mDragStartPos = ImGui::GetMousePos();
@@ -584,7 +513,7 @@ void DgScene::performDragSelection(const glm::mat4& viewMat, const glm::mat4& pr
 		}
 	}
 	mSelectedSweptVolume = nullptr;
-	mDraggingSweptCP = -1;
+	mSelectedKeyframeIdx = -1;
 	for (DgVolume* v : mSDFList) {
 		if (v && v->mSelected && v->mIsSweptVolume
 			&& v->mSourceTrajectory != nullptr
@@ -606,7 +535,7 @@ void DgScene::clearSelection()
 		}
 	}
 	mSelectedSweptVolume = nullptr;
-	mDraggingSweptCP = -1;
+	mSelectedKeyframeIdx = -1;
 }
 
 // 선택된 볼륨의 바운딩 박스 렌더링 (와이어프레임)
@@ -817,8 +746,70 @@ void DgScene::renderScene()
 	ImVec2 sceneImagePos = ImGui::GetCursorScreenPos();
 	ImGui::Image(textureID, ImGui::GetContentRegionAvail(), ImVec2(0, 1), ImVec2(1, 0));
 	
+	// ── 키프레임 기즈모 ──
+	bool keyframeGizmoActive = false;
+	if (mSelectedSweptVolume != nullptr
+		&& mSelectedSweptVolume->mSourceTrajectory != nullptr
+		&& mSelectedKeyframeIdx >= 0
+		&& mSelectedKeyframeIdx < (int)mSelectedSweptVolume->mSourceTrajectory->keyframes.size()
+		&& mEditMode != EditMode::Select && mEditMode != EditMode::Trajectory)
+	{
+		keyframeGizmoActive = true;
+		auto& kf = mSelectedSweptVolume->mSourceTrajectory->keyframes[mSelectedKeyframeIdx];
+
+		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
+		glm::mat4 viewMat(1.0f);
+		viewMat = glm::translate(viewMat, glm::vec3(0.0f, 0.0f, mZoom));
+		viewMat = viewMat * mRotMat;
+		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));
+
+		ImGuizmo::SetOrthographic(false);
+		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
+		ImGuizmo::SetRect(sceneImagePos.x, sceneImagePos.y, mSceneSize.x, mSceneSize.y);
+
+		ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
+		if (mEditMode == EditMode::Rotate) op = ImGuizmo::ROTATE;
+		if (mEditMode == EditMode::Scale)  op = ImGuizmo::SCALE;
+
+		glm::mat4 gizmoMat = glm::translate(glm::mat4(1.0f), kf.position)
+			* glm::mat4_cast(kf.rotation);
+
+		ImGuizmo::Manipulate(
+			glm::value_ptr(viewMat),
+			glm::value_ptr(projMat),
+			op,
+			ImGuizmo::WORLD,
+			glm::value_ptr(gizmoMat)
+		);
+
+		if (ImGuizmo::IsUsing())
+		{
+			glm::vec3 translation, rotEuler, scale;
+			ImGuizmo::DecomposeMatrixToComponents(
+				glm::value_ptr(gizmoMat),
+				glm::value_ptr(translation),
+				glm::value_ptr(rotEuler),
+				glm::value_ptr(scale)
+			);
+
+			if (op == ImGuizmo::TRANSLATE)
+				kf.position = translation;
+			else if (op == ImGuizmo::ROTATE)
+				kf.rotation = glm::quat(glm::radians(rotEuler));
+
+			mSelectedSweptVolume->mSourceTrajectory->rebuild();
+			resweepVolume(mSelectedSweptVolume, true);  // preview
+			mKeyframeGizmoWasUsing = true;
+		}
+		else if (mKeyframeGizmoWasUsing)
+		{
+			resweepVolume(mSelectedSweptVolume, false);  // full quality
+			mKeyframeGizmoWasUsing = false;
+		}
+	}
+
 	// ImGuizmo 렌더링
-	if (hasSelectedVolumes() && mEditMode != EditMode::Select && mEditMode != EditMode::Trajectory)
+	if (!keyframeGizmoActive && hasSelectedVolumes() && mEditMode != EditMode::Select && mEditMode != EditMode::Trajectory)
 	{
 		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
 		glm::mat4 viewMat(1.0f);
@@ -1147,11 +1138,7 @@ void DgScene::renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMa
 			float pt[3] = { kfPos.x, kfPos.y, kfPos.z };
 			glBufferData(GL_ARRAY_BUFFER, sizeof(pt), pt, GL_DYNAMIC_DRAW);
 
-			if (i == mDraggingCP) {
-				glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f);  // 드래그 중: 빨강
-				glPointSize(18.0f);
-			}
-			else if (i == 0 || i == (int)mTrajectory.keyframes.size() - 1) {
+			if (i == 0 || i == (int)mTrajectory.keyframes.size() - 1) {
 				glUniform3f(colorLoc, 1.0f, 0.78f, 0.1f);   // 시작/끝: 노랑
 				glPointSize(14.0f);
 			}
@@ -1228,7 +1215,7 @@ void DgScene::renderSweptVolumeTrajectory(const glm::mat4& viewMat,
 			float pt[3] = { kfPos.x, kfPos.y, kfPos.z };
 			glBufferData(GL_ARRAY_BUFFER, sizeof(pt), pt, GL_DYNAMIC_DRAW);
 
-			if (i == mDraggingSweptCP) {
+			if (i == mSelectedKeyframeIdx) {
 				glUniform3f(colorLoc, 1.0f, 0.25f, 0.25f);
 				glPointSize(18.0f);
 			}
