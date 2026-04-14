@@ -61,10 +61,10 @@ public:
         float lt2 = lt * lt;
         float lt3 = lt2 * lt;
 
-        return 0.5f * ((2.0f * k0)
-            + (-k00 + k1) * lt
-            + (2.0f * k00 - 5.0f * k0 + 4.0f * k1 - k2) * lt2
-            + (-k00 + 3.0f * k0 - 3.0f * k1 + k2) * lt3);
+		return 0.5f * ((2.0f * k0)  // 상수항, 키프레임 k0 위치
+			+ (-k00 + k1) * lt      // 1차항, 접선 방향
+			+ (2.0f * k00 - 5.0f * k0 + 4.0f * k1 - k2) * lt2  // 2차항, 곡률을 만듦
+            + (-k00 + 3.0f * k0 - 3.0f * k1 + k2) * lt3);      // 3차항, 변곡을 만듦
     }
 
     /*!
@@ -74,19 +74,23 @@ public:
      */
     glm::mat4 getTransformAt(float t) const
     {
-        int numSegs = (int)keyframes.size() - 1;
-        t = glm::clamp(t, 0.0f, 1.0f);
-        float scaled = t * numSegs;
-        int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
-        float lt = scaled - (float)seg;
+		int numSegs = (int)keyframes.size() - 1;    // 세그먼트 수
+		t = glm::clamp(t, 0.0f, 1.0f);              // t를 [0,1]로 클램프
+        
+		float scaled = t * numSegs;                 // t를 세그먼트 수로 스케일링
+		int   seg = glm::clamp((int)scaled, 0, numSegs - 1); // 세그먼트 인덱스 계산 및 클램프
+		float lt = scaled - (float)seg;             // 세그먼트 내 로컬 t 계산
 
         glm::vec3 pos;
-        if (mIsLinear)
+		if (mIsLinear)  // 직선 궤적이면 키프레임 사이를 선형 보간
             pos = glm::mix(keyframes[seg].position, keyframes[seg + 1].position, lt);
-        else
+		else            // 곡선 궤적이면 Catmull-Rom 보간
             pos = catmullRomEval(keyframes, seg, lt);
 
+		// 회전은 항상 slerp로 보간 (선형 궤적이든 곡선 궤적이든)
         glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
+        
+		// 변환 행렬 생성: 위치 이동 + 회전
         return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
     }
 
@@ -95,13 +99,13 @@ public:
      *  \param  startPos  시작 위치
      *  \param  endPos    끝 위치
      */
-    void generateLinear(const glm::vec3& startPos, const glm::vec3& endPos)
+    void generateLinear(const glm::vec3& center)
     {
         clear();
         mIsLinear = true;  // 직선 플래그 설정
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
-        keyframes.emplace_back(startPos, baseRot);
-        keyframes.emplace_back(endPos, baseRot);
+        keyframes.emplace_back(center, baseRot);
+        keyframes.emplace_back(center + glm::vec3(20.0f, 0.0f, 0.0f), baseRot);
         rebuild();
     }
 
@@ -110,17 +114,16 @@ public:
      *  \param  center      곡선의 시작 위치
      *  \param  numSamples  frames 샘플링 수 (기본값 64)
      */
-    void generateCurve(const glm::vec3& center, int numSamples = 64)
+    void generateCurve(const glm::vec3& center)
     {
         clear();
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
-
         keyframes.emplace_back(center, baseRot);
         keyframes.emplace_back(center + glm::vec3(5.0f, 0.0f, 4.0f), baseRot);
         keyframes.emplace_back(center + glm::vec3(13.0f, 0.0f, -3.0f), baseRot);
         keyframes.emplace_back(center + glm::vec3(20.0f, 0.0f, 0.0f), baseRot);
 
-        rebuild(numSamples);
+        rebuild();
     }
 
     /*!

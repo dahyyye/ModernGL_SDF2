@@ -156,7 +156,7 @@ void OpenProperty() {
 		{
 			if (selectedVol) {
 				glm::vec3 center = selectedVol->getCenter();
-				DgScene::instance().mTrajectory.generateLinear(center, center + glm::vec3(20.0f, 0.0f, 0.0f));
+				DgScene::instance().mTrajectory.generateLinear(center);
 				DgScene::instance().mDrawingVolume = selectedVol;
 				DgScene::instance().setEditMode(EditMode::Trajectory);
 			}
