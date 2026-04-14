@@ -90,7 +90,7 @@ public:
 		// 회전은 항상 slerp로 보간 (선형 궤적이든 곡선 궤적이든)
         glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
         
-		// 변환 행렬 생성: 위치 이동 + 회전
+		// 변환 행렬 생성: 위치 이동 + 회전(4*4)
         return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
     }
 
@@ -143,7 +143,7 @@ public:
             int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
             float lt = scaled - (float)seg;
 
-            glm::vec3 pos = catmullRomEval(keyframes, seg, lt);
+            glm::vec3 pos;
 
             if (mIsLinear)
                 // 직선: 키프레임 사이를 선형 보간
