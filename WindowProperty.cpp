@@ -315,6 +315,7 @@ void OpenProperty() {
 						brushCopy->mMin = brush->mMin;
 						brushCopy->mMax = brush->mMax;
 						brushCopy->createTexture();
+						brushCopy->mMesh = createBoundingBoxMesh(brushCopy->mMin, brushCopy->mMax);
 
 						swept->mIsSweptVolume = true;
 						swept->mSourceTrajectory = new DgTrajectory(traj);

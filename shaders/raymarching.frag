@@ -28,6 +28,9 @@ uniform mat4 uModelInverse;     // 모델 행렬의 역행렬
 // 오프셋 값
 uniform float uOffset;         // SDF 오프셋 값
 
+// 기본 색상
+uniform vec3 uBaseColor;        // 기본 색상
+
 //=============================================================================
 // 상수 정의
 //=============================================================================
@@ -205,7 +208,7 @@ void main()
     }
     
     // 조명 계산
-    vec3 baseColor = vec3(0.6, 0.6, 0.6);
+    vec3 baseColor = uBaseColor ;
     float diff = max(NdotL, 0.0);
     float spec = pow(max(dot(N, H), 0.0), 32.0);
     

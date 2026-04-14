@@ -705,6 +705,7 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
+			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.6f, 0.6f, 0.6f);   // 볼륨 기본 색상 (회색)
 
 			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
 			glm::vec3 localMin = pVolume->getLocalMin();
@@ -725,6 +726,68 @@ void DgScene::renderScene()
 			pVolume->mMesh->render();
 
 			glEnable(GL_CULL_FACE);
+			glBindTexture(GL_TEXTURE_3D, 0);
+			glUseProgram(0);
+		}
+
+		// 선택된 키프레임 위치에 브러시 볼륨 분홍색 프리뷰
+		if (mSelectedSweptVolume != nullptr
+			&& mSelectedSweptVolume->mBrushVolume != nullptr
+			&& mSelectedSweptVolume->mSourceTrajectory != nullptr
+			&& mSelectedKeyframeIdx >= 0
+			&& mSelectedKeyframeIdx < (int)mSelectedSweptVolume->mSourceTrajectory->keyframes.size())
+		{
+			// 선택된 키프레임의 위치/회전 정보
+			auto& kf = mSelectedSweptVolume->mSourceTrajectory->keyframes[mSelectedKeyframeIdx];
+			DgVolume* brush = mSelectedSweptVolume->mBrushVolume;
+
+			// 키프레임의 position + rotation으로 모델 행렬 구성
+			// → 브러시를 해당 키프레임 위치/자세로 배치
+			glm::mat4 kfModel = glm::translate(glm::mat4(1.0f), kf.position)
+				* glm::mat4_cast(kf.rotation);
+			glm::mat4 kfModelInv = glm::inverse(kfModel);
+
+			// 레이마칭 셰이더 설정 (기존 SDF 볼륨 렌더링과 동일한 파이프라인)
+			GLuint sp = mShaders[10];
+			glUseProgram(sp);
+
+			// 행렬 유니폼 전달
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uModel"), 1, GL_FALSE, glm::value_ptr(kfModel));
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uInvView"), 1, GL_FALSE, glm::value_ptr(invViewMat));
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProjMat));
+			glUniform2f(glGetUniformLocation(sp, "uResolution"), mSceneSize[0], mSceneSize[1]);
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));
+			glUniformMatrix4fv(glGetUniformLocation(sp, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(kfModelInv));
+			glUniform1f(glGetUniformLocation(sp, "uOffset"), brush->mOffset);
+
+			// 브러시 볼륨의 로컬 AABB 전달 (레이마칭 범위 지정)
+			glm::vec3 bMin = brush->getLocalMin();
+			glm::vec3 bMax = brush->getLocalMax();
+			glUniform3f(glGetUniformLocation(sp, "uVolumeMin"), bMin.x, bMin.y, bMin.z);
+			glUniform3f(glGetUniformLocation(sp, "uVolumeMax"), bMax.x, bMax.y, bMax.z);
+
+			// 프리뷰 색상: 분홍색
+			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.6f, 0.8f);
+
+			// 브러시의 3D SDF 텍스처 바인딩
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_3D, brush->mTextureID);
+			glUniform1i(glGetUniformLocation(sp, "uSDFVolume"), 0);
+
+			// 브러시 복사본에 프록시 메시가 없으면 AABB 바운딩 박스 메시 생성
+			if (!brush->mMesh)
+				brush->mMesh = createBoundingBoxMesh(brush->mMin, brush->mMax);
+
+			// Depth Test 비활성화: 스윕 볼륨에 가려지지 않고 전체 브러시가 보이도록
+			glDisable(GL_CULL_FACE);
+			glDisable(GL_DEPTH_TEST);
+			brush->mMesh->render();
+
+			glEnable(GL_DEPTH_TEST);
+			glEnable(GL_CULL_FACE);
+
 			glBindTexture(GL_TEXTURE_3D, 0);
 			glUseProgram(0);
 		}
