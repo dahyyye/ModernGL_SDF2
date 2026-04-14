@@ -234,16 +234,16 @@ void main()
 
     float minSDF = 1e10;
 
+    float t0   = 0.0;
+    vec3  p0   = evalInvTransformAt(t0, worldPos);
+    float sdf0 = sampleLocalSDF(p0);
+
     for (int seg = 0; seg < uSamplingSteps - 1; ++seg)          // 궤적을 uSamplingSteps-1 개의 세그먼트로 나누고, 각 세그먼트에 대해 최솟값을 계산
     {
-        float t0 = float(seg)     / float(uSamplingSteps - 1);
         float t1 = float(seg + 1) / float(uSamplingSteps - 1);
 
         // 세그먼트의 양 끝점에서 역변환을 평가하여 로컬 공간 좌표를 얻고, 해당 좌표에서 SDF 값을 샘플링
-        vec3 p0 = evalInvTransformAt(t0, worldPos);
         vec3 p1 = evalInvTransformAt(t1, worldPos);
-
-        float sdf0 = sampleLocalSDF(p0);
         float sdf1 = sampleLocalSDF(p1);
         float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
 
@@ -251,12 +251,17 @@ void main()
         if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));      // 양 끝점 중 작은 값을 최소값으로 사용
-            continue;
+        }
+        else
+        {
+            float bestSDF = brentMinimize(t0, t1, worldPos);    // Brent's method
+            bestSDF = min(bestSDF, min(sdf0, sdf1));            // Brent's method로 찾은 값과 양 끝점의 SDF 중 작은 값을 최종 최소값으로 사용
+            minSDF  = min(minSDF, bestSDF);                     // 세그먼트 전체에서 발견된 최소값과 비교하여 최종 최소값 업데이트
         }
 
-        float bestSDF = brentMinimize(t0, t1, worldPos);    // Brent's method
-        bestSDF = min(bestSDF, min(sdf0, sdf1));            // Brent's method로 찾은 값과 양 끝점의 SDF 중 작은 값을 최종 최소값으로 사용
-        minSDF  = min(minSDF, bestSDF);                     // 세그먼트 전체에서 발견된 최소값과 비교하여 최종 최소값 업데이트
+        t0   = t1;
+        p0   = p1;
+        sdf0 = sdf1;
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));  // 최종적으로 계산된 최소 SDF 값을 결과 텍스처에 저장 (R 채널에 저장, 나머지 채널은 0으로 설정)
