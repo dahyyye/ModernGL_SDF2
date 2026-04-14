@@ -1283,7 +1283,6 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	}
 	else {
 		vol->mData = std::move(newVol->mData);
-		vol->createTexture();
 	}
 
 	delete vol->mMesh;
