@@ -1259,7 +1259,7 @@ void DgScene::renderSweptVolumeTrajectory(const glm::mat4& viewMat,
 
 	loadBBoxShader();
 	glUseProgram(mBBoxShader);
-	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uModel"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uModel"), 1, GL_FALSE, glm::value_ptr(mSelectedSweptVolume->getModelMatrix()));
 	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
 	glUniformMatrix4fv(glGetUniformLocation(mBBoxShader, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
 	GLint colorLoc = glGetUniformLocation(mBBoxShader, "uColor");
