@@ -252,9 +252,11 @@ void DgScene::processMouseEvent()
 				const float kPickRadius = 2.5f;
 				float bestDist = kPickRadius;
 				int   bestIdx = -1;
+				glm::mat4 modelMat = mSelectedSweptVolume->getModelMatrix();
 				for (int i = 0; i < (int)srcTraj.keyframes.size(); ++i)
 				{
-					glm::vec3 cp = srcTraj.keyframes[i].position;
+					// 키프레임 로컬 좌표 → 볼륨 모델 변환 적용 → 월드 좌표
+					glm::vec3 cp = glm::vec3(modelMat * glm::vec4(srcTraj.keyframes[i].position, 1.0f));
 					glm::vec3 mw = mouseToWorld(mouse, cp.y);
 					float dist = sqrtf(powf(mw.x - cp.x, 2) + powf(mw.z - cp.z, 2));
 					if (dist < bestDist) { bestDist = dist; bestIdx = i; }
@@ -743,7 +745,8 @@ void DgScene::renderScene()
 
 			// 키프레임의 position + rotation으로 모델 행렬 구성
 			// → 브러시를 해당 키프레임 위치/자세로 배치
-			glm::mat4 kfModel = glm::translate(glm::mat4(1.0f), kf.position)
+			glm::mat4 kfModel = mSelectedSweptVolume->getModelMatrix()
+				* glm::translate(glm::mat4(1.0f), kf.position)
 				* glm::mat4_cast(kf.rotation);
 			glm::mat4 kfModelInv = glm::inverse(kfModel);
 
@@ -819,22 +822,25 @@ void DgScene::renderScene()
 	{
 		keyframeGizmoActive = true;
 		auto& kf = mSelectedSweptVolume->mSourceTrajectory->keyframes[mSelectedKeyframeIdx];
-
 		glm::mat4 projMat = glm::perspective(glm::radians(30.0f), mSceneSize.x / mSceneSize.y, 1.0f, 1000.0f);
 		glm::mat4 viewMat(1.0f);
 		viewMat = glm::translate(viewMat, glm::vec3(0.0f, 0.0f, mZoom));
 		viewMat = viewMat * mRotMat;
 		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));
-
 		ImGuizmo::SetOrthographic(false);
 		ImGuizmo::SetDrawlist(ImGui::GetWindowDrawList());
 		ImGuizmo::SetRect(sceneImagePos.x, sceneImagePos.y, mSceneSize.x, mSceneSize.y);
-
 		ImGuizmo::OPERATION op = ImGuizmo::TRANSLATE;
 		if (mEditMode == EditMode::Rotate) op = ImGuizmo::ROTATE;
 		if (mEditMode == EditMode::Scale)  op = ImGuizmo::SCALE;
 
-		glm::mat4 gizmoMat = glm::translate(glm::mat4(1.0f), kf.position)
+		// 볼륨 모델 행렬 (이동/회전 반영)
+		glm::mat4 volModel = mSelectedSweptVolume->getModelMatrix();
+		glm::mat4 volModelInv = glm::inverse(volModel);
+
+		// 로컬 키프레임 → 볼륨 모델 변환 적용 → 월드 위치에 기즈모 표시
+		glm::mat4 gizmoMat = volModel
+			* glm::translate(glm::mat4(1.0f), kf.position)
 			* glm::mat4_cast(kf.rotation);
 
 		ImGuizmo::Manipulate(
@@ -844,22 +850,22 @@ void DgScene::renderScene()
 			ImGuizmo::WORLD,
 			glm::value_ptr(gizmoMat)
 		);
-
 		if (ImGuizmo::IsUsing())
 		{
+			// 기즈모 결과(월드) → 볼륨 로컬로 역변환
+			glm::mat4 localMat = volModelInv * gizmoMat;
+
 			glm::vec3 translation, rotEuler, scale;
 			ImGuizmo::DecomposeMatrixToComponents(
-				glm::value_ptr(gizmoMat),
+				glm::value_ptr(localMat),
 				glm::value_ptr(translation),
 				glm::value_ptr(rotEuler),
 				glm::value_ptr(scale)
 			);
-
 			if (op == ImGuizmo::TRANSLATE)
 				kf.position = translation;
 			else if (op == ImGuizmo::ROTATE)
 				kf.rotation = glm::quat(glm::radians(rotEuler));
-
 			mSelectedSweptVolume->mSourceTrajectory->rebuild();
 			resweepVolume(mSelectedSweptVolume, true);  // preview
 			mKeyframeGizmoWasUsing = true;
