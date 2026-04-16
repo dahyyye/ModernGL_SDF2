@@ -143,7 +143,7 @@ float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 float brentMinimize(float t0, float t1, vec3 worldPos)
 {
     const float golden = 0.381966;      // (3 - sqrt(5)) / 2, 황금비의 역수
-    const int maxIter = 20;             // 최대 반복 횟수
+    const int maxIter = 10;             // 최대 반복 횟수
     const float tol = 1e-4;             // 허용 오차
 
     float a = 0.0, b = 1.0;             // alpha의 범위 [0,1]
@@ -248,15 +248,45 @@ void main()
         float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
 
         // Lipschitz 조건: 세그먼트 양 끝점에서 SDF가 모두 양수이고, 두 점 사이의 SDF 합이 세그먼트 길이보다 크면, 세그먼트 내에서 SDF가 0이 될 수 없으므로, 
-        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength)
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * 1.5)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));      // 양 끝점 중 작은 값을 최소값으로 사용
         }
         else
         {
-            float bestSDF = brentMinimize(t0, t1, worldPos);    // Brent's method
-            bestSDF = min(bestSDF, min(sdf0, sdf1));            // Brent's method로 찾은 값과 양 끝점의 SDF 중 작은 값을 최종 최소값으로 사용
-            minSDF  = min(minSDF, bestSDF);                     // 세그먼트 전체에서 발견된 최소값과 비교하여 최종 최소값 업데이트
+            const int M = 8;
+            float bestSDF = min(sdf0, sdf1);
+
+            float tPrev = t0;
+            vec3  pPrev = p0;
+            float sdfPrev = sdf0;
+
+            for (int i = 1; i <= M; ++i)
+            {
+                float tCurr = mix(t0, t1, float(i) / float(M));
+                vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
+                float sdfCurr = sampleLocalSDF(pCurr);
+
+                // sub-구간 Lipschitz 검사
+                float subLen = length(pCurr - pPrev);       // chord length로 빠르게 근사
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
+                {
+                    // 안전하게 skip, 끝점 값만 사용
+                    bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
+                }
+                else
+                {
+                    // Brent로 정밀 탐색
+                    float val = brentMinimize(tPrev, tCurr, worldPos);
+                    bestSDF = min(bestSDF, val);
+                }
+
+                tPrev = tCurr;
+                pPrev = pCurr;
+                sdfPrev = sdfCurr;
+            }
+
+            minSDF = min(minSDF, bestSDF);
         }
 
         t0   = t1;
