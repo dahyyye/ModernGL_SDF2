@@ -323,7 +323,6 @@ void OpenProperty() {
 						swept->mSweepResolution = sweepResolution;
 						swept->mSweepTimeSteps = timeSteps;
 						swept->mSweepMethod = 3;  // 버튼마다 0/1/2/3
-						//DgSweep::fastSweeping(swept);
 						DgScene::instance().addSDFVolume(swept);
 						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;

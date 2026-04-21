@@ -709,6 +709,10 @@ void DgScene::renderScene()
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
 			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.6f, 0.6f, 0.6f);   // 볼륨 기본 색상 (회색)
 
+			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
+			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
+			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.3f : 1.0f);
+
 			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
 			glm::vec3 localMin = pVolume->getLocalMin();
 			glm::vec3 localMax = pVolume->getLocalMax();
@@ -723,11 +727,19 @@ void DgScene::renderScene()
 			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
 
 			// Cull Face 비활성화
+			if (kfSelected) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			}
 			glDisable(GL_CULL_FACE);
 
 			pVolume->mMesh->render();
 
 			glEnable(GL_CULL_FACE);
+			if (kfSelected) {
+				glDisable(GL_BLEND);
+			}
+
 			glBindTexture(GL_TEXTURE_3D, 0);
 			glUseProgram(0);
 		}
@@ -772,7 +784,8 @@ void DgScene::renderScene()
 			glUniform3f(glGetUniformLocation(sp, "uVolumeMax"), bMax.x, bMax.y, bMax.z);
 
 			// 프리뷰 색상: 분홍색
-			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.6f, 0.8f);
+			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.5f, 0.2f);
+			glUniform1f(glGetUniformLocation(sp, "uAlpha"), 0.5f);  // 반투명
 
 			// 브러시의 3D SDF 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);

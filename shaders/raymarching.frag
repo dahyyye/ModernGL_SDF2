@@ -26,10 +26,11 @@ uniform mat4 uModel;            // 모델 행렬 (이동 + 회전)
 uniform mat4 uModelInverse;     // 모델 행렬의 역행렬
 
 // 오프셋 값
-uniform float uOffset;         // SDF 오프셋 값
+uniform float uOffset;          // SDF 오프셋 값
 
 // 기본 색상
 uniform vec3 uBaseColor;        // 기본 색상
+uniform float uAlpha;           // 투명도
 
 //=============================================================================
 // 상수 정의
@@ -224,5 +225,5 @@ void main()
     gl_FragDepth = (ndcZ * 0.5) + 0.5;
 
     // 8. 최종 출력
-    outColor = vec4(finalColor, 1.0);
+    outColor = vec4(finalColor, uAlpha);
 }
