@@ -711,7 +711,7 @@ void DgScene::renderScene()
 
 			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
 			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
-			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.3f : 1.0f);
+			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.7f : 1.0f);
 
 			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
 			glm::vec3 localMin = pVolume->getLocalMin();
@@ -784,8 +784,8 @@ void DgScene::renderScene()
 			glUniform3f(glGetUniformLocation(sp, "uVolumeMax"), bMax.x, bMax.y, bMax.z);
 
 			// 프리뷰 색상: 분홍색
-			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.5f, 0.2f);
-			glUniform1f(glGetUniformLocation(sp, "uAlpha"), 0.5f);  // 반투명
+			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.5f, 0.7f);
+			glUniform1f(glGetUniformLocation(sp, "uAlpha"), 0.8f);  // 반투명
 
 			// 브러시의 3D SDF 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
