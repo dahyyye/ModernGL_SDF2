@@ -685,65 +685,6 @@ void DgScene::renderScene()
 		glm::mat4 invViewMat = glm::inverse(viewMat);
 		glm::mat4 invProjMat = glm::inverse(projMat);
 
-		// SDF 볼륨 렌더링
-		for (DgVolume* pVolume : mSDFList)
-		{
-			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
-
-			glm::mat4 modelMat = pVolume->getModelMatrix();
-			glm::mat4 modelInverse = glm::inverse(modelMat);
-
-			GLuint shaderProgram = mShaders[10];
-			glUseProgram(shaderProgram);
-
-			// 행렬 유니폼
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(invViewMat));
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProjMat));
-			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
-
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
-			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
-			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
-			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.6f, 0.6f, 0.6f);   // 볼륨 기본 색상 (회색)
-
-			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
-			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
-			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.7f : 1.0f);
-
-			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
-			glm::vec3 localMin = pVolume->getLocalMin();
-			glm::vec3 localMax = pVolume->getLocalMax();
-			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
-				localMin.x, localMin.y, localMin.z);
-			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
-				localMax.x, localMax.y, localMax.z);
-
-			// 3D 텍스처 바인딩
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_3D, pVolume->mTextureID);
-			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
-
-			// Cull Face 비활성화
-			if (kfSelected) {
-				glEnable(GL_BLEND);
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			}
-			glDisable(GL_CULL_FACE);
-
-			pVolume->mMesh->render();
-
-			glEnable(GL_CULL_FACE);
-			if (kfSelected) {
-				glDisable(GL_BLEND);
-			}
-
-			glBindTexture(GL_TEXTURE_3D, 0);
-			glUseProgram(0);
-		}
-
 		// 선택된 키프레임 위치에 브러시 볼륨 분홍색 프리뷰
 		if (mSelectedSweptVolume != nullptr
 			&& mSelectedSweptVolume->mBrushVolume != nullptr
@@ -785,7 +726,7 @@ void DgScene::renderScene()
 
 			// 프리뷰 색상: 분홍색
 			glUniform3f(glGetUniformLocation(sp, "uBaseColor"), 1.0f, 0.5f, 0.7f);
-			glUniform1f(glGetUniformLocation(sp, "uAlpha"), 0.8f);  // 반투명
+			glUniform1f(glGetUniformLocation(sp, "uAlpha"), 1.0f);  // 반투명
 
 			// 브러시의 3D SDF 텍스처 바인딩
 			glActiveTexture(GL_TEXTURE0);
@@ -803,6 +744,65 @@ void DgScene::renderScene()
 
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_CULL_FACE);
+
+			glBindTexture(GL_TEXTURE_3D, 0);
+			glUseProgram(0);
+		}
+
+		// SDF 볼륨 렌더링
+		for (DgVolume* pVolume : mSDFList)
+		{
+			if (pVolume == nullptr || pVolume->mTextureID == 0) continue;
+
+			glm::mat4 modelMat = pVolume->getModelMatrix();
+			glm::mat4 modelInverse = glm::inverse(modelMat);
+
+			GLuint shaderProgram = mShaders[10];
+			glUseProgram(shaderProgram);
+
+			// 행렬 유니폼
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModel"), 1, GL_FALSE, glm::value_ptr(modelMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uView"), 1, GL_FALSE, glm::value_ptr(viewMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProjection"), 1, GL_FALSE, glm::value_ptr(projMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvView"), 1, GL_FALSE, glm::value_ptr(invViewMat));
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uInvProj"), 1, GL_FALSE, glm::value_ptr(invProjMat));
+			glUniform2f(glGetUniformLocation(shaderProgram, "uResolution"), mSceneSize[0], mSceneSize[1]);
+
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
+			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
+			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
+			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.6f, 0.6f, 0.6f);   // 볼륨 기본 색상 (회색)
+
+			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
+			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
+			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.5f : 1.0f);
+
+			// 이동된 위치를 반영하여 uVolumeMin/Max 전달
+			glm::vec3 localMin = pVolume->getLocalMin();
+			glm::vec3 localMax = pVolume->getLocalMax();
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMin"),
+				localMin.x, localMin.y, localMin.z);
+			glUniform3f(glGetUniformLocation(shaderProgram, "uVolumeMax"),
+				localMax.x, localMax.y, localMax.z);
+
+			// 3D 텍스처 바인딩
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_3D, pVolume->mTextureID);
+			glUniform1i(glGetUniformLocation(shaderProgram, "uSDFVolume"), 0);
+
+			// Cull Face 비활성화
+			if (kfSelected) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			}
+			glDisable(GL_CULL_FACE);
+
+			pVolume->mMesh->render();
+
+			glEnable(GL_CULL_FACE);
+			if (kfSelected) {
+				glDisable(GL_BLEND);
+			}
 
 			glBindTexture(GL_TEXTURE_3D, 0);
 			glUseProgram(0);
