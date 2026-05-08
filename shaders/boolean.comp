@@ -1,0 +1,107 @@
+#version 430 core
+
+// ===================================================================
+//  Boolean Compute Shader
+//  - 2개 입력 SDF 볼륨에 대해 Union/Intersection/Difference 수행
+//  - Sweep Compute Shader와 동일한 아키텍처 패턴
+// ===================================================================
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+
+// ----- 입력/출력 바인딩 -----
+
+// 입력 SDF 텍스처 2개 (읽기 전용)
+layout(binding = 0) uniform sampler3D uSdfA;
+layout(binding = 1) uniform sampler3D uSdfB;
+
+// 출력 SDF 텍스처 (쓰기 전용)
+layout(r32f, binding = 2) uniform writeonly image3D uResultSDF;
+
+
+// ----- Uniform -----
+
+// 결과 볼륨의 월드 공간 AABB
+uniform vec3  uResultMin;
+uniform vec3  uResultMax;
+uniform ivec3 uResolution;
+
+// 볼륨 A의 로컬 AABB + 역변환 행렬
+uniform vec3  uMinA;
+uniform vec3  uMaxA;
+uniform mat4  uInvModelA;
+
+// 볼륨 B의 로컬 AABB + 역변환 행렬
+uniform vec3  uMinB;
+uniform vec3  uMaxB;
+uniform mat4  uInvModelB;
+
+// Boolean 모드: 0=Union, 1=Intersection, 2=Difference
+uniform int   uBooleanMode;
+
+
+// ===================================================================
+//  SDF 샘플링 함수
+//  
+//  CPU의 resampleSDF + sampleLocalSDF를 하나로 합친 것.
+//  월드 좌표 → 역변환으로 로컬 좌표 → UVW 정규화 → 텍스처 샘플링
+//  영역 밖이면 클램핑 후 외부 거리를 더해줌
+// ===================================================================
+float sampleSDF(sampler3D sdf, mat4 invModel, vec3 localMin, vec3 localMax, vec3 worldPos)
+{
+    // 1. 월드 → 로컬 변환
+    vec3 localPos = (invModel * vec4(worldPos, 1.0)).xyz;
+
+    // 2. 로컬 → UVW 정규화
+    vec3 range = localMax - localMin;
+    vec3 uvw = (localPos - localMin) / range;
+
+    // 3. 영역 밖 처리: 클램핑 + 외부 거리 계산
+    float outsideDist = 0.0;
+
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
+    {
+        vec3 clamped = clamp(uvw, vec3(0.0), vec3(1.0));
+        vec3 diff = (uvw - clamped) * range;
+        outsideDist = length(diff);
+        uvw = clamped;
+    }
+
+    // 4. trilinear interpolation (GPU 하드웨어가 자동 수행)
+    return texture(sdf, uvw).r + outsideDist;
+}
+
+
+// ===================================================================
+//  메인: 각 복셀에 대해 Boolean 연산 수행
+// ===================================================================
+void main()
+{
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+
+    // 범위 체크
+    if (any(greaterThanEqual(id, uResolution)))
+        return;
+
+    // 결과 볼륨의 격자점 → 월드 좌표
+    vec3 volumeRange = uResultMax - uResultMin;
+    vec3 spacing = volumeRange / vec3(uResolution - 1);
+    vec3 worldPos = uResultMin + vec3(id) * spacing;
+
+    // 두 볼륨의 SDF 값 샘플링
+    float sdfA = sampleSDF(uSdfA, uInvModelA, uMinA, uMaxA, worldPos);
+    float sdfB = sampleSDF(uSdfB, uInvModelB, uMinB, uMaxB, worldPos);
+
+    // Boolean 연산
+    float result;
+
+    if (uBooleanMode == 0)          // Union: min(a, b)
+        result = min(sdfA, sdfB);
+    else if (uBooleanMode == 1)     // Intersection: max(a, b)
+        result = max(sdfA, sdfB);
+    else                            // Difference: max(a, -b)
+        result = max(sdfA, -sdfB);
+
+    // 결과 저장
+    imageStore(uResultSDF, id, vec4(result, 0.0, 0.0, 0.0));
+}

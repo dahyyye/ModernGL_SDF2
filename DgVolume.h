@@ -2,6 +2,15 @@
 #include "DgMesh.h"
 #include <vector>
 
+class DgTrajectory;
+
+// VTK 사용
+#include <vtkSmartPointer.h>
+#include <vtkXMLImageDataReader.h>
+#include <vtkImageData.h>
+#include <vtkPointData.h>
+#include <vtkDataArray.h>
+
 /*!
  *	\class	DgVolume
  *	\brief	메쉬의 부호거리장을 표현하는 클래스
@@ -12,6 +21,9 @@ public:
 	/*! \brief SDF의 기본 메쉬 */
 	DgMesh* mMesh = nullptr;
 
+	/*! \brief 볼륨 이름 */
+	std::string mName;
+
 	/*! \brief 격자 해상도 */
 	int mDim[3] = { 0, 0, 0 };
 
@@ -21,11 +33,40 @@ public:
 	/*! \brief 격자 공간 최대점 */
 	DgPos mMax;
 
-	/*! \brief 격자 간격(해상도) */
-	double mSpacing[3] = { 0.0, 0.0, 0.0};
+	/*! \brief 격자 간격 */
+	double mSpacing[3] = { 0.0, 0.0, 0.0 };
 
-	/* !\brief 부호거리장 데이터(격자 샘플별 부호거리 값) */
+	/*! \brief 부호거리장 데이터 */
 	std::vector<float> mData;
+
+	/* 볼륨의 텍스쳐 id */
+	GLuint mTextureID = 0;
+
+	/* 오프셋 */
+	float mOffset = 0.0f;
+
+	/* 선택 상태 */
+	bool mSelected = false;
+
+	/*! \brief 볼륨 위치 */
+	glm::vec3 mPosition = glm::vec3(0.0f);
+
+	/*! \brief 볼륨 회전 */
+	glm::quat mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);  // 항등 회전 (w=1, x=0, y=0, z=0)
+
+	/*! \brief 볼륨 스케일 */
+	glm::vec3 mScale = glm::vec3(1.0f);
+
+	// Swept volume metadata
+	bool mIsSweptVolume = false;
+	DgTrajectory* mSourceTrajectory = nullptr;  // owned
+	DgVolume* mBrushVolume = nullptr;  // owned copy (브러시 삭제돼도 안전)
+	int mSweepResolution;
+	int mSweepTimeSteps;
+	int mSweepMethod;
+
+	/*! \brief VTI 저장 함수 */ 
+	bool saveToVTI(const char* filename);
 
 public:
 
@@ -33,19 +74,103 @@ public:
 	DgVolume(DgMesh* mMesh);
 	DgVolume(DgVolume& cpy);
 	~DgVolume();
-	
+
 	void setDimensions(int dimX, int dimY, int dimZ);
-	
-	/*! #brief 입력 메쉬의 격자 공간을 정의(AABB) */
+
+	/*! \brief 입력 메쉬의 격자 공간을 정의(AABB) */
 	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
-	/*! #brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
+	/*! \brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
 	void computeSDF();
 
-	/*! #brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
+	/*! \brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
 	std::pair<DgFace*, float> findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p);
 
+	/*! \brief VTI 로드 함수 */
+	bool loadFromVTI(const char* filename);
+
+	/*! \brief 텍스쳐 생성 함수 */
+	void createTexture();
+
+	/*! \brief 볼륨의 중심점 반환 (위치 포함) */
+	glm::vec3 getCenter() const {
+		glm::vec3 localCenter(
+			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f,
+			(mMin.mPos[1] + mMax.mPos[1]) * 0.5f,
+			(mMin.mPos[2] + mMax.mPos[2]) * 0.5f
+		);
+		return glm::vec3(getModelMatrix() * glm::vec4(localCenter, 1.0f));
+	}
+
+	/*! \brief 로컬 최소점 반환 */
+	glm::vec3 getLocalMin() const {
+		return glm::vec3(mMin.mPos[0], mMin.mPos[1], mMin.mPos[2]);
+	}
+
+	/*! \brief 로컬 최대점 반환 */
+	glm::vec3 getLocalMax() const {
+		return glm::vec3(mMax.mPos[0], mMax.mPos[1], mMax.mPos[2]);
+	}
+
+	/*! \brief 이동된 최소점 반환 */
+	glm::vec3 getTransformedMin() const {
+		return glm::vec3(
+			mMin.mPos[0] + mPosition.x,
+			mMin.mPos[1] + mPosition.y,
+			mMin.mPos[2] + mPosition.z
+		);
+	}
+
+	/*! \brief 이동된 최대점 반환 */
+	glm::vec3 getTransformedMax() const {
+		return glm::vec3(
+			mMax.mPos[0] + mPosition.x,
+			mMax.mPos[1] + mPosition.y,
+			mMax.mPos[2] + mPosition.z
+		);
+	}
+
+	/*! \brief 모델 행렬 반환 (이동 + 회전) */
+	glm::mat4 getModelMatrix() const {
+		glm::mat4 model(1.0f);
+
+		// 볼륨 중심 계산
+		glm::vec3 center(
+			(mMin.mPos[0] + mMax.mPos[0]) * 0.5f,
+			(mMin.mPos[1] + mMax.mPos[1]) * 0.5f,
+			(mMin.mPos[2] + mMax.mPos[2]) * 0.5f
+		);
+
+		// 이동 적용
+		model = glm::translate(model, mPosition);
+
+		// 중심으로 이동 → 회전 → 원래 위치로
+		model = glm::translate(model, center);
+		model = model * glm::mat4_cast(mRotation);  // 쿼터니언 → 회전 행렬
+		model = glm::scale(model, mScale);			// 스케일 적용
+		model = glm::translate(model, -center);
+
+		return model;
+	}
+
+	/*! \brief 위치 이동 */
+	void translate(const glm::vec3& delta) {
+		mPosition += delta;
+	}
+
+	/*!
+	 * \brief 회전 적용 (라디안 단위의 오일러 각도 증분)
+	 *
+	 * 마우스 드래그에서 넘어오는 delta는 (dx, dy, 0) 형태의 작은 각도 증분.
+	 * 이걸 각 축별 쿼터니언으로 만들어서 현재 회전에 곱한다.
+	 */
+	void rotate(const glm::vec3& deltaRadians) {
+		glm::quat rotX = glm::angleAxis(deltaRadians.x, glm::vec3(1, 0, 0));
+		glm::quat rotY = glm::angleAxis(deltaRadians.y, glm::vec3(0, 1, 0));
+		glm::quat rotZ = glm::angleAxis(deltaRadians.z, glm::vec3(0, 0, 1));
+		mRotation = rotY * rotX * rotZ * mRotation;
+		mRotation = glm::normalize(mRotation);  // 누적 오차 방지
+	}
+
 private:
-	//float findClosestDistanceToMesh(const glm::vec3& p);
-	//float getSign(const glm::vec3& p);
 };

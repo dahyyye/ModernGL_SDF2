@@ -1,0 +1,297 @@
+#version 430 core
+
+// 워크그룹 하나의 크기는 8x8x8 = 512 스레드로 설정
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+
+// 입출력 데이터 바인딩
+layout(binding = 0) uniform sampler3D uBrushSDF;
+layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
+
+// Catmull-Rom 키프레임 구조체: 위치(xyz)와 회전 쿼터니언(xyzw)
+struct KeyFrame {
+    vec4 position; // xyz = position, w unused
+    vec4 rotation; // quaternion (x, y, z, w)
+};
+
+// GPU로 전달된 키프레임 배열 (크기 가변)
+layout(std430, binding = 2) buffer KeyFrameBuffer {
+    KeyFrame keyframes[];
+};
+
+uniform vec3 uVolumeMin;    // 결과 볼륨의 최소 좌표
+uniform vec3 uVolumeMax;    // 결과 볼륨의 최대 좌표
+uniform ivec3 uResolution;  // 결과 볼륨의 해상도 (x, y, z)
+
+uniform vec3 uBrushMin;     // 브러시의 로컬 공간 최소 좌표
+uniform vec3 uBrushMax;     // 브러시의 로컬 공간 최대 좌표
+
+uniform int uSamplingSteps; // 궤적을 몇개의 세그먼트로 나눌지
+
+uniform int uNumSegments;   
+
+// 브러시 SDF 샘플링 함수: 로컬 공간 좌표를 받아 SDF 값을 반환
+float sampleLocalSDF(vec3 localPos)
+{
+    vec3 brushRange = uBrushMax - uBrushMin;            
+    vec3 uvw = (localPos - uBrushMin) / brushRange;     // 로컬 좌표를 [0,1] 범위의 UVW로 변환
+
+    float outsideDist = 0.0;
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))  // UVW가 [0,1] 범위를 벗어나면 , 
+    {
+        vec3 clamped = clamp(uvw, vec3(0.0), vec3(1.0));        
+        vec3 diff = (uvw - clamped) * brushRange;
+        outsideDist = length(diff);
+        uvw = clamped;
+    }
+
+    return texture(uBrushSDF, uvw).r + outsideDist;     // 벗어난 만큼의 거리를 SDF에 추가
+}
+
+// Catmull-Rom은 keyframes를 직접 인덱싱하므로 seg 인덱스만 반환
+int getSegIdx(float t, out float lt)
+{
+    float scaled = clamp(t, 0.0, 1.0) * float(uNumSegments);
+    int seg      = clamp(int(scaled), 0, uNumSegments - 1);
+    lt           = scaled - float(seg); // 세그먼트 내 로컬 t [0,1]
+    return seg;
+}
+
+// Catmull-Rom 곡선에서 t에 해당하는 위치 계산
+// 경계에서는 phantom point(반사점)를 사용해 자연스러운 곡선 유지
+vec3 catmullRomPos(float t)
+{
+    float lt;
+    int seg = getSegIdx(t, lt);
+
+    // 양 끝 경계: 존재하지 않는 이웃 키프레임을 반사점으로 대체
+    vec3 k00 = (seg == 0)
+        ? (2.0 * keyframes[0].position.xyz - keyframes[1].position.xyz)
+        : keyframes[seg - 1].position.xyz;
+
+    vec3 k0 = keyframes[seg].position.xyz;
+    vec3 k1 = keyframes[seg + 1].position.xyz;
+
+    vec3 k2 = (seg + 2 <= uNumSegments)
+        ? keyframes[seg + 2].position.xyz
+        : (2.0 * keyframes[uNumSegments].position.xyz - keyframes[uNumSegments - 1].position.xyz);
+
+    // Catmull-Rom 공식 (Cubic Hermite 형태)
+    float lt2 = lt * lt;
+    float lt3 = lt2 * lt;
+
+    return 0.5 * ((2.0 * k0)
+        + (-k00 + k1)                        * lt
+        + (2.0*k00 - 5.0*k0 + 4.0*k1 - k2)  * lt2
+        + (-k00 + 3.0*k0 - 3.0*k1 + k2)     * lt3);
+}
+
+// 구면 선형 보간 (Slerp) 함수: 두 쿼터니언과 t를 받아 보간된 쿼터니언을 반환
+vec4 quatSlerp(vec4 q1, vec4 q2, float t)
+{
+    float cosA = clamp(dot(q1, q2), -1.0, 1.0);     // 두 단위 쿼터니언의 내적 = 4D 초구 위에서 두 점 사이 각도의 코사인. 
+    if (cosA < 0.0) { q2 = -q2; cosA = -cosA; }         // clamp는 부동소수점 오차로 ±1 범위를 살짝 벗어나는 경우를 막아줌
+    if (cosA > 0.9995) return normalize(mix(q1, q2, t));
+    
+    // 표준 Slerp 공식
+    float angle = acos(cosA);
+    float sinA = sin(angle);
+    return (sin((1.0 - t) * angle) / sinA) * q1
+         + (sin(t * angle)          / sinA) * q2;
+}
+
+// 쿼터니언으로 벡터 회전: v' = q * v * q^{-1} (q는 단위 쿼터니언이라고 가정)
+vec3 quatRotate(vec4 q, vec3 v)
+{
+    vec3 qv = q.xyz;
+    return v + 2.0 * cross(qv, cross(qv, v) + q.w * v);
+}
+
+// 역변환 평가: t에 해당하는 위치(Catmull-Rom)와 회전(Slerp)을 계산하여
+// worldPos를 브러시 로컬 공간으로 역변환
+vec3 evalInvTransformAt(float t, vec3 worldPos)
+{
+    float lt;
+    int seg = getSegIdx(t, lt);
+
+    vec3 pos    = catmullRomPos(t);
+    
+    vec4 rot    = quatSlerp(keyframes[seg].rotation,                // 회전은 인접 키프레임 사이를 Slerp으로 보간
+                            keyframes[seg + 1].rotation, lt);
+    vec4 invRot = vec4(-rot.xyz, rot.w);                            // 단위 쿼터니언의 역 = 켤레
+
+    return quatRotate(invRot, worldPos - pos);
+}
+
+// Arc length of p(α)=evalInvTransformAt(mix(t0,t1,α), worldPos) on α∈[0,1]
+// p0, p1은 호출자가 이미 계산한 끝점 — 재사용해서 evalInvTransformAt 2회 절약
+float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
+{
+    const int N = 4;   // subdivision 수, 내부 점 N-1개
+    float len = 0.0;
+    vec3 prev = p0;
+    for (int i = 1; i < N; ++i)
+    {
+        float alpha = float(i) / float(N);
+        vec3 curr = evalInvTransformAt(mix(t0, t1, alpha), worldPos);
+        len += length(curr - prev);
+        prev = curr;
+    }
+    len += length(p1 - prev);
+    return len;
+}
+
+// Brent's method: f(alpha) = SDF(T^{-1}(mix(t0,t1,alpha)) * worldPos)
+float brentMinimize(float t0, float t1, vec3 worldPos)
+{
+    const float golden = 0.381966;      // (3 - sqrt(5)) / 2, 황금비의 역수
+    const int maxIter = 10;             // 최대 반복 횟수
+    const float tol = 1e-4;             // 허용 오차
+
+    float a = 0.0, b = 1.0;             // alpha의 범위 [t0,t1]
+
+    float x = a + golden * (b - a);     // 현재까지 발견된 최소값의 위치
+    float w = x, v = x;                 // 두 번째로 작은 값의 위치, 세 번째로 작은 값의 위치
+
+    float fx = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, x), worldPos));
+    float fw = fx, fv = fx;
+
+    float d = 0.0, e = 0.0;             // d: 현재 단계에서 이동할 거리, e: 이전 단계에서 이동한 거리
+
+    for (int iter = 0; iter < maxIter; ++iter)
+    {
+        float mid  = 0.5 * (a + b);
+        float tol1 = tol * abs(x) + 1e-10;      // 절대 허용 오차 + 상대 허용 오차
+        float tol2 = 2.0 * tol1;                
+
+        if (abs(x - mid) <= (tol2 - 0.5 * (b - a)))
+            break;
+
+        bool useParabolic = false;
+        float u = 0.0;
+
+        // 포물러 보간 시도: e가 충분히 크고, fx, fw, fv가 서로 다를 때만 시도
+        if (abs(e) > tol1)
+        {
+            float r = (x - w) * (fx - fv);
+            float q = (x - v) * (fx - fw);
+            float p = (x - v) * q - (x - w) * r;
+            q = 2.0 * (q - r);
+
+            if (q > 0.0) p = -p; else q = -q;
+
+            float etemp = e; e = d;
+
+            if (abs(p) < abs(0.5 * q * etemp)
+                && p > q * (a - x)
+                && p < q * (b - x))
+            {
+                d = p / q;
+                u = x + d;
+                if ((u - a) < tol2 || (b - u) < tol2)   // u가 구간 끝에 너무 가까이 가지 않도록 조정
+                    d = (x < mid) ? tol1 : -tol1;
+                useParabolic = true;
+            }
+        }
+
+        // 포물러 보간이 실패했을 때는 황금 분할 방식으로 이동
+        if (!useParabolic)
+        {
+            e = (x < mid) ? (b - x) : (a - x);
+            d = golden * e;
+        }
+
+        // 새 평가 점 u를 결정, d가 tol1보다 크면 d만큼 이동, 그렇지 않으면 tol1만큼 이동 (x에서 멀어지는 방향으로)
+        u = (abs(d) >= tol1) ? x + d : x + ((d > 0.0) ? tol1 : -tol1);
+
+        // 새로운 점 u에서 함수값 평가
+        float fu = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, u), worldPos));
+
+        if (fu <= fx)       // u가 현재 최소값보다 좋으면, 구간을 좁히고 포물러 보간 결과를 업데이트
+        {
+            if (u < x) b = x; else a = x; 	 // u가 x보다 작으면 b를 x로, 그렇지 않으면 a를 x로 업데이트하여 구간을 좁힘
+            v = w; fv = fw;                  
+            w = x; fw = fx;
+            x = u; fx = fu;
+        }
+        else                // u가 현재 최소값보다 좋지 않으면, 구간을 좁히고 포물러 보간 결과를 업데이트
+        {
+            if (u < x) a = u; else b = u;       // u가 x보다 작으면 a를 u로, 그렇지 않으면 b를 u로 업데이트하여 구간을 좁힘
+            if (fu <= fw || w == x)      { v = w; fv = fw; w = u; fw = fu; }
+            else if (fu <= fv || v == x || v == w) { v = u; fv = fu; }
+        }
+    }
+
+    return fx;  // 최종적으로 발견된 최소값 반환
+}
+
+
+void main()
+{
+    ivec3 id = ivec3(gl_GlobalInvocationID);                    // 현재 스레드의 3D 인덱스 (x, y, z)
+    if (any(greaterThanEqual(id, uResolution))) return;         // 인덱스가 볼륨 해상도를 벗어나면 작업을 수행하지 않음
+
+    vec3 volumeRange = uVolumeMax - uVolumeMin;                 // 볼륨의 실제 크기 계산
+    vec3 spacing     = volumeRange / vec3(uResolution - 1);     // 각 축별로 voxel 간격 계산 (해상도 - 1로 나누는 이유는 voxel이 해상도보다 하나 적은 간격을 가지기 때문)
+    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;         // 현재 voxel의 실제 월드 좌표 계산
+
+    float minSDF = 1e10;
+
+    float t0   = 0.0;
+    vec3  p0   = evalInvTransformAt(t0, worldPos);
+    float sdf0 = sampleLocalSDF(p0);
+
+    for (int seg = 0; seg < uSamplingSteps - 1; ++seg)          // 궤적을 uSamplingSteps-1 개의 세그먼트로 나누고, 각 세그먼트에 대해 최솟값을 계산
+    {
+        float t1 = float(seg + 1) / float(uSamplingSteps - 1);
+
+        // 세그먼트의 양 끝점에서 역변환을 평가하여 로컬 공간 좌표를 얻고, 해당 좌표에서 SDF 값을 샘플링
+        vec3 p1 = evalInvTransformAt(t1, worldPos);
+        float sdf1 = sampleLocalSDF(p1);
+        float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
+
+        // 외부판별 조건 
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength*1.5)
+        {
+            minSDF = min(minSDF, min(sdf0, sdf1));      // 양 끝점 중 작은 값을 최소값으로 사용
+        }
+        else
+        {
+            const int M = 8;
+            float bestSDF = min(sdf0, sdf1);
+
+            float tPrev = t0;
+            vec3  pPrev = p0;
+            float sdfPrev = sdf0;
+
+            for (int i = 1; i <= M; ++i)
+            {
+                float tCurr = mix(t0, t1, float(i) / float(M));
+                vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
+                float sdfCurr = sampleLocalSDF(pCurr);
+
+                float subLen = length(pCurr - pPrev);
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
+                {
+                    bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
+                }
+                else
+                {
+                    float val = brentMinimize(tPrev, tCurr, worldPos);
+                    bestSDF = min(bestSDF, val);
+                }
+
+                tPrev = tCurr;
+                pPrev = pCurr;
+                sdfPrev = sdfCurr;
+            }
+
+            minSDF = min(minSDF, bestSDF);
+        }
+
+        t0   = t1;
+        p0   = p1;
+        sdf0 = sdf1;
+    }
+
+    imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));  // 최종적으로 계산된 최소 SDF 값을 결과 텍스처에 저장 (R 채널에 저장, 나머지 채널은 0으로 설정)
+}

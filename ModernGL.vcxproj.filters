@@ -72,7 +72,13 @@
     <ClCompile Include="WindowProperty.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="DgBvh.cpp">
+    <ClCompile Include="DgSweep.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="DgSweepVia.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuizmo.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
@@ -95,7 +101,16 @@
     <ClInclude Include="DgBoolean.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="DgBvh.h">
+    <ClInclude Include="DgSweep.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DgTrajectory.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DgSweepVia.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="DgUtil.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

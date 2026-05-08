@@ -1,134 +1,229 @@
 #version 330 core
 
-out vec4 outColor; //최종 프래그먼트 색상
+//=============================================================================
+// 출력 변수
+//=============================================================================
+out vec4 outColor;
 
-//=========================================== SDF 볼륨 유니폼 ===============================================
-uniform sampler3D uSDFVolume;
-uniform vec3 uVolumeMin;
-uniform vec3 uVolumeMax;
+//=============================================================================
+// 유니폼 변수
+//=============================================================================
 
+// SDF 볼륨 관련
+uniform sampler3D uSDFVolume;   // 3D SDF 텍스처
+uniform vec3 uVolumeMin;        // 볼륨 AABB 최소점 (로컬 좌표)
+uniform vec3 uVolumeMax;        // 볼륨 AABB 최대점 (로컬 좌표)
 
-//===========================================카메라 조작==============================================
+// 카메라 관련
+uniform mat4 uView;             // 뷰 행렬
+uniform mat4 uProj;             // 투영 행렬
+uniform mat4 uInvView;          // 뷰 행렬의 역행렬
+uniform mat4 uInvProj;          // 투영 행렬의 역행렬
+uniform vec2 uResolution;       // 화면 해상도
 
-uniform mat4 uView, uProj, uInvView, uInvProj; //카메라 뷰/투영 행렬 및 역행렬
-uniform vec2 uResolution; //화면 해상도
+// 모델 변환 관련
+uniform mat4 uModel;            // 모델 행렬 (이동 + 회전)
+uniform mat4 uModelInverse;     // 모델 행렬의 역행렬
 
-float mapSDFd(vec3 p) {
+// 오프셋 값
+uniform float uOffset;          // SDF 오프셋 값
+
+// 기본 색상
+uniform vec3 uBaseColor;        // 기본 색상
+uniform float uAlpha;           // 투명도
+
+//=============================================================================
+// 상수 정의
+//=============================================================================
+#define MAX_STEPS 256
+#define EPS 0.001
+
+//=============================================================================
+// 레이-AABB 교차 검사
+//-----------------------------------------------------------------------------
+// 광선과 축 정렬 바운딩 박스(AABB)의 교차점을 계산
+// 반환값: vec2(tNear, tFar)
+// tNear > tFar 이면 교차하지 않음
+//=============================================================================
+vec2 intersectAABB(vec3 rayOrigin, vec3 rayDir, vec3 boxMin, vec3 boxMax) 
+{
+    vec3 tMin = (boxMin - rayOrigin) / rayDir;
+    vec3 tMax = (boxMax - rayOrigin) / rayDir;
+    
+    vec3 t1 = min(tMin, tMax);
+    vec3 t2 = max(tMin, tMax);
+    
+    float tNear = max(max(t1.x, t1.y), t1.z);
+    float tFar  = min(min(t2.x, t2.y), t2.z);
+    
+    return vec2(tNear, tFar);
+}
+
+//=============================================================================
+// SDF 샘플링 함수
+//-----------------------------------------------------------------------------
+// 로컬 좌표 p에서 SDF 값을 샘플링
+//=============================================================================
+float mapSDF(vec3 p) 
+{
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 uvw = (p - uVolumeMin) / volumeRange;
+    uvw = clamp(uvw, vec3(0.001), vec3(0.999));
+    return texture(uSDFVolume, uvw).r - uOffset;
+}
+
+//=============================================================================
+// SDF 샘플링 (범위 체크 포함)
+//-----------------------------------------------------------------------------
+// 볼륨 범위 밖이면 1.0 반환 (레이마칭 탈출용)
+//=============================================================================
+float mapSDFWithBoundsCheck(vec3 p) 
+{
     vec3 volumeRange = uVolumeMax - uVolumeMin;
     vec3 uvw = (p - uVolumeMin) / volumeRange;
     
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0)))) {
-        return 500.0;
+        return 1.0;
     }
-    return texture(uSDFVolume, uvw).r; 
+    return texture(uSDFVolume, uvw).r - uOffset;
 }
 
-vec3 mapColor(vec3 p) {
-    return vec3(0.1, 0.4, 0.8);
+//=============================================================================
+// 카메라 위치 반환
+//=============================================================================
+vec3 getCameraPosition() 
+{ 
+    return (uInvView * vec4(0.0, 0.0, 0.0, 1.0)).xyz; 
 }
 
-// 화면 좌표에서 월드 공간의 광선 방향 얻기
-vec3 getRayDir(vec2 fragCoord){
-    // 화면 좌표 (fragCoord)를 NDC (Normalized Device Coordinates) [-1, 1]로 변환
-    vec2 ndc = (fragCoord / uResolution) * 2.0 - 1.0; 
+//=============================================================================
+// 화면 좌표에서 월드 공간 광선 방향 계산
+//=============================================================================
+vec3 getRayDirection(vec2 fragCoord) 
+{
+    // NDC 좌표로 변환
+    vec2 ndc = (fragCoord / uResolution) * 2.0 - 1.0;
     
-    // NDC를 클립 공간 좌표로 변환 (z=-1, w=1)
+    // 클립 → 뷰 → 월드 변환
     vec4 clip = vec4(ndc, -1.0, 1.0);
-    
-    // 클립 좌표를 Eye(View) 공간 좌표로 변환 (역투영 행렬 사용)
-    vec4 eye = uInvProj * clip;
-    
-    // Ray Direction을 계산하기 위해 z=-1, w=0 (무한대의 점)으로 설정
+    vec4 eye  = uInvProj * clip;
     eye = vec4(eye.xy, -1.0, 0.0);
     
-    // Eye 공간에서 World 공간으로 변환하고 정규화
     return normalize((uInvView * eye).xyz);
 }
 
-// 카메라 위치 얻기
-vec3 getCamPos(){ return (uInvView * vec4(0,0,0,1)).xyz; }
-
-// 법선 계산
-vec3 calcNormal(vec3 p){
-    const float e = 1.5e-3;
-    vec2 k = vec2(1,-1);
-    return normalize(
-         k.xyy * mapSDFd(p + k.xyy*e) +
-        k.yyx * mapSDFd(p + k.yyx*e) +
-        k.yxy * mapSDFd(p + k.yxy*e) +
-        k.xxx * mapSDFd(p + k.xxx*e)
-    );
-}
-
-
-
-
-
-//============================================레이마칭================================================
-
-struct Hit{ 
-    bool hit;                                           // 히트 여부
-    vec3 hitPoint;                                      // 히트 위치 
-    vec3 n;                                             // 히트 위치의 법선
-    vec3 color;                                         // 히트 위치의 색상
-};
-
-Hit raymarch(vec3 rayOrigin, vec3 rayDir){                // rayOrigin: 광선 시작점, rd: 광선 방향
-    float t= 0.0;                                         // t: 광선 거리 누적 변수
-    const float EPS = 1e-3;                               // 히트 허용 오차
-    const float MIN_STEP = 1e-4;                          // 최소 스텝 크기
-
-    for(int i = 0; i < 256; i++) {
-        vec3 p = rayOrigin + rayDir * t;
-        float d = mapSDFd(p);
-
-        if (d < EPS) {                                    // 히트 발생
-            vec3 n = calcNormal(p);
-            vec3 c = mapColor(p);
-            return Hit(true, p, n, c);
-        }
-
-        t += max(d, MIN_STEP);
-
-        if(t > 500.0) break;                              // 최대 거리 초과 시 종료
+//=============================================================================
+// 법선 계산 (중앙 차분법)
+//-----------------------------------------------------------------------------
+// 로컬 좌표에서 그래디언트를 계산하고 월드 공간으로 변환
+//=============================================================================
+vec3 calcNormal(vec3 p) 
+{
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    float minRange = min(min(volumeRange.x, volumeRange.y), volumeRange.z);
+    float e = minRange / 128.0;
+    
+    // 중앙 차분법으로 그래디언트 계산
+    float dx = mapSDF(p + vec3(e, 0, 0)) - mapSDF(p - vec3(e, 0, 0));
+    float dy = mapSDF(p + vec3(0, e, 0)) - mapSDF(p - vec3(0, e, 0));
+    float dz = mapSDF(p + vec3(0, 0, e)) - mapSDF(p - vec3(0, 0, e));
+    
+    vec3 n = vec3(dx, dy, dz);
+    float len = length(n);
+    
+    if (len < 0.0001) {
+        return vec3(0.0, 1.0, 0.0);
     }
-    return Hit(false, vec3(0.0), vec3(0.0), vec3(0.0));
-}
-float depthFromWorld(vec3 worldPos) {
-    // 월드 좌표를 클립 공간 좌표로 변환: ClipPos = uProj * uView * WorldPos
-    //    (uView, uProj 유니폼은 DgScene.cpp에서 전달됩니다.)
-    vec4 clipPos = uProj * uView * vec4(worldPos, 1.0);
     
-    // 클립 좌표를 NDC (Normalized Device Coordinates)로 변환: z/w
-    //    NDC z 값은 [-1, 1] 범위입니다.
+    // 로컬 법선을 월드 공간으로 변환
+    vec3 localNormal = n / len;
+    vec3 worldNormal = normalize(mat3(uModel) * localNormal);
+    
+    return worldNormal;
+}
+
+//=============================================================================
+// 메인 함수
+//=============================================================================
+void main() 
+{
+    // 1. 월드 공간에서 광선 설정
+    vec3 worldRayOrigin = getCameraPosition();
+    vec3 worldRayDir    = getRayDirection(gl_FragCoord.xy);
+
+    // 2. 월드 레이를 로컬 공간으로 변환
+    // 볼륨이 회전되어 있으면, 레이를 역방향으로 회전해서
+    // 로컬 공간에서 레이마칭을 수행해야 함
+    vec3 localRayOrigin = (uModelInverse * vec4(worldRayOrigin, 1.0)).xyz;
+    vec3 localRayDir    = normalize((uModelInverse * vec4(worldRayDir, 0.0)).xyz);
+
+    // 3. 로컬 공간에서 레이-박스 교차 검사
+    vec2 tHit = intersectAABB(localRayOrigin, localRayDir, uVolumeMin, uVolumeMax);
+    
+    if (tHit.x > tHit.y || tHit.y < 0.0) {
+        discard;
+    }
+    
+    float t    = max(tHit.x, 0.0) + 0.001;
+    float tEnd = tHit.y;
+
+    // 4. 레이마칭 (Sphere Tracing)
+    // 로컬 공간에서 SDF를 샘플링하며 표면을 찾음
+    bool hit = false;
+    vec3 localHitPoint;
+    
+    for (int i = 0; i < MAX_STEPS; i++) 
+    {
+        if (t > tEnd) break;
+        
+        vec3 p = localRayOrigin + localRayDir * t;
+        float d = mapSDFWithBoundsCheck(p);
+        
+        if (abs(d) < EPS) {
+            hit = true;
+            localHitPoint = p;
+            break;
+        }
+        
+        t += max(abs(d) * 0.5, EPS);
+    }
+    
+    if (!hit) { 
+        discard; 
+    }
+
+    // 5. 로컬 히트 포인트를 월드 공간으로 변환
+    vec3 worldHitPoint = (uModel * vec4(localHitPoint, 1.0)).xyz;
+
+    // 6. 셰이딩 (Phong 조명)
+    vec3 N = calcNormal(localHitPoint);
+    vec3 V = normalize(worldRayOrigin - worldHitPoint);
+    vec3 L = V;  // 헤드라이트 조명
+    vec3 H = normalize(L + V);
+    
+    // 양면 조명
+    float NdotL = dot(N, L);
+    if (NdotL < 0.0) {
+        N = -N;
+        NdotL = -NdotL;
+    }
+    
+    // 조명 계산
+    vec3 baseColor = uBaseColor ;
+    float diff = max(NdotL, 0.0);
+    float spec = pow(max(dot(N, H), 0.0), 32.0);
+    
+    vec3 ambient  = 0.2 * baseColor;
+    vec3 diffuse  = diff * baseColor;
+    vec3 specular = spec * vec3(0.3);
+    
+    vec3 finalColor = ambient + diffuse + specular;
+
+    // 7. 깊이 버퍼 설정
+    vec4 clipPos = uProj * uView * vec4(worldHitPoint, 1.0);
     float ndcZ = clipPos.z / clipPos.w;
-    
-    // NDC z 값을 [0, 1] 범위의 최종 깊이 값으로 변환하여 반환
-    return (ndcZ * 0.5) + 0.5;
-}
+    gl_FragDepth = (ndcZ * 0.5) + 0.5;
 
-//=========================================메인 함수====================================================
-
-void main(){
-    vec3 rayOrigin = getCamPos();
-    vec3 rayDir = getRayDir(gl_FragCoord.xy);
-    
-    Hit hit = raymarch(rayOrigin, rayDir);                          // 레이마칭으로 히트 검사
-
-    if(!hit.hit) { discard; }                                       // 히트 없으면 프래그먼트 버림
-
-    gl_FragDepth = depthFromWorld(hit.hitPoint);                    // 깊이 버퍼에 표면 깊이 기록
-    
-    vec3 V = normalize(rayOrigin - hit.hitPoint);                   // 간단 셰이딩(색은 surf.color 사용)
-    vec3 L = V;                                                     // 광원 방향 (뷰어 방향과 동일)
-    vec3 H = normalize(L+V);  
-
-    float diff = max(dot(hit.n, L), 0.0);
-    float spec = pow(max(dot(hit.n, H),0.0),64.0);
-
-    vec3 ambient = 0.20 * hit.color;
-    vec3 color   = ambient + diff * hit.color + spec * vec3(1.0);
-
-
-    outColor = vec4(color, 1.0);
+    // 8. 최종 출력
+    outColor = vec4(finalColor, uAlpha);
 }
