@@ -3,6 +3,31 @@
 bool show_window_model_property = true;
 void OpenProperty();
 
+static void SaveGridToText(DgVolume* vol, const std::string& filename)
+{
+	std::ofstream file(filename);
+	if (!file.is_open()) return;
+
+	int dimX = vol->mDim[0];
+	int dimY = vol->mDim[1];
+	int dimZ = vol->mDim[2];
+	int midZ = dimZ / 2;
+
+	file << "Grid Size: " << dimX << " x " << dimY << " x " << dimZ << "\n";
+	file << "Slice Z = " << midZ << " (center)\n\n";
+
+	for (int y = 0; y < dimY; ++y) {
+		for (int x = 0; x < dimX; ++x) {
+			size_t idx = (size_t)midZ * (dimY * dimX) + (size_t)y * dimX + x;
+			file << std::fixed << std::setprecision(2) << vol->mData[idx] << "\t";
+		}
+		file << "\n";
+	}
+	file.close();
+	std::cout << "[SaveGrid] " << filename << " 저장 완료 (z=" << midZ << ")" << std::endl;
+
+}
+
 void ShowWindowModelProperty(bool* p_open)
 {
 
@@ -341,7 +366,7 @@ void OpenProperty() {
 		}
 
 		ImGui::Separator();
-		if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
+		/*if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
 		{
 			DgVolume* brush = DgScene::instance().mDrawingVolume;
 			if (brush)
@@ -349,6 +374,27 @@ void OpenProperty() {
 				DgSweep::fastSweeping(brush);
 				std::cout << "Fast Sweeping 적용 (Drawing Volume)" << std::endl;
 			}
+		}*/
+
+		if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
+		{
+			DgVolume* target = nullptr;
+			for (DgVolume* v : DgScene::instance().getSDFList()) {
+				if (v->mSelected) { target = v; break; }
+			}
+
+			if (target)
+			{
+				SaveGridToText(target, "C:\\Users\\user\\바탕 화면\\학교\\sdf_before.txt");
+				DgSweep::fastSweeping(target);
+				SaveGridToText(target, "C:\\Users\\user\\바탕 화면\\학교\\sdf_after.txt");
+				std::cout << "Fast Sweeping 완료 + txt 추출 완료" << std::endl;
+			}
+			else
+			{
+				std::cout << "선택된 볼륨이 없음!" << std::endl;
+			}
 		}
 	}
 }
+
