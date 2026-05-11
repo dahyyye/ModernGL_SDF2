@@ -50,7 +50,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Sphere_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Sphere_128.vti")) {
 			volume->mName = "Sphere";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -68,7 +68,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Box_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Box_128.vti")) {
 			volume->mName = "Box";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -86,7 +86,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Torus_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Torus_128.vti")) {
 			volume->mName = "Torus";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -104,7 +104,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Cylinder_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Cylinder_128.vti")) {
 			volume->mName = "Cylinder";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -122,7 +122,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Capsule_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Capsule_128.vti")) {
 			volume->mName = "Capsule";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -140,7 +140,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\QuadPramid_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti")) {
 			volume->mName = "QuadPramid";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -158,7 +158,7 @@ void CreateMesh() {
 		DgVolume* volume = new DgVolume();
 
 		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\Cone_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Cone_128.vti")) {
 			volume->mName = "Cone";
 			// 바운딩 박스 메쉬 생성
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
@@ -175,7 +175,7 @@ void CreateMesh() {
 	{
 		DgVolume* volume = new DgVolume();
 		volume->mName = "Bunny";
-		if (volume->loadFromVTI(".\\res\\volume\\Bunny_256.vti")) {
+		if (volume->loadFromVTI(".\\res\\volume\\(mini)Bunny_128.vti")) {
 			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
 			volume->createTexture();
 			DgScene::instance().addSDFVolume(volume);
