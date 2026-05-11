@@ -59,6 +59,10 @@ public:
 	GLuint mTrajectoryVAO = 0;
 	GLuint mTrajectoryVBO = 0;
 
+	// 面倒 单葛
+	std::vector<DgMesh*> mObstacleMeshes;
+	bool mCollisionDemoActive = false;
+
 private:
 	std::vector<DgVolume*> mSDFList; // DgVolume 按眉 包府 府胶飘
 
@@ -195,4 +199,9 @@ public:
 	void renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
 	void renderSweptVolumeTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
 	void resweepVolume(DgVolume* vol, bool preview = false);
+
+	// 面倒 单葛 包访 窃荐
+	void startCollisionDemo(DgVolume* sv);
+	void runCollisionOptimization(DgVolume* sv, float safetyFactor = 1.5f, int maxIter = 50);
+	void clearCollisionDemo();
 };

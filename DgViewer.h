@@ -44,6 +44,7 @@
 #include "DgBoolean.h"
 #include "DgTrajectory.h"
 #include "DgUtil.h"
+#include "DgCollision.h"
 //#include "DgSweepVia.h"
 #define GLM_ENABLE_EXPERIMENTAL
 

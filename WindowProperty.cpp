@@ -396,5 +396,47 @@ void OpenProperty() {
 			}
 		}
 	}
+
+	if (ImGui::CollapsingHeader("Collision Demo"))
+	{
+		DgVolume* selectedSV = nullptr;
+
+		for (DgVolume* vol : DgScene::instance().getSDFList())
+		{
+			if (vol && vol->mSelected && vol->mIsSweptVolume) {
+				selectedSV = vol;
+				break;
+			}
+		}
+
+		if (selectedSV)
+		{
+			DgScene& scene = DgScene::instance();
+
+			if (!scene.mCollisionDemoActive)
+			{
+				if (ImGui::Button("Start Collision Demo", ImVec2(-1, 0)))
+					scene.startCollisionDemo(selectedSV);
+			}
+			else
+			{
+				static float safetyFactor = 1.5f;
+				static int   maxIter = 50;
+				ImGui::SliderFloat("Safety Factor", &safetyFactor, 1.0f, 3.0f);
+				ImGui::SliderInt("Max Iterations", &maxIter, 5, 200);
+
+				if (ImGui::Button("Start", ImVec2(-1, 0)))
+					scene.runCollisionOptimization(selectedSV, safetyFactor, maxIter);
+
+				ImGui::Separator();
+				if (ImGui::Button("Clear Demo", ImVec2(-1, 0)))
+					scene.clearCollisionDemo();
+			}
+		}
+		else
+		{
+			ImGui::TextDisabled("Select a Swept Volume");
+		}
+	}
 }
 

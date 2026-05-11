@@ -1358,3 +1358,119 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	newVol->mMesh = nullptr;
 	delete newVol;
 }
+
+void DgScene::startCollisionDemo(DgVolume* sv)
+{
+	if (!sv || !sv->mIsSweptVolume) return;
+	clearCollisionDemo();
+
+	struct ObstacleInfo {
+		const char* path;
+		glm::vec3   position;
+	};
+
+	ObstacleInfo obstacles[] = {
+		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(4.0f, 0.0f,  10.0f) },
+		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(17.0f, 0.0f,  8.0f) },
+		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(30.0f, 0.0f,  0.0f) },
+		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(43.0f, 0.0f, -4.0f) },
+		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(43.0f, 0.0f, -1.0f) },
+		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(50.0f, 0.0f,  1.0f) },
+	};
+
+	for (auto& info : obstacles)
+	{
+		DgMesh* mesh = import_mesh_obj(info.path);
+		if (!mesh) {
+			std::cout << "장애물 로드 실패: " << info.path << std::endl;
+			continue;
+		}
+
+		// 정점을 목표 위치로 이동
+		for (auto& v : mesh->mVerts) {
+			v.mPos[0] += info.position.x;
+			v.mPos[1] += info.position.y;
+			v.mPos[2] += info.position.z;
+		}
+
+		mesh->mShaderId = mShaders[2];  // phong
+		mesh->setupBuffers();
+		mMeshList.push_back(mesh);		 // 전체 메쉬 목록에 추가(렌더링용)
+		mObstacleMeshes.push_back(mesh); // 충돌 데모용 장애물 목록에도 추가
+	}
+
+	mCollisionDemoActive = true;
+	std::cout << "충돌 데모: 장애물 " << mObstacleMeshes.size() << "개 배치" << std::endl;
+}
+
+void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int maxIter)
+{
+	if (!sv || !sv->mIsSweptVolume || !sv->mSourceTrajectory) return;
+	if (mObstacleMeshes.empty()) return;
+
+	auto& kfs = sv->mSourceTrajectory->keyframes;
+	int numKFs = (int)kfs.size();
+
+	std::cout << "=== 충돌 최적화 시작 ===" << std::endl;
+
+	for (int iter = 0; iter < maxIter; ++iter)
+	{
+		// 모든 장애물 중 가장 깊은 충돌 찾기
+		CollisionResult worst;
+		worst.deepestSDF = 0.0f;
+
+		for (DgMesh* obs : mObstacleMeshes)
+		{
+			CollisionResult cr = DgCollision::detectCollision(sv, obs);
+			if (cr.hasCollision && cr.deepestSDF < worst.deepestSDF)
+				worst = cr;
+		}
+
+		if (!worst.hasCollision) {
+			std::cout << "충돌 해소 완료 (iteration " << iter << ")" << std::endl;
+			break;
+		}
+
+		// 유클리드 거리로 가장 가까운 키프레임 (시작/끝 제외)
+		int nearestKF = 1;
+		float minDist = FLT_MAX;
+		for (int i = 1; i < numKFs - 1; ++i)
+		{
+			float d = glm::length(kfs[i].position - worst.deepestPoint);
+			if (d < minDist) {
+				minDist = d;
+				nearestKF = i;
+			}
+		}
+
+		// 법선 방향으로 키프레임 이동
+		glm::vec3 displacement = worst.normal * (-worst.deepestSDF) * safetyFactor;
+		kfs[nearestKF].position += displacement;
+
+		std::cout << "Iter " << iter
+			<< " | SDF=" << worst.deepestSDF
+			<< " | KF=" << nearestKF
+			<< " | disp=" << glm::length(displacement) << std::endl;
+
+		// 궤적 재구성 + SV 재생성 (preview)
+		sv->mSourceTrajectory->rebuild();
+		resweepVolume(sv, true);
+	}
+
+	std::cout << "최종 full quality resweep..." << std::endl;
+	resweepVolume(sv, false);
+	std::cout << "=== 충돌 최적화 완료 ===" << std::endl;
+}
+
+void DgScene::clearCollisionDemo()
+{
+	for (DgMesh* obs : mObstacleMeshes)
+	{
+		auto it = std::find(mMeshList.begin(), mMeshList.end(), obs);
+		if (it != mMeshList.end())
+			mMeshList.erase(it);
+		delete obs;
+	}
+	mObstacleMeshes.clear();
+	mCollisionDemoActive = false;
+}
