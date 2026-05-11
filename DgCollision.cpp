@@ -28,20 +28,39 @@ CollisionResult DgCollision::detectCollision(DgVolume* sv, DgMesh* obstacle)
     if (!sv || !obstacle || sv->mTextureID == 0) return result;
     if (obstacle->mVerts.empty()) return result;
 
-    // AABB 교차 검사
-    glm::vec3 svMin = sv->getLocalMin();
-    glm::vec3 svMax = sv->getLocalMax();
+    // SV 월드 AABB 계산
+    glm::vec3 svLocalMin = sv->getLocalMin();
+    glm::vec3 svLocalMax = sv->getLocalMax();
+    glm::mat4 modelMat = sv->getModelMatrix();
 
+    glm::vec3 svWorldMin(FLT_MAX), svWorldMax(-FLT_MAX);
+    glm::vec3 corners[8] = {
+        {svLocalMin.x, svLocalMin.y, svLocalMin.z},
+        {svLocalMax.x, svLocalMin.y, svLocalMin.z},
+        {svLocalMax.x, svLocalMax.y, svLocalMin.z},
+        {svLocalMin.x, svLocalMax.y, svLocalMin.z},
+        {svLocalMin.x, svLocalMin.y, svLocalMax.z},
+        {svLocalMax.x, svLocalMin.y, svLocalMax.z},
+        {svLocalMax.x, svLocalMax.y, svLocalMax.z},
+        {svLocalMin.x, svLocalMax.y, svLocalMax.z},
+    };
+    for (auto& c : corners) {
+        glm::vec3 wc = glm::vec3(modelMat * glm::vec4(c, 1.0f));
+        svWorldMin = glm::min(svWorldMin, wc);
+        svWorldMax = glm::max(svWorldMax, wc);
+    }
+
+    // 장애물 AABB (이미 월드 좌표)
     glm::vec3 obsMin(FLT_MAX), obsMax(-FLT_MAX);
     for (auto& v : obstacle->mVerts) {
         obsMin = glm::min(obsMin, glm::vec3((float)v.mPos[0], (float)v.mPos[1], (float)v.mPos[2]));
         obsMax = glm::max(obsMax, glm::vec3((float)v.mPos[0], (float)v.mPos[1], (float)v.mPos[2]));
     }
 
-    if (obsMax.x < svMin.x || obsMin.x > svMax.x ||
-        obsMax.y < svMin.y || obsMin.y > svMax.y ||
-        obsMax.z < svMin.z || obsMin.z > svMax.z)
-        return result;  // AABB 안 겹침 → 충돌 없음
+    if (obsMax.x < svWorldMin.x || obsMin.x > svWorldMax.x ||
+        obsMax.y < svWorldMin.y || obsMin.y > svWorldMax.y ||
+        obsMax.z < svWorldMin.z || obsMin.z > svWorldMax.z)
+        return result;
 
     if (!initializeGPU()) return result;
 
@@ -78,8 +97,8 @@ CollisionResult DgCollision::detectCollision(DgVolume* sv, DgMesh* obstacle)
     glBindTexture(GL_TEXTURE_3D, sv->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSvSDF"), 0);
 
-    glUniform3f(glGetUniformLocation(sComputeShader, "uSvMin"), svMin.x, svMin.y, svMin.z);
-    glUniform3f(glGetUniformLocation(sComputeShader, "uSvMax"), svMax.x, svMax.y, svMax.z);
+    glUniform3f(glGetUniformLocation(sComputeShader, "uSvMin"), svLocalMin.x, svLocalMin.y, svLocalMin.z);
+    glUniform3f(glGetUniformLocation(sComputeShader, "uSvMax"), svLocalMax.x, svLocalMax.y, svLocalMax.z);
     glUniform1i(glGetUniformLocation(sComputeShader, "uNumVertices"), numVerts);
 
     glDispatchCompute((numVerts + 255) / 256, 1, 1);

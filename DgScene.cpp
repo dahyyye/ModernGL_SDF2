@@ -1431,12 +1431,15 @@ void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int max
 			break;
 		}
 
-		// 유클리드 거리로 가장 가까운 키프레임 (시작/끝 제외)
+		// deepestPoint(월드)를 SV 로컬로 변환 후 비교
+		glm::mat4 invModel = glm::inverse(sv->getModelMatrix());
+		glm::vec3 deepestLocal = glm::vec3(invModel * glm::vec4(worst.deepestPoint, 1.0f));
+
 		int nearestKF = 1;
 		float minDist = FLT_MAX;
 		for (int i = 1; i < numKFs - 1; ++i)
 		{
-			float d = glm::length(kfs[i].position - worst.deepestPoint);
+			float d = glm::length(kfs[i].position - deepestLocal);
 			if (d < minDist) {
 				minDist = d;
 				nearestKF = i;
@@ -1444,7 +1447,9 @@ void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int max
 		}
 
 		// 법선 방향으로 키프레임 이동
-		glm::vec3 displacement = worst.normal * (-worst.deepestSDF) * safetyFactor;
+		glm::vec3 normalLocal = glm::normalize(
+			glm::vec3(invModel * glm::vec4(worst.normal, 0.0f)));
+		glm::vec3 displacement = normalLocal * (-worst.deepestSDF) * safetyFactor;
 		kfs[nearestKF].position += displacement;
 
 		std::cout << "Iter " << iter
