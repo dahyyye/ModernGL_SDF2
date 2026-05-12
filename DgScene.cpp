@@ -772,7 +772,7 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
-			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.6f, 0.6f, 0.6f);   // 볼륨 기본 색상 (회색)
+			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.255f, 0.412f, 0.882f);   // 볼륨 기본 색상 (회색 : 0.6 0.6 0.6)
 
 			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
 			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
@@ -1374,7 +1374,7 @@ void DgScene::startCollisionDemo(DgVolume* sv)
 	// 생성 영역: 정육면체 AABB
 	// 중심과 반크기(half-extent)로 정육면체 정의 → 원하는 위치로 자유롭게 조정
 	constexpr glm::vec3 kBoxCenter = glm::vec3(25.0f, 0.0f, 0.0f); // 정육면체 중심
-	constexpr float     kBoxHalfSize = 30.0f;                      // 반크기 (한 변 = 60)
+	constexpr float     kBoxHalfSize = 20.0f;                      // 반크기 (한 변 = 60)
 
 	constexpr int   kNumObstacles = 80;
 	constexpr float kMinSpacing = 2.0f;  // 장애물 간 최소 간격
