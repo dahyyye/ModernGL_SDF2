@@ -227,13 +227,12 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
     if (volumes.empty()) return;
 
     // 첫 번째 볼륨의 월드 AABB
-    getWorldAABB(volumes[0], combinedMin, combinedMax);
+    volumes[0]->getWorldAABB(combinedMin, combinedMax);
 
     // 나머지 볼륨들과 결합
     for (size_t i = 1; i < volumes.size(); i++) {
         glm::vec3 volMin, volMax;
-        getWorldAABB(volumes[i], volMin, volMax);
-
+        volumes[i]->getWorldAABB(volMin, volMax);
         switch (mode) {
         case BooleanMode::Union:
             combinedMin = glm::min(combinedMin, volMin);
@@ -255,33 +254,6 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
     float padding = glm::max(size.x, glm::max(size.y, size.z)) * 0.05f;
     combinedMin -= glm::vec3(padding);
     combinedMax += glm::vec3(padding);
-}
-
-void DgBoolean::getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax)
-{
-    glm::vec3 localMin = vol->getLocalMin();
-    glm::vec3 localMax = vol->getLocalMax();
-    glm::mat4 model = vol->getModelMatrix();
-
-    glm::vec3 corners[8] = {
-        {localMin.x, localMin.y, localMin.z},
-        {localMax.x, localMin.y, localMin.z},
-        {localMax.x, localMax.y, localMin.z},
-        {localMin.x, localMax.y, localMin.z},
-        {localMin.x, localMin.y, localMax.z},
-        {localMax.x, localMin.y, localMax.z},
-        {localMax.x, localMax.y, localMax.z},
-        {localMin.x, localMax.y, localMax.z}
-    };
-
-    glm::vec3 transformed = glm::vec3(model * glm::vec4(corners[0], 1.0f));
-    outMin = outMax = transformed;
-
-	for (int i = 1; i < 8; i++) { // 8개의 코너를 월드 좌표로 변환 및 크기 계산
-        transformed = glm::vec3(model * glm::vec4(corners[i], 1.0f));
-        outMin = glm::min(outMin, transformed);
-        outMax = glm::max(outMax, transformed);
-    }
 }
 
 std::string DgBoolean::generateName(BooleanMode mode)

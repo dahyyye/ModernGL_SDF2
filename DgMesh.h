@@ -165,26 +165,28 @@ public:
 	std::vector<DgNormal> mNormals;		/*! \brief 메쉬를 구성하는 법선 배열 */
 	std::vector<DgFace> mFaces;			/*! \brief 메쉬를 구성하는 삼각형 배열 */
 	std::vector<DgMaterial> mMaterials;	/*! \brief 메쉬가 사용하는 재질 배열 */
+	std::vector<GLuint> mEBOs;  // 머티리얼별 EBO
 
 	std::vector<std::vector<unsigned int>> mVertexIndicesPerMtl;	/*! 재질별 삼각형 정점 인덱스 그룹 */
 	GLuint mShaderId;												/*! \brief 메쉬가 사용하는 쉐이더 아이디 */
 	GLuint mVAO;
 	GLuint mVBO;
-	GLuint mEBO;	
 	bool mBuffersInitialized;
 
 public:
 	DgMesh() {
 		mVAO = 0;
 		mVBO = 0;
-		mEBO = 0;
+		mEBOs.clear();
 		mBuffersInitialized = false;
 	}
 
 	~DgMesh() {
 		if (mVAO) glDeleteVertexArrays(1, &mVAO);
 		if (mVBO) glDeleteBuffers(1, &mVBO);
-		if (mEBO) glDeleteBuffers(1, &mEBO);
+		for (GLuint ebo : mEBOs) {
+			if (ebo) glDeleteBuffers(1, &ebo);
+		}
 	};
 
 	void setupBuffers();

@@ -100,6 +100,19 @@ void DgMesh::setupBuffers()
 		glEnableVertexAttribArray(2);
 	}
 
+	// 머티리얼별 EBO 생성
+	for (GLuint ebo : mEBOs) glDeleteBuffers(1, &ebo);
+	mEBOs.resize(mMaterials.size(), 0);
+
+	for (size_t i = 0; i < mMaterials.size(); ++i) {
+		if (mVertexIndicesPerMtl[i].empty()) continue;
+		glGenBuffers(1, &mEBOs[i]);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBOs[i]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+			mVertexIndicesPerMtl[i].size() * sizeof(unsigned int),
+			mVertexIndicesPerMtl[i].data(), GL_STATIC_DRAW);
+	}
+
 	glBindVertexArray(0);
 }
 
@@ -221,14 +234,8 @@ void DgMesh::render()
 		if (indices.empty()) continue;
 
 		// EBO 없이 임시 인덱스 전송 (draw call마다)
-		GLuint tempEBO;
-		glGenBuffers(1, &tempEBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tempEBO);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBOs[i]);
 		glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, 0);
-
-		glDeleteBuffers(1, &tempEBO);
 	}
 
 	glBindVertexArray(0);

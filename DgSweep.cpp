@@ -608,30 +608,6 @@ bool DgSweep::initializeBrentGPU()
     return true;
 }
 
-void DgSweep::computeSweptAABB(DgVolume* brush, const DgTrajectory& trajectory,
-    int samplingSteps, glm::vec3& outMin, glm::vec3& outMax)
-{
-    glm::vec3 localMin = brush->getLocalMin();
-    glm::vec3 localMax = brush->getLocalMax();
-    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
-    float radius = glm::length(localMax - localCenter);
-
-    outMin = glm::vec3(FLT_MAX);
-    outMax = glm::vec3(-FLT_MAX);
-
-    for (int step = 0; step < samplingSteps; ++step)
-    {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-        outMin = glm::min(outMin, worldCenter);
-        outMax = glm::max(outMax, worldCenter);
-    }
-
-    outMin -= glm::vec3(radius);
-    outMax += glm::vec3(radius);
-}
-
 void DgSweep::fastSweeping(DgVolume* vol)
 {
     glm::ivec3 res(vol->mDim[0], vol->mDim[1], vol->mDim[2]);

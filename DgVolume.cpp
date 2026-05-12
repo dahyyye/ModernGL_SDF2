@@ -6,25 +6,6 @@ DgVolume::DgVolume()
 {
 	mMesh = nullptr;
 	mName = "volume";
-	
-	mDim[0] = 0;
-	mDim[1] = 0;
-	mDim[2] = 0;
-
-	mMin.mPos[0] = 0;
-	mMin.mPos[1] = 0;
-	mMin.mPos[2] = 0;
-
-	mMax.mPos[0] = 0;
-	mMax.mPos[1] = 0;
-	mMax.mPos[2] = 0;
-
-	mSpacing[0] = 0;
-	mSpacing[1] = 0;
-	mSpacing[2] = 0;
-
-	mPosition = glm::vec3(0.0f);
-	mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 }
 
 DgVolume::DgVolume(DgMesh* mesh)
