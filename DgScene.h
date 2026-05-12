@@ -15,6 +15,9 @@ class DgScene
 {
 public:
 	bool mOpen;
+	bool mShowGround = true;
+	bool mShowBBox = true;
+
 	ImVec2 mSceneSize;
 	DgFrmBuffer mFrameBuf;
 

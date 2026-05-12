@@ -438,5 +438,21 @@ void OpenProperty() {
 			ImGui::TextDisabled("Select a Swept Volume");
 		}
 	}
+	
+	if (ImGui::CollapsingHeader("Rendering"))
+	{
+		bool showGround = DgScene::instance().mShowGround;
+		bool showBBox = DgScene::instance().mShowBBox;
+
+		if (ImGui::Checkbox("Show Ground Grid", &showGround))
+		{
+			DgScene::instance().mShowGround = showGround;
+		}
+		
+		if (ImGui::Checkbox("Show Bounding Box", &showBBox))
+		{
+			DgScene::instance().mShowBBox = showBBox;
+		}
+	}
 }
 

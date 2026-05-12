@@ -628,6 +628,7 @@ void DgScene::renderScene()
 		viewMat = glm::translate(viewMat, glm::vec3(mPan[0], mPan[1], mPan[2]));	// Pan 변환, M = I * T * R * Pan
 
 		// 바닥 렌더링
+		if(mShowGround)
 		{
 			// 모델링 변환 행렬(단위 행렬)
 			glm::mat4 modelMat(1.0f);
@@ -809,7 +810,8 @@ void DgScene::renderScene()
 		}
 
 		// 선택된 볼륨의 바운딩 박스 렌더링
-		renderSelectedBoundingBoxes(viewMat, projMat);
+		if(mShowBBox)
+			renderSelectedBoundingBoxes(viewMat, projMat);
 
 		// 궤적 시각화
 		renderTrajectory(viewMat, projMat);  
@@ -1126,6 +1128,10 @@ void DgScene::resetScene()
 	mRotMat = glm::rotate(mRotMat, glm::radians(60.0f), glm::vec3(0, 1, 0));  // yaw
 	mPan = glm::vec3(0.0f);
 	mEditMode = EditMode::Select;
+
+	// 3. 충돌 제거
+	clearCollisionDemo();
+
 	std::cout << "장면 초기화 완료" << std::endl;
 }
 
@@ -1359,49 +1365,123 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	delete newVol;
 }
 
+// 무작위 생성
 void DgScene::startCollisionDemo(DgVolume* sv)
 {
 	if (!sv || !sv->mIsSweptVolume) return;
 	clearCollisionDemo();
 
-	struct ObstacleInfo {
-		const char* path;
-		glm::vec3   position;
-	};
+	// 생성 영역: 정육면체 AABB
+	// 중심과 반크기(half-extent)로 정육면체 정의 → 원하는 위치로 자유롭게 조정
+	constexpr glm::vec3 kBoxCenter = glm::vec3(25.0f, 0.0f, 0.0f); // 정육면체 중심
+	constexpr float     kBoxHalfSize = 30.0f;                      // 반크기 (한 변 = 60)
 
-	ObstacleInfo obstacles[] = {
-		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(4.0f, 0.0f,  10.0f) },
-		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(17.0f, 0.0f,  8.0f) },
-		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(30.0f, 0.0f,  0.0f) },
-		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(43.0f, 0.0f, -4.0f) },
-		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(43.0f, 0.0f, -1.0f) },
-		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(50.0f, 0.0f,  1.0f) },
-	};
+	constexpr int   kNumObstacles = 80;
+	constexpr float kMinSpacing = 2.0f;  // 장애물 간 최소 간격
+	constexpr int   kMaxAttempts = 800;
 
-	for (auto& info : obstacles)
+	std::mt19937 rng(std::random_device{}());
+	std::uniform_real_distribution<float> randAxis(-kBoxHalfSize, kBoxHalfSize);
+	std::uniform_int_distribution<int>    randType(0, 1);
+
+	std::vector<glm::vec3> placed;
+	placed.reserve(kNumObstacles);
+
+	for (int attempt = 0, count = 0;
+		attempt < kMaxAttempts && count < kNumObstacles; ++attempt)
 	{
-		DgMesh* mesh = import_mesh_obj(info.path);
-		if (!mesh) {
-			std::cout << "장애물 로드 실패: " << info.path << std::endl;
-			continue;
-		}
+		// 1. 정육면체 안에서 균등 무작위 위치
+		glm::vec3 candidate(
+			kBoxCenter.x + randAxis(rng),
+			kBoxCenter.y + randAxis(rng),
+			kBoxCenter.z + randAxis(rng)
+		);
 
-		// 정점을 목표 위치로 이동
+		// 2. Poisson-disk 간격 검사
+		bool tooClose = false;
+		for (const glm::vec3& p : placed) {
+			if (glm::length(candidate - p) < kMinSpacing) {
+				tooClose = true;
+				break;
+			}
+		}
+		if (tooClose) continue;
+
+		// 3. 메시 로드 및 배치
+		DgMesh* mesh = import_mesh_obj(".\\res\\object\\Obstacle_box.obj");
+
+		if (!mesh) continue;
+
 		for (auto& v : mesh->mVerts) {
-			v.mPos[0] += info.position.x;
-			v.mPos[1] += info.position.y;
-			v.mPos[2] += info.position.z;
+			v.mPos[0] += candidate.x;
+			v.mPos[1] += candidate.y;
+			v.mPos[2] += candidate.z;
 		}
 
-		mesh->mShaderId = mShaders[2];  // phong
+		mesh->mShaderId = mShaders[2];
 		mesh->setupBuffers();
-		mMeshList.push_back(mesh);		 // 전체 메쉬 목록에 추가(렌더링용)
-		mObstacleMeshes.push_back(mesh); // 충돌 데모용 장애물 목록에도 추가
+
+		for (auto& mat : mesh->mMaterials) {
+			mat.mKa[0] = 0.18f; mat.mKa[1] = 0.05f; mat.mKa[2] = 0.05f;
+			mat.mKd[0] = 0.78f; mat.mKd[1] = 0.25f; mat.mKd[2] = 0.24f;
+			mat.mKs[0] = 0.15f; mat.mKs[1] = 0.10f; mat.mKs[2] = 0.10f;
+			mat.mNs = 10.0f;
+		}
+
+		mMeshList.push_back(mesh);
+		mObstacleMeshes.push_back(mesh);
+		placed.push_back(candidate);
+		++count;
 	}
 
 	mCollisionDemoActive = true;
 	std::cout << "충돌 데모: 장애물 " << mObstacleMeshes.size() << "개 배치" << std::endl;
 }
+
+// 내가 지정해서 생성
+//void DgScene::startCollisionDemo(DgVolume* sv)
+//{
+//	if (!sv || !sv->mIsSweptVolume) return;
+//	clearCollisionDemo();
+//
+//	struct ObstacleInfo {
+//		const char* path;
+//		glm::vec3   position;
+//	};
+//
+//	ObstacleInfo obstacles[] = {
+//		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(4.0f, 0.0f,  10.0f) },
+//		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(17.0f, 0.0f,  8.0f) },
+//		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(30.0f, 0.0f,  0.0f) },
+//		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(43.0f, 0.0f, -4.0f) },
+//		{ ".\\res\\object\\Obstacle_sphere.obj", glm::vec3(43.0f, 0.0f, -1.0f) },
+//		{ ".\\res\\object\\Obstacle_box.obj",    glm::vec3(50.0f, 0.0f,  1.0f) },
+//	};
+//
+//	for (auto& info : obstacles)
+//	{
+//		DgMesh* mesh = import_mesh_obj(info.path);
+//		if (!mesh) {
+//			std::cout << "장애물 로드 실패: " << info.path << std::endl;
+//			continue;
+//		}
+//
+//		// 정점을 목표 위치로 이동
+//		for (auto& v : mesh->mVerts) {
+//			v.mPos[0] += info.position.x;
+//			v.mPos[1] += info.position.y;
+//			v.mPos[2] += info.position.z;
+//		}
+//
+//		mesh->mShaderId = mShaders[2];  // phong
+//		mesh->setupBuffers();
+//		mMeshList.push_back(mesh);		 // 전체 메쉬 목록에 추가(렌더링용)
+//		mObstacleMeshes.push_back(mesh); // 충돌 데모용 장애물 목록에도 추가
+//	}
+//
+//	mCollisionDemoActive = true;
+//	std::cout << "충돌 데모: 장애물 " << mObstacleMeshes.size() << "개 배치" << std::endl;
+//}
 
 void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int maxIter)
 {

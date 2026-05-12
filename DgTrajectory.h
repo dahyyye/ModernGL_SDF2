@@ -105,7 +105,7 @@ public:
         mIsLinear = true;  // 직선 플래그 설정
         glm::quat baseRot(1.0f, 0.0f, 0.0f, 0.0f);
         keyframes.emplace_back(center, baseRot);
-        keyframes.emplace_back(center + glm::vec3(20.0f, 0.0f, 0.0f), baseRot);
+        keyframes.emplace_back(center + glm::vec3(100.0f, 0.0f, 0.0f), baseRot);
         rebuild();
     }
 
