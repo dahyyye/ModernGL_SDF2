@@ -369,3 +369,27 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 	return vol;
 }
 
+void DgVolume::getWorldAABB(glm::vec3& outMin, glm::vec3& outMax) const
+{
+	glm::vec3 localMin = getLocalMin();
+	glm::vec3 localMax = getLocalMax();
+	glm::mat4 model = getModelMatrix();
+
+	glm::vec3 corners[8] = {
+		{localMin.x, localMin.y, localMin.z},
+		{localMax.x, localMin.y, localMin.z},
+		{localMax.x, localMax.y, localMin.z},
+		{localMin.x, localMax.y, localMin.z},
+		{localMin.x, localMin.y, localMax.z},
+		{localMax.x, localMin.y, localMax.z},
+		{localMax.x, localMax.y, localMax.z},
+		{localMin.x, localMax.y, localMax.z}
+	};
+
+	outMin = outMax = glm::vec3(model * glm::vec4(corners[0], 1.0f));
+	for (int i = 1; i < 8; ++i) {
+		glm::vec3 transformed = glm::vec3(model * glm::vec4(corners[i], 1.0f));
+		outMin = glm::min(outMin, transformed);
+		outMax = glm::max(outMax, transformed);
+	}
+}

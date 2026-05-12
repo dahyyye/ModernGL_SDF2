@@ -175,6 +175,6 @@ public:
 	static DgVolume* createResultVolume(const std::string& name,
 		int resolution, const glm::vec3& minPos, const glm::vec3& maxPos);
 
-	static GLuint createEmpty3DTexture(int resolution);
+	void getWorldAABB(glm::vec3& outMin, glm::vec3& outMax) const;
 private:
 };

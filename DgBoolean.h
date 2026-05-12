@@ -64,15 +64,6 @@ private:
 		BooleanMode mode);
 
 	/*!
-	 *  \brief  단일 볼륨의 월드 공간 AABB 계산 (이동+회전 반영)
-	 *
-	 *  \param[in]  vol         입력 볼륨
-	 *  \param[out] outMin      월드 공간 AABB 최소점
-	 *  \param[out] outMax      월드 공간 AABB 최대점
-	 */
-	static void getWorldAABB(DgVolume* vol, glm::vec3& outMin, glm::vec3& outMax);
-
-	/*!
 	 *  \brief  결과 볼륨 이름 생성 (union1, intersection2 등)
 	 *
 	 *  \param[in]  mode    연산 모드
