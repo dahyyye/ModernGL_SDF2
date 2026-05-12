@@ -1330,11 +1330,13 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 {
 	if (!vol || !vol->mIsSweptVolume || !vol->mSourceTrajectory || !vol->mBrushVolume) return;
 
+	const DgTrajectory& traj = *vol->mSourceTrajectory;
+
+	int numKF = (int)traj.keyframes.size();
 	int res = preview ? 128 : vol->mSweepResolution;
-	int steps = preview ? 50 : vol->mSweepTimeSteps;
+	int steps = preview ? std::max(numKF * 4, 10) : vol->mSweepTimeSteps;
 	int method = preview ? 3 : vol->mSweepMethod;
 
-	const DgTrajectory& traj = *vol->mSourceTrajectory;
 	DgVolume* newVol = nullptr;
 	switch (method) {
 	case 0: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, false); break;

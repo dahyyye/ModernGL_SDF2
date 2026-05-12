@@ -227,12 +227,12 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 
 void main()
 {
-    ivec3 id = ivec3(gl_GlobalInvocationID);                    // 현재 스레드의 3D 인덱스 (x, y, z)
-    if (any(greaterThanEqual(id, uResolution))) return;         // 인덱스가 볼륨 해상도를 벗어나면 작업을 수행하지 않음
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(id, uResolution))) return;
 
-    vec3 volumeRange = uVolumeMax - uVolumeMin;                 // 볼륨의 실제 크기 계산
-    vec3 spacing     = volumeRange / vec3(uResolution - 1);     // 각 축별로 voxel 간격 계산 (해상도 - 1로 나누는 이유는 voxel이 해상도보다 하나 적은 간격을 가지기 때문)
-    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;         // 현재 voxel의 실제 월드 좌표 계산
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 spacing     = volumeRange / vec3(uResolution - 1);
+    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;
 
     float minSDF = 1e10;
 
@@ -240,52 +240,58 @@ void main()
     vec3  p0   = evalInvTransformAt(t0, worldPos);
     float sdf0 = sampleLocalSDF(p0);
 
-    for (int seg = 0; seg < uSamplingSteps - 1; ++seg)          // 궤적을 uSamplingSteps-1 개의 세그먼트로 나누고, 각 세그먼트에 대해 최솟값을 계산
+    for (int seg = 0; seg < uSamplingSteps - 1; ++seg)
     {
         float t1 = float(seg + 1) / float(uSamplingSteps - 1);
 
-        // 세그먼트의 양 끝점에서 역변환을 평가하여 로컬 공간 좌표를 얻고, 해당 좌표에서 SDF 값을 샘플링
         vec3 p1 = evalInvTransformAt(t1, worldPos);
         float sdf1 = sampleLocalSDF(p1);
-        float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
+        float chordLen = length(p1 - p0);
 
-        // 외부판별 조건 
-        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength*1.5)
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > chordLen * 1.5)
         {
-            minSDF = min(minSDF, min(sdf0, sdf1));      // 양 끝점 중 작은 값을 최소값으로 사용
+            minSDF = min(minSDF, min(sdf0, sdf1));
         }
         else
         {
-            const int M = 8;
-            float bestSDF = min(sdf0, sdf1);
-
-            float tPrev = t0;
-            vec3  pPrev = p0;
-            float sdfPrev = sdf0;
-
-            for (int i = 1; i <= M; ++i)
+            float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
+            if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * 1.5)
             {
-                float tCurr = mix(t0, t1, float(i) / float(M));
-                vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
-                float sdfCurr = sampleLocalSDF(pCurr);
-
-                float subLen = length(pCurr - pPrev);
-                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
-                {
-                    bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
-                }
-                else
-                {
-                    float val = brentMinimize(tPrev, tCurr, worldPos);
-                    bestSDF = min(bestSDF, val);
-                }
-
-                tPrev = tCurr;
-                pPrev = pCurr;
-                sdfPrev = sdfCurr;
+                minSDF = min(minSDF, min(sdf0, sdf1));
             }
+            else
+            {
+                const int M = 8;
+                float bestSDF = min(sdf0, sdf1);
 
-            minSDF = min(minSDF, bestSDF);
+                float tPrev = t0;
+                vec3  pPrev = p0;
+                float sdfPrev = sdf0;
+
+                for (int i = 1; i <= M; ++i)
+                {
+                    float tCurr = mix(t0, t1, float(i) / float(M));
+                    vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
+                    float sdfCurr = sampleLocalSDF(pCurr);
+
+                    float subLen = length(pCurr - pPrev);
+                    if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
+                    {
+                        bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
+                    }
+                    else
+                    {
+                        float val = brentMinimize(tPrev, tCurr, worldPos);
+                        bestSDF = min(bestSDF, val);
+                    }
+
+                    tPrev = tCurr;
+                    pPrev = pCurr;
+                    sdfPrev = sdfCurr;
+                }
+
+                minSDF = min(minSDF, bestSDF);
+            }
         }
 
         t0   = t1;
@@ -293,5 +299,5 @@ void main()
         sdf0 = sdf1;
     }
 
-    imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));  // 최종적으로 계산된 최소 SDF 값을 결과 텍스처에 저장 (R 채널에 저장, 나머지 채널은 0으로 설정)
+    imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
 }

@@ -330,6 +330,8 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uSamplingSteps"), samplingSteps);
     // 셰이더의 uNumSegments에 세그먼트 수 전달
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
+	// 셰이더의 uMaxBrentIter에 최대 브렌트 반복 횟수 전달 (skipReadback이 true면 6, 아니면 10)
+    glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
 
     // Dispatch
     int numGroups = (resolution + 7) / 8;
