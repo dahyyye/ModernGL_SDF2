@@ -172,5 +172,9 @@ public:
 		mRotation = glm::normalize(mRotation);  // 누적 오차 방지
 	}
 
+	static DgVolume* createResultVolume(const std::string& name,
+		int resolution, const glm::vec3& minPos, const glm::vec3& maxPos);
+
+	static GLuint createEmpty3DTexture(int resolution);
 private:
 };

@@ -74,7 +74,7 @@ void OpenProperty() {
 		if (ImGui::ImageButton("Union", DgUtil::toImTextureID(icon_tex_id[0]), ImVec2(64, 64), ImVec2(0, 1), ImVec2(1, 0)))
 		{
 			if (selected.size() >= 2)
-			{clock_t start, finish;
+			{
 				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 128);
 				if (result)
 				{
@@ -366,6 +366,8 @@ void OpenProperty() {
 		}
 
 		ImGui::Separator();
+
+		// 전후 비교없는 Fast Sweeping 
 		/*if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
 		{
 			DgVolume* brush = DgScene::instance().mDrawingVolume;

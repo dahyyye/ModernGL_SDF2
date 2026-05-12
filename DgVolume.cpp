@@ -346,3 +346,26 @@ bool DgVolume::saveToVTI(const char* filename)
 
 	return writer->Write() != 0;
 }
+
+DgVolume* DgVolume::createResultVolume(const std::string& name,
+	int resolution, const glm::vec3& minPos, const glm::vec3& maxPos)
+{
+	DgVolume* vol = new DgVolume();
+	vol->mName = name;
+	vol->mDim[0] = resolution;
+	vol->mDim[1] = resolution;
+	vol->mDim[2] = resolution;
+
+	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
+	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
+
+	glm::vec3 range = maxPos - minPos;
+	vol->mSpacing[0] = range.x / (resolution - 1);
+	vol->mSpacing[1] = range.y / (resolution - 1);
+	vol->mSpacing[2] = range.z / (resolution - 1);
+
+	vol->mMesh = createBoundingBoxMesh(vol->mMin, vol->mMax);
+
+	return vol;
+}
+

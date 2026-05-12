@@ -157,19 +157,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius);
     combinedMax += glm::vec3(radius);
 
-    DgVolume* result = new DgVolume();
-    result->mName = "Swept Volume (Brent)";
-    result->mDim[0] = resolution;
-    result->mDim[1] = resolution;
-    result->mDim[2] = resolution;
-
-    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
-    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    result->mSpacing[0] = range.x / (resolution - 1);
-    result->mSpacing[1] = range.y / (resolution - 1);
-    result->mSpacing[2] = range.z / (resolution - 1);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
     int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
@@ -242,9 +230,6 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
         << " (" << (100.0 * brentCount / totalVoxelSeg) << "%)" << std::endl;
 
     result->createTexture();
-    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
-    result->mPosition = glm::vec3(0.0f);
-    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     return result;
 }
@@ -354,19 +339,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     // 결과 볼륨 생성
-    DgVolume* result = new DgVolume();
-    result->mName = "Swept Volume (Brent GPU)";
-    result->mDim[0] = resolution;
-    result->mDim[1] = resolution;
-    result->mDim[2] = resolution;
-
-    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
-    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    result->mSpacing[0] = range.x / (resolution - 1);
-    result->mSpacing[1] = range.y / (resolution - 1);
-    result->mSpacing[2] = range.z / (resolution - 1);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
 
     // preview모드 아닐 땐 GPU → CPU 복사
     if (!skipReadback) {
@@ -377,10 +350,6 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     }
 
     result->mTextureID = resultTexture;
-
-    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
-    result->mPosition = glm::vec3(0.0f);
-    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
@@ -440,19 +409,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     combinedMax += glm::vec3(radius);
 
     // 결과 볼륨 생성
-    DgVolume* result = new DgVolume();
-    result->mName = "Swept Volume (CPU)";
-    result->mDim[0] = resolution;
-    result->mDim[1] = resolution;
-    result->mDim[2] = resolution;
-
-    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
-    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    result->mSpacing[0] = range.x / (resolution - 1);
-    result->mSpacing[1] = range.y / (resolution - 1);
-    result->mSpacing[2] = range.z / (resolution - 1);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
 
     // SDF 초기화
     int totalSize = resolution * resolution * resolution;
@@ -493,11 +450,8 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
     std::cout << "Swept Volume 생성 완료: " << duration << "초" << std::endl;
 
-    // 텍스처 및 볼륨 생성
+    // 텍스처 생성
     result->createTexture();
-    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
-    result->mPosition = glm::vec3(0.0f);
-    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     return result;
 }
@@ -599,19 +553,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
     // 5. 결과 볼륨 생성
-    DgVolume* result = new DgVolume();
-    result->mName = "Swept Volume (GPU)";
-    result->mDim[0] = resolution;
-    result->mDim[1] = resolution;
-    result->mDim[2] = resolution;
-
-    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
-    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    result->mSpacing[0] = range.x / (resolution - 1);
-    result->mSpacing[1] = range.y / (resolution - 1);
-    result->mSpacing[2] = range.z / (resolution - 1);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (GPU)", resolution, combinedMin, combinedMax);
 
     // GPU → CPU 복사
     int totalSize = resolution * resolution * resolution;
@@ -620,13 +562,8 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
-    // 텍스처 ID 직접 사용     
+    // 텍스처 생성    
     result->mTextureID = resultTexture;
-
-    // 박스 메쉬 생성
-    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
-    result->mPosition = glm::vec3(0.0f);
-    result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
@@ -669,6 +606,30 @@ bool DgSweep::initializeBrentGPU()
 
     sBrentInitialized = true;
     return true;
+}
+
+void DgSweep::computeSweptAABB(DgVolume* brush, const DgTrajectory& trajectory,
+    int samplingSteps, glm::vec3& outMin, glm::vec3& outMax)
+{
+    glm::vec3 localMin = brush->getLocalMin();
+    glm::vec3 localMax = brush->getLocalMax();
+    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+    float radius = glm::length(localMax - localCenter);
+
+    outMin = glm::vec3(FLT_MAX);
+    outMax = glm::vec3(-FLT_MAX);
+
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        glm::mat4 transform = trajectory.getTransformAt(t);
+        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
+        outMin = glm::min(outMin, worldCenter);
+        outMax = glm::max(outMax, worldCenter);
+    }
+
+    outMin -= glm::vec3(radius);
+    outMax += glm::vec3(radius);
 }
 
 void DgSweep::fastSweeping(DgVolume* vol)

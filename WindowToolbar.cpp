@@ -39,150 +39,52 @@ void CreateMesh() {
 			icon_tex_id[i] = DgUtil::loadTexture2D(icon_files[i]);
 	}
 
+	auto loadVolumeVTI = [](const char* path, const char* name) {
+		DgVolume* volume = new DgVolume();
+		if (volume->loadFromVTI(path)) {
+			volume->mName = name;
+			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
+			volume->createTexture();
+			DgScene::instance().addSDFVolume(volume);
+		}
+		else {
+			delete volume;
+		}
+		};
+
 	if (ImGui::ImageButton("NewScene", DgUtil::toImTextureID(icon_tex_id[0]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
 		DgScene::instance().resetScene();
-	}
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Sphere", DgUtil::toImTextureID(icon_tex_id[1]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Sphere_128.vti")) {
-			volume->mName = "Sphere";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Sphere_128.vti", "Sphere");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Box", DgUtil::toImTextureID(icon_tex_id[2]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Box_128.vti")) {
-			volume->mName = "Box";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Box_128.vti", "Box");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Torus", DgUtil::toImTextureID(icon_tex_id[3]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Torus_128.vti")) {
-			volume->mName = "Torus";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Torus_128.vti", "Torus");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cylinder", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Cylinder_128.vti")) {
-			volume->mName = "Cylinder";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_128.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Capsule", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Capsule_128.vti")) {
-			volume->mName = "Capsule";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Capsule_128.vti", "Capsule");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("QuadPramid", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti")) {
-			volume->mName = "QuadPramid";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti", "QuadPramid");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-
-		// VTI 파일에서 SDF 로드
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Cone_128.vti")) {
-			volume->mName = "Cone";
-			// 바운딩 박스 메쉬 생성
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Cone_128.vti", "Cone");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Bunny", DgUtil::toImTextureID(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-	{
-		DgVolume* volume = new DgVolume();
-		volume->mName = "Bunny";
-		if (volume->loadFromVTI(".\\res\\volume\\(mini)Bunny_128.vti")) {
-			volume->mMesh = createBoundingBoxMesh(volume->mMin, volume->mMax);
-			volume->createTexture();
-			DgScene::instance().addSDFVolume(volume);
-		}
-		else {
-			delete volume;
-		}
-	}
+		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_128.vti", "Bunny");
 	ImGui::SameLine();
 }
