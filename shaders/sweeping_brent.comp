@@ -26,6 +26,7 @@ uniform vec3 uBrushMin;     // 브러시의 로컬 공간 최소 좌표
 uniform vec3 uBrushMax;     // 브러시의 로컬 공간 최대 좌표
 
 uniform int uSamplingSteps; // 궤적을 몇개의 세그먼트로 나눌지
+uniform int uMaxBrentIter;  // 브렌트 최적화의 최대 반복 횟수
 
 uniform int uNumSegments;   
 
@@ -144,7 +145,6 @@ float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 float brentMinimize(float t0, float t1, vec3 worldPos)
 {
     const float golden = 0.381966;      // (3 - sqrt(5)) / 2, 황금비의 역수
-    const int maxIter = 10;             // 최대 반복 횟수
     const float tol = 1e-4;             // 허용 오차
 
     float a = 0.0, b = 1.0;             // alpha의 범위 [t0,t1]
@@ -157,7 +157,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 
     float d = 0.0, e = 0.0;             // d: 현재 단계에서 이동할 거리, e: 이전 단계에서 이동한 거리
 
-    for (int iter = 0; iter < maxIter; ++iter)
+    for (int iter = 0; iter < uMaxBrentIter; ++iter)
     {
         float mid  = 0.5 * (a + b);
         float tol1 = tol * abs(x) + 1e-10;      // 절대 허용 오차 + 상대 허용 오차

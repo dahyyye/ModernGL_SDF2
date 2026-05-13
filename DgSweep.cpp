@@ -192,7 +192,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
                     float segLength = glm::length(p1 - p0);
 
                     // 외부 판별
-                    if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength)
+                    if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength*1.5)
                     {
                         result->mData[index] = std::min(result->mData[index],
                             std::min(sdf0, sdf1));
