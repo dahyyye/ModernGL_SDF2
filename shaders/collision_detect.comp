@@ -24,8 +24,8 @@ void main()
     uint idx = gl_GlobalInvocationID.x;
     if (idx >= uint(uNumVertices)) return;
 
-    vec3 worldPos = vertices[idx].xyz;
-    vec3 uvw = (worldPos - uSvMin) / (uSvMax - uSvMin);
+    vec3 worldPos = vertices[idx].xyz;                      // 정점의 월드 좌표
+    vec3 uvw = (worldPos - uSvMin) / (uSvMax - uSvMin);     // SV AABB 내에서 정규화된 UVW 좌표 계산
 
     // SV AABB 밖이면 충돌 아님
     if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))
@@ -34,5 +34,5 @@ void main()
         return;
     }
 
-    sdfValues[idx] = texture(uSvSDF, uvw).r;
+    sdfValues[idx] = texture(uSvSDF, uvw).r;    // SDF 값 읽기
 }

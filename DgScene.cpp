@@ -1508,18 +1508,20 @@ void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int max
 				worst = cr;
 		}
 
-		if (!worst.hasCollision) {
+		if (!worst.hasCollision) {	// 충돌 없으면 종료
 			std::cout << "충돌 해소 완료 (iteration " << iter << ")" << std::endl;
 			break;
 		}
 
 		// deepestPoint(월드)를 SV 로컬로 변환 후 비교
 		glm::mat4 invModel = glm::inverse(sv->getModelMatrix());
+
+		// 가장 깊은 충돌 지점이 가장 가까운 키프레임 찾기
 		glm::vec3 deepestLocal = glm::vec3(invModel * glm::vec4(worst.deepestPoint, 1.0f));
 
 		int nearestKF = 1;
 		float minDist = FLT_MAX;
-		for (int i = 1; i < numKFs - 1; ++i)
+		for (int i = 1; i < numKFs - 1; ++i)	// 시작/끝 키프레임은 고정
 		{
 			float d = glm::length(kfs[i].position - deepestLocal);
 			if (d < minDist) {
