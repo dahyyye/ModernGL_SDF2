@@ -82,6 +82,36 @@ void ShowWindowSceneLayer(bool* p_open)
 
 	if (ImGui::TreeNode("Trajectories"))
 	{
+		{
+			DgVolume* selectedSV = nullptr;
+			for (DgVolume* vol : DgScene::instance().getSDFList())
+			{
+				if (vol && vol->mSelected && vol->mIsSweptVolume
+					&& vol->mSourceTrajectory != nullptr)
+				{
+					selectedSV = vol;
+					break;
+				}
+			}
+
+			if (selectedSV)
+			{
+				if (ImGui::Button("Save Trajectory", ImVec2(-1, 0)))
+				{
+					DgScene::instance().mSavedTrajectories.push_back(*selectedSV->mSourceTrajectory);
+					std::cout << "Trajectory saved to list." << std::endl;
+				}
+			}
+			else
+			{
+				ImGui::BeginDisabled();
+				ImGui::Button("Save Trajectory", ImVec2(-1, 0));  // 회색 비활성 버튼
+				ImGui::EndDisabled();
+				ImGui::TextDisabled("Select a Swept Volume to save");
+			}
+		}
+		ImGui::Separator();
+
 		auto& trajList = DgScene::instance().mSavedTrajectories;
 		if (trajList.empty())
 		{

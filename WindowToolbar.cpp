@@ -69,15 +69,18 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cylinder", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_128.vti", "Cylinder");
+		//loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_128.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\knots_128.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Capsule", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Capsule_128.vti", "Capsule");
+		//loadVolumeVTI(".\\res\\volume\\(mini)Capsule_128.vti", "Capsule");
+		loadVolumeVTI(".\\res\\volume\\kitten_128.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("QuadPramid", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti", "QuadPramid");
+		//loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti", "QuadPramid");
+		loadVolumeVTI(".\\res\\volume\\rocker_128.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
