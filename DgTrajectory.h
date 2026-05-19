@@ -13,7 +13,7 @@ struct DgTrajectoryFrame
     }
 
     DgTrajectoryFrame(glm::vec3 pos, glm::quat rot, glm::vec3 scl = glm::vec3(1.0f))
-        : position(pos), rotation(rot), scale(1.0f, 1.0f, 1.0f) {
+        : position(pos), rotation(rot), scale(scl) {
     }
 };
 

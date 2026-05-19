@@ -290,7 +290,7 @@ void DgScene::processMouseEvent()
 			if (glm::length(rotAxis) > 0.000001f)
 			{
 				float angle = acos(px * qx + py * qy + pz * qz);
-				mRotMat = glm::rotate(glm::mat4(1.0f), angle, glm::normalize(rotAxis)) * mRotMat;
+				mRotMat = glm::rotate(glm::mat4(1.0f), angle*1.5f, glm::normalize(rotAxis)) * mRotMat;
 			}
 			mStartPos[0] = pos[0];
 			mStartPos[1] = pos[1];
@@ -339,8 +339,8 @@ void DgScene::processMouseEvent()
 		}
 		else if (io.KeyCtrl && ImGui::IsMouseDragging(ImGuiMouseButton_Middle))	// 중간 버튼으로 드래깅하는 경우
 		{
-			float dx = (float)(pos[0] - mStartPos[0]) * 0.01f;
-			float dy = (float)(mStartPos[1] - pos[1]) * 0.01f;
+			float dx = (float)(pos[0] - mStartPos[0]) * 0.05f;
+			float dy = (float)(mStartPos[1] - pos[1]) * 0.05f;
 			mPan += glm::inverse(glm::mat3(mRotMat)) * glm::vec3(dx, dy, 0.0f);
 			mStartPos[0] = pos[0];
 			mStartPos[1] = pos[1];
@@ -365,7 +365,7 @@ void DgScene::processMouseEvent()
 		if (ImGui::GetIO().MouseWheel != 0.0f)
 		{
 			int dir = (ImGui::GetIO().MouseWheel > 0.0) ? 1 : -1;
-			mZoom += (float)dir;
+			mZoom += (float)dir * 3.0f;
 		}
 	}
 }
@@ -1118,6 +1118,12 @@ void DgScene::addSDFVolume(DgVolume* volume)
 // 장면 초기화 함수
 void DgScene::resetScene()
 {
+	// 선택 상태 먼저 초기화 (댕글링 포인터 방지)
+	mSelectedSweptVolume = nullptr;
+	mSelectedKeyframeIdx = -1;
+	mKeyframeGizmoWasUsing = false;
+	mDrawingVolume = nullptr;
+
 	// 1. 모든 볼륨 삭제
 	for (DgVolume* v : mSDFList)
 	{
@@ -1351,12 +1357,21 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	}
 	if (!newVol) return;
 
+	glm::vec3 c_old = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+
 	for (int i = 0; i < 3; ++i) {
 		vol->mDim[i] = newVol->mDim[i];
 		vol->mSpacing[i] = newVol->mSpacing[i];
 	}
 	vol->mMin = newVol->mMin;
 	vol->mMax = newVol->mMax;
+
+	glm::vec3 c_new = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+	glm::vec3 dc = c_old - c_new;
+	glm::mat3 R = glm::mat3(glm::mat4_cast(vol->mRotation));
+	glm::mat3 S = glm::mat3(glm::scale(glm::mat4(1.0f), vol->mScale));
+	glm::mat3 RS = R * S;
+	vol->mPosition += dc - RS * dc;
 
 	if (vol->mTextureID != 0) glDeleteTextures(1, &vol->mTextureID);
 	vol->mTextureID = newVol->mTextureID;
