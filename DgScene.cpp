@@ -701,7 +701,8 @@ void DgScene::renderScene()
 			// → 브러시를 해당 키프레임 위치/자세로 배치
 			glm::mat4 kfModel = mSelectedSweptVolume->getModelMatrix()
 				* glm::translate(glm::mat4(1.0f), kf.position)
-				* glm::mat4_cast(kf.rotation);
+				* glm::mat4_cast(kf.rotation)
+				* glm::scale(glm::mat4(1.0f), kf.scale);
 			glm::mat4 kfModelInv = glm::inverse(kfModel);
 
 			// 레이마칭 셰이더 설정 (기존 SDF 볼륨 렌더링과 동일한 파이프라인)
@@ -857,7 +858,8 @@ void DgScene::renderScene()
 		// 로컬 키프레임 → 볼륨 모델 변환 적용 → 월드 위치에 기즈모 표시
 		glm::mat4 gizmoMat = volModel
 			* glm::translate(glm::mat4(1.0f), kf.position)
-			* glm::mat4_cast(kf.rotation);
+			* glm::mat4_cast(kf.rotation)
+			* glm::scale(glm::mat4(1.0f), kf.scale);
 
 		ImGuizmo::Manipulate(
 			glm::value_ptr(viewMat),
@@ -882,6 +884,8 @@ void DgScene::renderScene()
 				kf.position = translation;
 			else if (op == ImGuizmo::ROTATE)
 				kf.rotation = glm::quat(glm::radians(rotEuler));
+			else if (op == ImGuizmo::SCALE)
+				kf.scale = scale;
 			mSelectedSweptVolume->mSourceTrajectory->rebuild();
 			resweepVolume(mSelectedSweptVolume, true);  // preview
 			mKeyframeGizmoWasUsing = true;

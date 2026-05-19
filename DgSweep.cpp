@@ -154,8 +154,13 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     }
 
     float radius = glm::length(localMax - localCenter);
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
@@ -260,13 +265,19 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // GPU에 넘기기 위한 구조체
     struct GPUKeyFrame {
         glm::vec4 position; // xyz = 위치, w = 0 (패딩)
         glm::vec4 rotation; // xyzw = 쿼터니언
+        glm::vec4 scale;    // xyz = 스케일, w = 0 (패딩)
     };
 
     // Catmull-Rom 키프레임을 직접 GPU에 전송
@@ -278,6 +289,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         gpuKFs[i].position = glm::vec4(trajectory.keyframes[i].position, 0.0f);
         glm::quat q = trajectory.keyframes[i].rotation;
         gpuKFs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
+		gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
@@ -407,8 +419,13 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     // 반경만큼 패딩
     float radius = glm::length(localMax - localCenter);
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
@@ -486,8 +503,13 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // 변환 행렬
     std::vector<glm::mat4> invTransforms(samplingSteps);

@@ -6,13 +6,14 @@ struct DgTrajectoryFrame
 {
     glm::vec3 position;
     glm::quat rotation;
+    glm::vec3 scale;
 
     DgTrajectoryFrame()
-        : position(0.0f), rotation(1.0f, 0.0f, 0.0f, 0.0f) {
+        : position(0.0f), rotation(1.0f, 0.0f, 0.0f, 0.0f), scale(1.0f) {
     }
 
-    DgTrajectoryFrame(glm::vec3 pos, glm::quat rot)
-        : position(pos), rotation(rot) {
+    DgTrajectoryFrame(glm::vec3 pos, glm::quat rot, glm::vec3 scl = glm::vec3(1.0f))
+        : position(pos), rotation(rot), scale(1.0f, 1.0f, 1.0f) {
     }
 };
 
@@ -90,8 +91,13 @@ public:
 		// 회전은 항상 slerp로 보간 (선형 궤적이든 곡선 궤적이든)
         glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
         
-		// 변환 행렬 생성: 위치 이동 + 회전(4*4)
-        return glm::translate(glm::mat4(1.0f), pos) * glm::mat4_cast(rot);
+        // scale lerp 보간 
+        glm::vec3 scl = glm::mix(keyframes[seg].scale, keyframes[seg + 1].scale, lt);
+
+        // 변환 행렬 반환: T = Trans * Rot * Scale
+        return glm::translate(glm::mat4(1.0f), pos)
+            * glm::mat4_cast(rot)
+            * glm::scale(glm::mat4(1.0f), scl);
     }
 
     /*!
@@ -152,8 +158,13 @@ public:
                 // 곡선: Catmull-Rom 보간
                 pos = catmullRomEval(keyframes, seg, lt);
 
+			// 회전은 항상 slerp로 보간 (선형 궤적이든 곡선 궤적이든)
             glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
-            frames.emplace_back(pos, rot);
+
+            // scale lerp 보간
+            glm::vec3 scl = glm::mix(keyframes[seg].scale, keyframes[seg + 1].scale, lt);
+
+            frames.emplace_back(pos, rot, scl);
         }
     }
 
@@ -166,7 +177,8 @@ public:
         f << keyframes.size() << "\n";
         for (auto& kf : keyframes)
             f << kf.position.x << " " << kf.position.y << " " << kf.position.z << " "
-            << kf.rotation.w << " " << kf.rotation.x << " " << kf.rotation.y << " " << kf.rotation.z << "\n";
+            << kf.rotation.w << " " << kf.rotation.x << " " << kf.rotation.y << " " << kf.rotation.z << " "
+            << kf.scale.x << " " << kf.scale.y << " " << kf.scale.z << "\n";
         std::cout << filename << " 저장 완료" << std::endl;
     }
 
@@ -179,9 +191,9 @@ public:
         int n; f >> n;
         keyframes.clear();
         for (int i = 0; i < n; ++i) {
-            glm::vec3 pos; glm::quat rot;
-            f >> pos.x >> pos.y >> pos.z >> rot.w >> rot.x >> rot.y >> rot.z;
-            keyframes.emplace_back(pos, rot);
+            glm::vec3 pos; glm::quat rot; glm::vec3 scl;
+            f >> pos.x >> pos.y >> pos.z >> rot.w >> rot.x >> rot.y >> rot.z >> scl.x >> scl.y >> scl.z;
+            keyframes.emplace_back(pos, rot, scl);
         }
         rebuild();
     }
