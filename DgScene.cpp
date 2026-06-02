@@ -774,10 +774,12 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
 			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.255f, 0.412f, 0.882f);   // 볼륨 기본 색상 (회색 : 0.6 0.6 0.6)
-			// 0.255f, 0.412f, 0.882
-			// 0.467f, 1.000f, 0.522f
-			// 0.537f, 0.886f, 0.780f
-			// 0.851f, 0.894f, 0.263f
+			// 0.255f, 0.412f, 0.882 파랑
+			// 0.467f, 1.000f, 0.522f 쨍한 연두;
+			// 0.537f, 0.886f, 0.780f 민트
+			// 0.851f, 0.894f, 0.263f 형광 노랑
+			// // 0.859f, 0.761f, 0.431f 노랑
+			// // 0.600f, 0.808f, 0.667f 연두
 			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
 			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
 			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.5f : 1.0f);

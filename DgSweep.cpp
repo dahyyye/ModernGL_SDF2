@@ -3,6 +3,7 @@
 #include "DgBoolean.h"
 #include <algorithm>
 #include <cfloat>
+#include <chrono>
 
 GLuint DgSweep::sComputeShader = 0;
 GLuint DgSweep::sTransformSSBO = 0;
@@ -247,7 +248,8 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 {
     if (!initializeBrentGPU()) return nullptr;
 
-    clock_t start = clock();
+    //clock_t start = clock();
+    auto cpuStart = std::chrono::high_resolution_clock::now();
 
     // 바운딩 박스 계산
     glm::vec3 localMin = brush->getLocalMin();
@@ -365,9 +367,18 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     result->mTextureID = resultTexture;
 
-    clock_t finish = clock();
-    double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
+    //clock_t finish = clock();
+    //double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+    //std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
+
+    glFinish();
+    auto cpuEnd = std::chrono::high_resolution_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
+    std::cout << "[BrentGPU] "
+        << (skipReadback ? "Preview" : "Full")
+        << " | res=" << resolution
+        << " | steps=" << samplingSteps
+        << " | time=" << ms << " ms" << std::endl;
 
     glUseProgram(0);
     return result;
