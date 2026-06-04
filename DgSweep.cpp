@@ -3,6 +3,7 @@
 #include "DgBoolean.h"
 #include <algorithm>
 #include <cfloat>
+#include <chrono>
 
 GLuint DgSweep::sComputeShader = 0;
 GLuint DgSweep::sTransformSSBO = 0;
@@ -154,8 +155,13 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     }
 
     float radius = glm::length(localMax - localCenter);
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
@@ -242,7 +248,8 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 {
     if (!initializeBrentGPU()) return nullptr;
 
-    clock_t start = clock();
+    //clock_t start = clock();
+    auto cpuStart = std::chrono::high_resolution_clock::now();
 
     // 바운딩 박스 계산
     glm::vec3 localMin = brush->getLocalMin();
@@ -260,13 +267,19 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // GPU에 넘기기 위한 구조체
     struct GPUKeyFrame {
         glm::vec4 position; // xyz = 위치, w = 0 (패딩)
         glm::vec4 rotation; // xyzw = 쿼터니언
+        glm::vec4 scale;    // xyz = 스케일, w = 0 (패딩)
     };
 
     // Catmull-Rom 키프레임을 직접 GPU에 전송
@@ -278,6 +291,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         gpuKFs[i].position = glm::vec4(trajectory.keyframes[i].position, 0.0f);
         glm::quat q = trajectory.keyframes[i].rotation;
         gpuKFs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
+		gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
@@ -353,9 +367,18 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     result->mTextureID = resultTexture;
 
-    clock_t finish = clock();
-    double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
+    //clock_t finish = clock();
+    //double duration = (double)(finish - start) / CLOCKS_PER_SEC;
+    //std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
+
+    glFinish();
+    auto cpuEnd = std::chrono::high_resolution_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
+    std::cout << "[BrentGPU] "
+        << (skipReadback ? "Preview" : "Full")
+        << " | res=" << resolution
+        << " | steps=" << samplingSteps
+        << " | time=" << ms << " ms" << std::endl;
 
     glUseProgram(0);
     return result;
@@ -407,8 +430,13 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     // 반경만큼 패딩
     float radius = glm::length(localMax - localCenter);
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
@@ -486,8 +514,13 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    combinedMin -= glm::vec3(radius);
-    combinedMax += glm::vec3(radius);
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    combinedMin -= glm::vec3(radius * maxScaleFactor);
+    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // 변환 행렬
     std::vector<glm::mat4> invTransforms(samplingSteps);

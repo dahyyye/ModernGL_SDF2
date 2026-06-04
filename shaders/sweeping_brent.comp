@@ -11,6 +11,7 @@ layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
 struct KeyFrame {
     vec4 position; // xyz = position, w unused
     vec4 rotation; // quaternion (x, y, z, w)
+    vec4 scale;    // scale (x, y, z), w unused
 };
 
 // GPU로 전달된 키프레임 배열 (크기 가변)
@@ -120,7 +121,9 @@ vec3 evalInvTransformAt(float t, vec3 worldPos)
                             keyframes[seg + 1].rotation, lt);
     vec4 invRot = vec4(-rot.xyz, rot.w);                            // 단위 쿼터니언의 역 = 켤레
 
-    return quatRotate(invRot, worldPos - pos);
+    vec3 scl = mix(keyframes[seg].scale.xyz, keyframes[seg + 1].scale.xyz, lt); // 스케일은 선형 보간
+
+    return quatRotate(invRot, (worldPos - pos) / scl);
 }
 
 // Arc length of p(α)=evalInvTransformAt(mix(t0,t1,α), worldPos) on α∈[0,1]

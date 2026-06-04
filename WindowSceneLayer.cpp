@@ -67,11 +67,28 @@ void ShowWindowSceneLayer(bool* p_open)
 						ImGui::EndPopup();
 						break;
 					}
-					if (ImGui::MenuItem("Export"))
+					if (ImGui::BeginMenu("Export"))
 					{
-						char path[256];
-						snprintf(path, sizeof(path), "volume%zu.vti", i + 1);
-						sdfList[i]->saveToVTI(path);
+						if (ImGui::MenuItem("Volume (.vti)"))
+						{
+							char path[256];
+							snprintf(path, sizeof(path), "volume%zu.vti", i + 1);
+							sdfList[i]->saveToVTI(path);
+						}
+						if (ImGui::MenuItem("Mesh (.obj)"))
+						{
+							char path[256];
+							snprintf(path, sizeof(path), "mesh%zu.obj", i + 1);
+							DgMesh* mc = extractMeshMC(sdfList[i], sdfList[i]->mOffset);
+							if (mc) {
+								save_mesh_obj(mc, path);
+								delete mc;   // 파일만 추출하고 즉시 해제
+							}
+							else {
+								std::cerr << "MC 추출 결과가 비어있음 (iso=" << sdfList[i]->mOffset << ")" << std::endl;
+							}
+						}
+						ImGui::EndMenu();
 					}
 					ImGui::EndPopup();
 				}
@@ -82,6 +99,36 @@ void ShowWindowSceneLayer(bool* p_open)
 
 	if (ImGui::TreeNode("Trajectories"))
 	{
+		{
+			DgVolume* selectedSV = nullptr;
+			for (DgVolume* vol : DgScene::instance().getSDFList())
+			{
+				if (vol && vol->mSelected && vol->mIsSweptVolume
+					&& vol->mSourceTrajectory != nullptr)
+				{
+					selectedSV = vol;
+					break;
+				}
+			}
+
+			if (selectedSV)
+			{
+				if (ImGui::Button("Save Trajectory", ImVec2(-1, 0)))
+				{
+					DgScene::instance().mSavedTrajectories.push_back(*selectedSV->mSourceTrajectory);
+					std::cout << "Trajectory saved to list." << std::endl;
+				}
+			}
+			else
+			{
+				ImGui::BeginDisabled();
+				ImGui::Button("Save Trajectory", ImVec2(-1, 0));  // 회색 비활성 버튼
+				ImGui::EndDisabled();
+				ImGui::TextDisabled("Select a Swept Volume to save");
+			}
+		}
+		ImGui::Separator();
+
 		auto& trajList = DgScene::instance().mSavedTrajectories;
 		if (trajList.empty())
 		{

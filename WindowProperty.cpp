@@ -263,7 +263,6 @@ void OpenProperty() {
 					if (swept)
 					{
 						DgScene::instance().addSDFVolume(swept);
-						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -285,7 +284,11 @@ void OpenProperty() {
 					if (swept)
 					{
 						DgScene::instance().addSDFVolume(swept);
-						DgScene::instance().mSavedTrajectories.push_back(traj);
+						swept->mIsSweptVolume = true;                           // ← 추가
+						swept->mSourceTrajectory = new DgTrajectory(traj);      // ← 추가
+						swept->mSweepResolution = sweepResolution;              // ← 추가
+						swept->mSweepTimeSteps = timeSteps;                     // ← 추가
+						swept->mSweepMethod = 1;                                // ← 추가
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -307,7 +310,6 @@ void OpenProperty() {
 					if (swept)
 					{
 						DgScene::instance().addSDFVolume(swept);
-						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();
@@ -349,7 +351,6 @@ void OpenProperty() {
 						swept->mSweepTimeSteps = timeSteps;
 						swept->mSweepMethod = 3;  // 버튼마다 0/1/2/3
 						DgScene::instance().addSDFVolume(swept);
-						DgScene::instance().mSavedTrajectories.push_back(traj);
 						swept->mSelected = true;
 						brush->mSelected = false;
 						DgScene::instance().exitTrajectoryMode();

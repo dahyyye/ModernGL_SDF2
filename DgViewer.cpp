@@ -1,5 +1,9 @@
 // OpenGL 3.3 Core Profile을 사용한 3DViewer
 #include "DgViewer.h"
+#define NOMINMAX
+#include <windows.h>
+#include <commdlg.h>
+#pragma comment(lib, "comdlg32.lib")
 
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glfw3_mt.lib")
@@ -64,6 +68,47 @@ int main(int argc, char **argv)
             {
                 if (ImGui::BeginMenu("File"))
                 {
+                    if (ImGui::MenuItem("Import OBJ"))
+                    {
+                        char szFile[MAX_PATH] = {};
+                        OPENFILENAMEA ofn = {};
+                        ofn.lStructSize = sizeof(ofn);
+                        ofn.hwndOwner = nullptr;
+                        ofn.lpstrFilter = "OBJ Files\0*.obj\0All Files\0*.*\0";
+                        ofn.lpstrFile = szFile;
+                        ofn.nMaxFile = MAX_PATH;
+                        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+                        if (GetOpenFileNameA(&ofn))
+                        {
+                            DgMesh* mesh = import_mesh_obj(szFile);
+                            if (mesh)
+                            {
+                                mesh->mName = std::filesystem::path(szFile).stem().string();
+                                mesh->computeNormal(0);
+                                mesh->mShaderId = scene.mShaders[2];
+                                mesh->setupBuffers();
+                                scene.mMeshList.push_back(mesh);
+                            }
+                        }
+                    }
+                    if (ImGui::MenuItem("Import Trajectory"))
+                    {
+                        char szFile[MAX_PATH] = {};
+                        OPENFILENAMEA ofn = {};
+                        ofn.lStructSize = sizeof(ofn);
+                        ofn.hwndOwner = nullptr;
+                        ofn.lpstrFilter = "Text Files\0*.txt\0All Files\0*.*\0";
+                        ofn.lpstrFile = szFile;
+                        ofn.nMaxFile = MAX_PATH;
+                        ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+                        if (GetOpenFileNameA(&ofn))
+                        {
+                            DgTrajectory traj;
+                            traj.loadFromFile(szFile);
+                            if (!traj.keyframes.empty())
+                                scene.mSavedTrajectories.push_back(std::move(traj));
+                        }
+                    }
                     if (ImGui::MenuItem("Exit"))
                     {
                         glfwSetWindowShouldClose(ImGuiManager::instance().mWindow, true);

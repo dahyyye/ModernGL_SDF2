@@ -290,7 +290,7 @@ void DgScene::processMouseEvent()
 			if (glm::length(rotAxis) > 0.000001f)
 			{
 				float angle = acos(px * qx + py * qy + pz * qz);
-				mRotMat = glm::rotate(glm::mat4(1.0f), angle, glm::normalize(rotAxis)) * mRotMat;
+				mRotMat = glm::rotate(glm::mat4(1.0f), angle*1.5f, glm::normalize(rotAxis)) * mRotMat;
 			}
 			mStartPos[0] = pos[0];
 			mStartPos[1] = pos[1];
@@ -339,8 +339,8 @@ void DgScene::processMouseEvent()
 		}
 		else if (io.KeyCtrl && ImGui::IsMouseDragging(ImGuiMouseButton_Middle))	// 중간 버튼으로 드래깅하는 경우
 		{
-			float dx = (float)(pos[0] - mStartPos[0]) * 0.01f;
-			float dy = (float)(mStartPos[1] - pos[1]) * 0.01f;
+			float dx = (float)(pos[0] - mStartPos[0]) * 0.05f;
+			float dy = (float)(mStartPos[1] - pos[1]) * 0.05f;
 			mPan += glm::inverse(glm::mat3(mRotMat)) * glm::vec3(dx, dy, 0.0f);
 			mStartPos[0] = pos[0];
 			mStartPos[1] = pos[1];
@@ -365,7 +365,7 @@ void DgScene::processMouseEvent()
 		if (ImGui::GetIO().MouseWheel != 0.0f)
 		{
 			int dir = (ImGui::GetIO().MouseWheel > 0.0) ? 1 : -1;
-			mZoom += (float)dir;
+			mZoom += (float)dir * 3.0f;
 		}
 	}
 }
@@ -701,7 +701,8 @@ void DgScene::renderScene()
 			// → 브러시를 해당 키프레임 위치/자세로 배치
 			glm::mat4 kfModel = mSelectedSweptVolume->getModelMatrix()
 				* glm::translate(glm::mat4(1.0f), kf.position)
-				* glm::mat4_cast(kf.rotation);
+				* glm::mat4_cast(kf.rotation)
+				* glm::scale(glm::mat4(1.0f), kf.scale);
 			glm::mat4 kfModelInv = glm::inverse(kfModel);
 
 			// 레이마칭 셰이더 설정 (기존 SDF 볼륨 렌더링과 동일한 파이프라인)
@@ -773,7 +774,12 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
 			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.255f, 0.412f, 0.882f);   // 볼륨 기본 색상 (회색 : 0.6 0.6 0.6)
-
+			// 0.255f, 0.412f, 0.882 파랑
+			// 0.467f, 1.000f, 0.522f 쨍한 연두;
+			// 0.537f, 0.886f, 0.780f 민트
+			// 0.851f, 0.894f, 0.263f 형광 노랑
+			// // 0.859f, 0.761f, 0.431f 노랑
+			// // 0.600f, 0.808f, 0.667f 연두
 			// 키프레임 선택 중이면 기존 볼륨을 반투명으로
 			bool kfSelected = (mSelectedKeyframeIdx >= 0 && mSelectedSweptVolume != nullptr);
 			glUniform1f(glGetUniformLocation(shaderProgram, "uAlpha"), kfSelected ? 0.5f : 1.0f);
@@ -856,7 +862,8 @@ void DgScene::renderScene()
 		// 로컬 키프레임 → 볼륨 모델 변환 적용 → 월드 위치에 기즈모 표시
 		glm::mat4 gizmoMat = volModel
 			* glm::translate(glm::mat4(1.0f), kf.position)
-			* glm::mat4_cast(kf.rotation);
+			* glm::mat4_cast(kf.rotation)
+			* glm::scale(glm::mat4(1.0f), kf.scale);
 
 		ImGuizmo::Manipulate(
 			glm::value_ptr(viewMat),
@@ -881,6 +888,8 @@ void DgScene::renderScene()
 				kf.position = translation;
 			else if (op == ImGuizmo::ROTATE)
 				kf.rotation = glm::quat(glm::radians(rotEuler));
+			else if (op == ImGuizmo::SCALE)
+				kf.scale = scale;
 			mSelectedSweptVolume->mSourceTrajectory->rebuild();
 			resweepVolume(mSelectedSweptVolume, true);  // preview
 			mKeyframeGizmoWasUsing = true;
@@ -1113,6 +1122,12 @@ void DgScene::addSDFVolume(DgVolume* volume)
 // 장면 초기화 함수
 void DgScene::resetScene()
 {
+	// 선택 상태 먼저 초기화 (댕글링 포인터 방지)
+	mSelectedSweptVolume = nullptr;
+	mSelectedKeyframeIdx = -1;
+	mKeyframeGizmoWasUsing = false;
+	mDrawingVolume = nullptr;
+
 	// 1. 모든 볼륨 삭제
 	for (DgVolume* v : mSDFList)
 	{
@@ -1346,12 +1361,21 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	}
 	if (!newVol) return;
 
+	glm::vec3 c_old = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+
 	for (int i = 0; i < 3; ++i) {
 		vol->mDim[i] = newVol->mDim[i];
 		vol->mSpacing[i] = newVol->mSpacing[i];
 	}
 	vol->mMin = newVol->mMin;
 	vol->mMax = newVol->mMax;
+
+	glm::vec3 c_new = (vol->getLocalMin() + vol->getLocalMax()) * 0.5f;
+	glm::vec3 dc = c_old - c_new;
+	glm::mat3 R = glm::mat3(glm::mat4_cast(vol->mRotation));
+	glm::mat3 S = glm::mat3(glm::scale(glm::mat4(1.0f), vol->mScale));
+	glm::mat3 RS = R * S;
+	vol->mPosition += dc - RS * dc;
 
 	if (vol->mTextureID != 0) glDeleteTextures(1, &vol->mTextureID);
 	vol->mTextureID = newVol->mTextureID;
@@ -1374,11 +1398,10 @@ void DgScene::startCollisionDemo(DgVolume* sv)
 	clearCollisionDemo();
 
 	// 생성 영역: 정육면체 AABB
-	// 중심과 반크기(half-extent)로 정육면체 정의 → 원하는 위치로 자유롭게 조정
 	constexpr glm::vec3 kBoxCenter = glm::vec3(25.0f, 0.0f, 0.0f); // 정육면체 중심
-	constexpr float     kBoxHalfSize = 20.0f;                      // 반크기 (한 변 = 60)
+	constexpr float     kBoxHalfSize = 50.0f;                      // 크기
 
-	constexpr int   kNumObstacles = 80;
+	constexpr int   kNumObstacles = 140;
 	constexpr float kMinSpacing = 2.0f;  // 장애물 간 최소 간격
 	constexpr int   kMaxAttempts = 800;
 

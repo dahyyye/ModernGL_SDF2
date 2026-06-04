@@ -124,9 +124,9 @@ vec3 calcNormal(vec3 p)
     float e = minRange / 128.0;
     
     // 중앙 차분법으로 그래디언트 계산
-    float dx = mapSDF(p + vec3(e, 0, 0)) - mapSDF(p - vec3(e, 0, 0));
-    float dy = mapSDF(p + vec3(0, e, 0)) - mapSDF(p - vec3(0, e, 0));
-    float dz = mapSDF(p + vec3(0, 0, e)) - mapSDF(p - vec3(0, 0, e));
+    float dx = mapSDFWithBoundsCheck(p + vec3(e,0,0)) - mapSDFWithBoundsCheck(p - vec3(e,0,0));
+    float dy = mapSDFWithBoundsCheck(p + vec3(0,e,0)) - mapSDFWithBoundsCheck(p - vec3(0,e,0));
+    float dz = mapSDFWithBoundsCheck(p + vec3(0,0,e)) - mapSDFWithBoundsCheck(p - vec3(0,0,e));
     
     vec3 n = vec3(dx, dy, dz);
     float len = length(n);
@@ -147,17 +147,17 @@ vec3 calcNormal(vec3 p)
 //=============================================================================
 void main() 
 {
-    // 1. 월드 공간에서 광선 설정
+    // 월드 공간에서 광선 설정
     vec3 worldRayOrigin = getCameraPosition();
     vec3 worldRayDir    = getRayDirection(gl_FragCoord.xy);
 
-    // 2. 월드 레이를 로컬 공간으로 변환
+    // 월드 레이를 로컬 공간으로 변환
     // 볼륨이 회전되어 있으면, 레이를 역방향으로 회전해서
     // 로컬 공간에서 레이마칭을 수행해야 함
     vec3 localRayOrigin = (uModelInverse * vec4(worldRayOrigin, 1.0)).xyz;
     vec3 localRayDir    = normalize((uModelInverse * vec4(worldRayDir, 0.0)).xyz);
 
-    // 3. 로컬 공간에서 레이-박스 교차 검사
+    // 로컬 공간에서 레이-박스 교차 검사
     vec2 tHit = intersectAABB(localRayOrigin, localRayDir, uVolumeMin, uVolumeMax);
     
     if (tHit.x > tHit.y || tHit.y < 0.0) {
@@ -167,7 +167,11 @@ void main()
     float t    = max(tHit.x, 0.0) + 0.001;
     float tEnd = tHit.y;
 
-    // 4. 레이마칭 (Sphere Tracing)
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    float minRange   = min(min(volumeRange.x, volumeRange.y), volumeRange.z);
+    float surfDist   = minRange / 128.0 * 0.5;
+
+    // 레이마칭 (Sphere Tracing)
     // 로컬 공간에서 SDF를 샘플링하며 표면을 찾음
     bool hit = false;
     vec3 localHitPoint;
@@ -179,13 +183,13 @@ void main()
         vec3 p = localRayOrigin + localRayDir * t;
         float d = mapSDFWithBoundsCheck(p);
         
-        if (abs(d) < EPS) {
+        if (abs(d) < surfDist) {
             hit = true;
             localHitPoint = p;
             break;
         }
         
-        t += max(abs(d) * 0.5, EPS);
+        t += max(abs(d) * 0.5, surfDist * 0.1);
     }
     
     if (!hit) { 
