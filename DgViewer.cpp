@@ -82,9 +82,3 @@ int main(int argc, char **argv)
     ImGuiManager::instance().cleanUp();
     return 0;
 }
-
-
-
-
-
-

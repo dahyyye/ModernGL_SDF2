@@ -100,6 +100,19 @@ void DgMesh::setupBuffers()
 		glEnableVertexAttribArray(2);
 	}
 
+	// 머티리얼별 EBO 생성
+	for (GLuint ebo : mEBOs) glDeleteBuffers(1, &ebo);
+	mEBOs.resize(mMaterials.size(), 0);
+
+	for (size_t i = 0; i < mMaterials.size(); ++i) {
+		if (mVertexIndicesPerMtl[i].empty()) continue;
+		glGenBuffers(1, &mEBOs[i]);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBOs[i]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+			mVertexIndicesPerMtl[i].size() * sizeof(unsigned int),
+			mVertexIndicesPerMtl[i].data(), GL_STATIC_DRAW);
+	}
+
 	glBindVertexArray(0);
 }
 
@@ -221,202 +234,11 @@ void DgMesh::render()
 		if (indices.empty()) continue;
 
 		// EBO 없이 임시 인덱스 전송 (draw call마다)
-		GLuint tempEBO;
-		glGenBuffers(1, &tempEBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tempEBO);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mEBOs[i]);
 		glDrawElements(GL_TRIANGLES, (GLsizei)indices.size(), GL_UNSIGNED_INT, 0);
-
-		glDeleteBuffers(1, &tempEBO);
 	}
 
 	glBindVertexArray(0);
-}
-
-void DgMesh::addVertex(DgVertex* pVert)
-{
-	// 정점의 인덱스를 설정하고 정점 배열에 추가한다.
-	pVert->mMesh = this;
-	pVert->mIdx = (int)mVerts.size();
-	mVerts.push_back(*pVert);
-}
-
-void DgMesh::updateEdgeMate(DgVertex* pVert)
-{
-	if (pVert == nullptr)
-	{
-		// 메쉬의 모든 에지의 메이트 정보를 초기화 한다.
-		for (DgFace& f : mFaces)
-			for (DgEdge* e : f.getEdges())
-				e->mMate = nullptr;
-
-		// 각각의 정점에 대하여
-		for (DgVertex& v : mVerts)
-		{
-			// 정점에서 시작하는 각각의 에지에 대하여
-			for (DgEdge* e1 : v.mEdges)
-			{
-				if (e1->mMate != NULL)
-					continue;
-
-				// 에지의 다음 정점에서 시작하는 각각의 에지에 대하여
-				for (DgEdge* e2 : EV(e1)->mEdges)
-				{
-					// e2가 e1의 mate 에지라면
-					if (IS_MATE_EDGE(e1, e2))
-					{
-						// mate 정보를 설정한다.
-						e1->mMate = e2;
-						e2->mMate = e1;
-						break;
-					}
-				}
-			}
-		}
-	}
-	else // 정점 주변의 정보를 갱신한다.
-	{
-		for (DgVertex* v : pVert->getOneRingVerts(false))
-		{
-			// 정점에서 시작하는 각각의 에지 e1에 대하여
-			for (DgEdge* e1 : v->mEdges)
-			{
-				// 2023-10-01 추가...
-				if (e1->mFace->mIdx == -1)
-					continue;
-
-				// 에지의 끝점에서 시작하는 각각의 에지 e2에 대하여
-				for (DgEdge* e2 : EV(e1)->mEdges)
-				{
-					if (e2->mFace->mIdx == -1)
-						continue;
-
-					// e1과 e2가 mate 관계라면
-					if (IS_MATE_EDGE(e1, e2))
-					{
-						// mate 정보를 설정한다.
-						e1->mMate = e2;
-						e2->mMate = e1;
-						break;
-					}
-				}
-			}
-		}
-	}
-}
-
-void DgMesh::updateNormal(TypeNormal normalType)
-{
-	// 기존의 모든 법선을 제거한다.
-	for (DgNormal& n : mNormals)
-		delete &n;
-	mNormals.clear();
-	mNormalBuffer.clear();
-
-	// 법선 형태를 설정한다.
-	mNormalType = (normalType == NORMAL_ASIS) ? mNormalType : normalType;
-
-	// 삼각형 법선을 사용한다면
-	if (mNormalType == NORMAL_FACE)
-	{
-		// 각각의 삼각형에 대하여
-		mNormals.assign(NUM(mFaces), DgNormal(0.0, 0.0, 0.0));
-#pragma omp parallel for
-		for (int i = 0; i < NUM(mFaces); ++i)
-		{
-			// 삼각형 법선을 생성하여 리스트에 추가한다.
-			DgFace* f = &mFaces[i];
-			DgVec3 N;
-			try {
-				N = f->getFaceNormal(true);
-			}
-			catch (...) {
-				N.setCoords(0.0, 0.0, 0.0);
-			}
-			DgNormal* pNormal = new DgNormal(N);
-			pNormal->mIdx = i;
-			mNormals[i] = pNormal;
-
-			// 각 에지에 삼각형 법선을 할당한다.
-			f->mEdge->mNormal = pNormal;
-			f->mEdge->mNext->mNormal = pNormal;
-			f->mEdge->mNext->mNext->mNormal = pNormal;
-		}
-	}
-	else  if (mNormalType == NORMAL_VERTEX) // 정점 법선을 사용한다면
-	{
-		// 각각의 정점에 대하여
-		mNormals.assign(NUM(mVerts), DgNormal(0.0, 0.0, 0.0));
-#pragma omp parallel for
-		for (int i = 0; i < NUM(mVerts); ++i)
-		{
-			// 정점 법선을 생성하고 리스트에 추가한다.
-			DgNormal* pNormal = new DgNormal();
-			pNormal->mIdx = i;
-			mNormals[i] = pNormal;
-
-			// 정점에서 시작하는 각각의 에지에 대하여 정점 법선을 할당한다.
-			for (DgEdge* e : mVerts[i].mEdges)
-				e->mNormal = pNormal;
-		}
-
-		// 각 삼각형의 법선을 계산하여 세 에지에 누적한다.
-#pragma omp parallel for
-		for (int i = 0; i < NUM(mFaces); ++i)
-		{
-			DgFace* f = &mFaces[i];
-			DgVec3 N;
-			try {
-				N = f->getFaceNormal(true);
-			}
-			catch (...) {
-				N.setCoords(0.0, 0.0, 0.0);
-			}
-			f->mEdge->mNormal->mDir += N;
-			f->mEdge->mNext->mNormal->mDir += N;
-			f->mEdge->mNext->mNext->mNormal->mDir += N;
-		}
-
-		// 누적된 법선을 정규화 한다.
-#pragma omp parallel for
-		for (int i = 0; i < NUM(mNormals); ++i)
-		{
-			if (mNormals[i]->mDir.isZero())
-				continue;
-			mNormals[i]->mDir.normalize();
-		}
-	}
-	else
-		printf("Error in DgMesh::updateNormal()...\n");
-}
-
-void DgMesh::updateBndBox()
-{
-	// 메쉬 정점이 없다면 리턴한다.
-	if (getNumVerts() == 0)
-	{
-		mBndBox[0] = mBndBox[1] = DgPos(0.0, 0.0, 0.0);
-		return;
-	}
-
-	// 메쉬 정점의 각 축에 대한 최대/최소 좌표를 구한다.
-	mBndBox[0] = mBndBox[1] = mVerts[0].mPos;
-	for (DgVertex& v : mVerts)
-	{
-		mBndBox[0][0] = MIN(mBndBox[0][0], v.mPos[0]);
-		mBndBox[0][1] = MIN(mBndBox[0][1], v.mPos[1]);
-		mBndBox[0][2] = MIN(mBndBox[0][2], v.mPos[2]);
-											
-		mBndBox[1][0] = MAX(mBndBox[1][0], v.mPos[0]);
-		mBndBox[1][1] = MAX(mBndBox[1][1], v.mPos[1]);
-		mBndBox[1][2] = MAX(mBndBox[1][2], v.mPos[2]);
-	}
-}
-
-int DgMesh::getNumVerts()
-{
-	return (int)mVerts.size();
 }
 
 void DgMesh::computeNormal(int normalType)
@@ -798,954 +620,117 @@ GLuint load_shaders(const char* vertexPath, const char* fragmentPath)
 	return programID;
 }
 
-void DgMesh::addFace(DgFace* pFace)
+GLuint loadComputeShader(const char* computePath)
 {
-	// 삼각형의 인덱스를 설정하고 삼각형 배열에 추가한다.
-	pFace->mIdx = (int)mFaces.size();
-	mFaces.push_back(*pFace);
-}
-
-/**********************/
-/* DgFace 클래스 구현 */
-/**********************/
-DgMesh* DgFace::getMesh()
-{
-	return mEdge->mVert->mMesh;
-}
-
-DgPos DgFace::getVertexPos(int vidx)
-{
-	switch (vidx)
-	{
-	case 0:
-		return DgPos(mEdge->mVert->mPos[0], mEdge->mVert->mPos[1], mEdge->mVert->mPos[2]);
-	case 1:
-		return DgPos(mEdge->mNext->mVert->mPos[0], mEdge->mNext->mVert->mPos[1], mEdge->mNext->mVert->mPos[2]);
-	case 2:
-		return DgPos(mEdge->mNext->mNext->mVert->mPos[0], mEdge->mNext->mNext->mVert->mPos[1], mEdge->mNext->mNext->mVert->mPos[2]);
+	// 파일 열기
+	std::ifstream file(computePath);
+	if (!file.is_open()) {
+		std::cerr << "Compute Shader 파일 열기 실패: " << computePath << std::endl;
+		return 0;
 	}
-	throw std::runtime_error("Invalide index...");
-}
 
-DgVertex* DgFace::getVertex(int vIdx)
-{
-	return getEdge(vIdx)->mVert;
-}
+	// 파일 내용 읽기
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	std::string code = buffer.str();
+	const char* codePtr = code.c_str();
+	file.close();
 
-DgEdge* DgFace::getEdge(int eIdx)
-{
-	switch (eIdx)
-	{
-	case 0:
-		return mEdge;
-	case 1:
-		return mEdge->mNext;
-	case 2:
-		return mEdge->mNext->mNext;
+	// Compute Shader 컴파일
+	GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
+	glShaderSource(shader, 1, &codePtr, nullptr);
+	glCompileShader(shader);
+
+	// 컴파일 에러 체크
+	GLint success;
+	GLchar infoLog[512];
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success) {
+		glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+		std::cerr << "Compute Shader 컴파일 실패:\n" << infoLog << std::endl;
+		return 0;
 	}
-	return NULL;
-}
 
-double DgFace::getArea()
-{
-	DgVec3 a = getVertex(1)->mPos - getVertex(0)->mPos;
-	DgVec3 b = getVertex(2)->mPos - getVertex(0)->mPos;
-	return norm(a ^ b) * 0.5;
-}
+	// 프로그램 링크
+	GLuint programID = glCreateProgram();
+	glAttachShader(programID, shader);
+	glLinkProgram(programID);
 
-DgVec3 DgFace::getFaceNormal(bool bLocal)
-{
-	// 삼각형의 세 정점의 위치를 구하여
-	DgPos& p0 = mEdge->mVert->mPos;
-	DgPos& p1 = mEdge->mNext->mVert->mPos;
-	DgPos& p2 = mEdge->mNext->mNext->mVert->mPos;
-
-	// 단위 길이의 법선을 구하여 반환한다.
-	DgVec3 e0 = (p1 - p0) * 1000.0;
-	DgVec3 e1 = (p2 - p0) * 1000.0;
-	DgVec3 N = (e0 ^ e1).normalize();
-	if (bLocal)
-		return N;
-	else
-		return getMesh()->mMC * N;
-}
-
-bool DgFace::isBndryFace()
-{
-	for (int i = 0; i < 3; ++i)
-		if (getVertex(i)->isBndry())
-			return true;
-	return false;
-}
-
-
-/**********************/
-/* DgEdge 클래스 구현 */
-/**********************/
-DgEdge::DgEdge(DgVertex* pVert, DgTexel* pTexel, DgNormal* pNormal)
-{
-	// 정점, 텍셀, 법선 정보를 에지의 시작점에 할당한다.
-	mVert = pVert;
-	mTexel = pTexel;
-	mNormal = pNormal;
-
-	// 다음 에지, 반대편 에지, 에지가 속한 삼각형에 대한 포인터를 초기화한다.
-	mNext = NULL;
-	mMate = NULL;
-	mFace = NULL;
-
-	// 시작점의 정점에 현재 에지를 추가한다.
-	mVert->mEdges.push_back(this);
-
-	// 에지 비용을 초기화 한다.
-	mCostOrLen = 0.0;
-}
-
-DgEdge::~DgEdge()
-{
-}
-
-std::vector<DgFace*> DgEdge::getFaces()
-{
-	return (mMate == nullptr)
-		? std::vector<DgFace*>{ mFace }
-	: std::vector<DgFace*>{ mFace, mMate->mFace };
-}
-
-bool DgEdge::isBndry()
-{
-	return (mMate == NULL);
-}
-
-double DgEdge::getAngle(bool bRadian)
-{
-	// 에지가 포함된 삼각형에서 세 점과 법선 벡터를 구한다.
-	DgPos p = mVert->mPos;
-	DgPos q = mNext->mVert->mPos;
-	DgPos r = mNext->mNext->mVert->mPos;
-	DgVec3 N = mFace->getFaceNormal(true);
-
-	// 에지가 마주보고 있는 각도를 계산하여 반환한다.
-	return (bRadian) ? angle(p - r, q - r, N, true) : angle(p - r, q - r, N, false);
-}
-
-
-/**********************/
-/* DgVec3 클래스 구현 */
-/**********************/
-
-DgVec3::DgVec3(double x, double y, double z)
-{
-	mPos[0] = x;
-	mPos[1] = y;
-	mPos[2] = z;
-}
-
-DgVec3::DgVec3(std::initializer_list<double> coords)
-{
-	auto it = coords.begin();
-	mPos[0] = *it;
-	mPos[1] = *(it + 1);
-	mPos[2] = *(it + 2);
-}
-
-DgVec3::DgVec3(const DgVec3& cpy)
-{
-	mPos[0] = cpy.mPos[0];
-	mPos[1] = cpy.mPos[1];
-	mPos[2] = cpy.mPos[2];
-}
-
-DgVec3::~DgVec3()
-{
-}
-
-DgVec3& DgVec3::setCoords(double x, double y, double z)
-{
-	mPos[0] = x;
-	mPos[1] = y;
-	mPos[2] = z;
-	return *this;
-}
-
-bool DgVec3::isZero(double eps) const
-{
-	return EQ_ZERO(mPos[0], eps) && EQ_ZERO(mPos[1], eps) && EQ_ZERO(mPos[2], eps);
-}
-
-DgVec3& DgVec3::normalize(double eps)
-{
-	if (isZero(eps))
-	{
-		throw std::runtime_error("DgVec3::normalize()...\n");
+	// 링크 에러 체크
+	glGetProgramiv(programID, GL_LINK_STATUS, &success);
+	if (!success) {
+		glGetProgramInfoLog(programID, 512, nullptr, infoLog);
+		std::cerr << "Compute Shader 링크 실패:\n" << infoLog << std::endl;
+		return 0;
 	}
-	double len = norm(*this);
-	mPos[0] /= len;
-	mPos[1] /= len;
-	mPos[2] /= len;
-	return *this;
+
+	glDeleteShader(shader);
+	std::cout << "Compute Shader 로드 성공: " << computePath << std::endl;
+	return programID;
 }
 
-DgVec3& DgVec3::operator =(const DgVec3& rhs)
-{
-	mPos[0] = rhs.mPos[0];
-	mPos[1] = rhs.mPos[1];
-	mPos[2] = rhs.mPos[2];
-	return *this;
-}
-
-DgVec3& DgVec3::operator +=(const DgVec3& rhs)
-{
-	mPos[0] += rhs.mPos[0];
-	mPos[1] += rhs.mPos[1];
-	mPos[2] += rhs.mPos[2];
-	return *this;
-}
-
-DgVec3& DgVec3::operator -=(const DgVec3& rhs)
-{
-	mPos[0] -= rhs.mPos[0];
-	mPos[1] -= rhs.mPos[1];
-	mPos[2] -= rhs.mPos[2];
-	return *this;
-}
-
-DgVec3& DgVec3::operator *=(const double& s)
-{
-	mPos[0] *= s;
-	mPos[1] *= s;
-	mPos[2] *= s;
-	return *this;
-}
-
-DgVec3& DgVec3::operator /=(const double& s)
-{
-	if (EQ_ZERO(s, MTYPE_EPS))
-	{
-		throw std::runtime_error("DgVec3::operator /=(const double &s)...\n");
-	}
-	mPos[0] /= s;
-	mPos[1] /= s;
-	mPos[2] /= s;
-	return *this;
-}
-
-DgVec3& DgVec3::operator ^=(const DgVec3& rhs)
-{
-	double x = mPos[0], y = mPos[1], z = mPos[2];
-	mPos[0] = y * rhs.mPos[2] - z * rhs.mPos[1];
-	mPos[1] = z * rhs.mPos[0] - x * rhs.mPos[2];
-	mPos[2] = x * rhs.mPos[1] - y * rhs.mPos[0];
-	return *this;
-}
-
-DgVec3 DgVec3::operator +() const
-{
-	return *this;
-}
-
-DgVec3 DgVec3::operator -() const
-{
-	return DgVec3(-mPos[0], -mPos[1], -mPos[2]);
-}
-
-double& DgVec3::operator [](const int& idx)
+double& DgPos::operator[](const int& idx)
 {
 	assert(idx >= 0 && idx < 3);
 	return mPos[idx];
 }
 
-const double& DgVec3::operator [](const int& idx) const
+const double& DgPos::operator[](const int& idx) const
 {
 	assert(idx >= 0 && idx < 3);
 	return mPos[idx];
 }
-
-DgVec3 operator +(const DgVec3& v, const DgVec3& w)
-{
-	return DgVec3(v.mPos[0] + w.mPos[0], v.mPos[1] + w.mPos[1], v.mPos[2] + w.mPos[2]);
-}
-
-DgVec3 operator -(const DgVec3& v, const DgVec3& w)
-{
-	return DgVec3(v.mPos[0] - w.mPos[0], v.mPos[1] - w.mPos[1], v.mPos[2] - w.mPos[2]);
-}
-
-DgVec3 operator *(const DgVec3& v, const double& s)
-{
-	return DgVec3(v.mPos[0] * s, v.mPos[1] * s, v.mPos[2] * s);
-}
-
-DgVec3 operator *(const double& s, const DgVec3& v)
-{
-	return DgVec3(v.mPos[0] * s, v.mPos[1] * s, v.mPos[2] * s);
-}
-
-double operator *(const DgVec3& v, const DgVec3& w)
-{
-	return (v.mPos[0] * w.mPos[0] + v.mPos[1] * w.mPos[1] + v.mPos[2] * w.mPos[2]);
-}
-
-DgVec3 operator /(const double& s, const DgVec3& v)
-{
-	return DgVec3(s / v.mPos[0], s / v.mPos[1], s / v.mPos[2]);
-}
-
-DgVec3 operator /(const DgVec3& v, const double& s)
-{
-	if (EQ_ZERO(s, 1e-10))
-	{
-		throw std::runtime_error("DgVec3 operator /(const DgVec3 &v, double s)...\n");
-	}
-	return DgVec3(v.mPos[0] / s, v.mPos[1] / s, v.mPos[2] / s);
-}
-
-DgVec3 operator ^(const DgVec3& v, const DgVec3& w)
-{
-	return DgVec3(
-		v.mPos[1] * w.mPos[2] - v.mPos[2] * w.mPos[1],
-		v.mPos[2] * w.mPos[0] - v.mPos[0] * w.mPos[2],
-		v.mPos[0] * w.mPos[1] - v.mPos[1] * w.mPos[0]);
-}
-
-bool operator ==(const DgVec3& v, const DgVec3& w)
-{
-	return EQ(v.mPos[0], w.mPos[0], MTYPE_EPS) && EQ(v.mPos[1], w.mPos[1], MTYPE_EPS) && EQ(v.mPos[2], w.mPos[2], MTYPE_EPS);
-}
-
-bool operator !=(const DgVec3& v, const DgVec3& w)
-{
-	return !(v == w);
-}
-
-std::ostream& operator <<(std::ostream& os, const DgVec3& v)
-{
-	os << "(" << v.mPos[0] << ", " << v.mPos[1] << ", " << v.mPos[2] << ")";
-	return os;
-}
-
-std::istream& operator >>(std::istream& is, DgVec3& v)
-{
-	is >> v.mPos[0] >> v.mPos[1] >> v.mPos[2];
-	return is;
-}
-
-/*************************/
-/* DgVec3 유틸 함수 구현 */
-/*************************/
-
-DgVec3 proj(const DgVec3& u, const DgVec3& v)
-{
-	double v_norm_sq = norm_sq(v);
-	if (EQ_ZERO(v_norm_sq, MTYPE_EPS))
-	{
-		throw std::runtime_error("DgVec3 proj(const DgVec3 &u, const DgVec3 &v)\n");
-	}
-	return (u * v / v_norm_sq) * v;
-}
-
-DgVec3 ortho(const DgVec3& v)
-{
-	// 가장 작은 값을 찾기 위해 std::min 사용
-	double min_val = std::min({ v.mPos[0], v.mPos[1], v.mPos[2] });
-
-	// 가장 작은 값을 기준으로 ret 설정
-	DgVec3 ret;
-	if (min_val == v[0])
-		ret.setCoords(0.0, -v[2], v[1]);
-	else if (min_val == v[1])
-		ret.setCoords(v[2], 0.0, -v[0]);
-	else
-		ret.setCoords(-v[1], v[0], 0.0);
-
-	if (ret.isZero())
-	{
-		throw std::runtime_error("DgVec3 ortho(const DgVec3 &v)\n");
-	}
-	return ret.normalize();
-}
-
-double det(const DgVec3& u, const DgVec3& v, const DgVec3& w)
-{
-	// det (u, v, w) =  u * ( v ^ w) 와 같음
-	return (
-		u.mPos[0] * (v.mPos[1] * w.mPos[2] - v.mPos[2] * w.mPos[1]) -
-		u.mPos[1] * (v.mPos[0] * w.mPos[2] - v.mPos[2] * w.mPos[0]) +
-		u.mPos[2] * (v.mPos[0] * w.mPos[1] - v.mPos[1] * w.mPos[0]));
-}
-
-double norm(const DgVec3& v)
-{
-	return SQRT(norm_sq(v));
-}
-
-double norm_sq(const DgVec3& v)
-{
-	return SQR(v.mPos[0]) + SQR(v.mPos[1]) + SQR(v.mPos[2]);
-}
-
-double angle(const DgVec3& u, const DgVec3& v, bool radian)
-{
-	if (u.isZero() || v.isZero())
-		throw std::runtime_error("Zero vector in angle()...\n");
-	DgVec3 p(u);
-	DgVec3 q(v);
-	p.normalize();
-	q.normalize();
-	double cs = p * q;
-	double sn = norm(p ^ q);
-	return (radian) ? atan2(sn, cs) : RAD2DEG(atan2(sn, cs));
-}
-
-double angle(const DgVec3& u, const DgVec3& v, const DgVec3& axis, bool radian)
-{
-	if (u.isZero() || v.isZero() || axis.isZero())
-		throw std::runtime_error("Zero vector in angle()...\n");
-	DgVec3 p(u);
-	DgVec3 q(v);
-	p.normalize();
-	q.normalize();
-	DgVec3 r = p ^ q;
-
-	double cs = p * q;
-	double sn = norm(r);
-	double theta = atan2(sn, cs);
-	if (r * axis < 0.0)
-		theta = 2 * M_PI - theta;
-
-	theta = radian ? theta : RAD2DEG(theta);
-	return theta;
-}
-
-/***********************/
-/* intersect 함수 구현 */
-/***********************/
 
 /*!
-*	\brief	평면과 경계 상자의 교차 여부를 검사한다.
-*
-*	\param	n[in]			평면의 법선
-*	\param	p[in]			평면 위의 점
-*	\param	halfsize[in]	원점을 중심으로하는 경계 상자의 각 축 길이의 반
-*
-*	\return 평면과 경계 상자가 교차하면 true, 아니면 false를 반환한다.
+*   @brief  바운딩 박스 메쉬 생성 (레이마칭용)
 */
-static bool intersect_plane_box(DgVec3 n, DgVec3 p, DgVec3 halfsize)
+DgMesh* createBoundingBoxMesh(const DgPos& minPos, const DgPos& maxPos)
 {
-	DgVec3 vmin, vmax;
-	for (int i = 0; i < 3; ++i)
-	{
-		if (n[i] > 0.0)
-		{
-			vmin[i] = -halfsize[i] - p[i];	// -NJMP-
-			vmax[i] = halfsize[i] - p[i];	// -NJMP-
-		}
-		else
-		{
-			vmin[i] = halfsize[i] - p[i];	// -NJMP-
-			vmax[i] = -halfsize[i] - p[i];	// -NJMP-
-		}
-	}
-	if (n * vmin > 0.0)
-		return false;	// -NJMP-
-	if (n * vmax >= 0.0)
-		return true;	// -NJMP-
-	return false;
+	DgMesh* mesh = new DgMesh();
+
+	double x0 = minPos.mPos[0], y0 = minPos.mPos[1], z0 = minPos.mPos[2];
+	double x1 = maxPos.mPos[0], y1 = maxPos.mPos[1], z1 = maxPos.mPos[2];
+
+	// 8개 정점
+	mesh->mVerts.emplace_back(x0, y0, z0); // 0
+	mesh->mVerts.emplace_back(x1, y0, z0); // 1
+	mesh->mVerts.emplace_back(x1, y1, z0); // 2
+	mesh->mVerts.emplace_back(x0, y1, z0); // 3
+	mesh->mVerts.emplace_back(x0, y0, z1); // 4
+	mesh->mVerts.emplace_back(x1, y0, z1); // 5
+	mesh->mVerts.emplace_back(x1, y1, z1); // 6
+	mesh->mVerts.emplace_back(x0, y1, z1); // 7
+
+	// 법선 (각 면에 대해)
+	mesh->mNormals.emplace_back(0, 0, -1); // 0: 앞면
+	mesh->mNormals.emplace_back(0, 0, 1);  // 1: 뒷면
+	mesh->mNormals.emplace_back(-1, 0, 0); // 2: 왼쪽
+	mesh->mNormals.emplace_back(1, 0, 0);  // 3: 오른쪽
+	mesh->mNormals.emplace_back(0, -1, 0); // 4: 아래
+	mesh->mNormals.emplace_back(0, 1, 0);  // 5: 위
+
+	// 기본 재질 추가
+	mesh->mMaterials.emplace_back();
+
+	// 12개 삼각형 (6면 x 2)
+	// 앞면 (z = z0)
+	mesh->mFaces.emplace_back(0, 2, 1, 0, 0, 0, 0);
+	mesh->mFaces.emplace_back(0, 3, 2, 0, 0, 0, 0);
+	// 뒷면 (z = z1)							  
+	mesh->mFaces.emplace_back(4, 5, 6, 1, 1, 1, 0);
+	mesh->mFaces.emplace_back(4, 6, 7, 1, 1, 1, 0);
+	// 왼쪽 (x = x0)							  
+	mesh->mFaces.emplace_back(0, 4, 7, 2, 2, 2, 0);
+	mesh->mFaces.emplace_back(0, 7, 3, 2, 2, 2, 0);
+	// 오른쪽 (x = x1)							 
+	mesh->mFaces.emplace_back(1, 2, 6, 3, 3, 3, 0);
+	mesh->mFaces.emplace_back(1, 6, 5, 3, 3, 3, 0);
+	// 아래 (y = y0)							  
+	mesh->mFaces.emplace_back(0, 1, 5, 4, 4, 4, 0);
+	mesh->mFaces.emplace_back(0, 5, 4, 4, 4, 4, 0);
+	// 위 (y = y1)							   
+	mesh->mFaces.emplace_back(3, 7, 6, 5, 5, 5, 0);
+	mesh->mFaces.emplace_back(3, 6, 2, 5, 5, 5, 0);
+
+	return mesh;
 }
-
-bool intersect_tri_box(DgPos u0, DgPos u1, DgPos u2, DgPos box_min, DgPos box_max)
-{
-	// x 축 테스트
-#define AXISTEST_X01(a, b, fa, fb)	\
-		p0 = a * v0[1] - b * v0[2];	p2 = a * v2[1] - b * v2[2];	\
-		if (p0 < p2) { min = p0; max = p2; } else { min = p2;  max = p0; }	\
-		rad = fa * box_halfsize[1] + fb * box_halfsize[2];	\
-		if (min > rad || max < -rad) return 0
-
-#define AXISTEST_X2(a, b, fa, fb)	\
-		p0 = a * v0[1] - b * v0[2];	p1 = a * v1[1] - b * v1[2]; \
-		if (p0 < p1) { min = p0; max = p1; } else { min = p1; max = p0; } \
-		rad = fa * box_halfsize[1] + fb * box_halfsize[2];   \
-		if (min > rad || max < -rad) return 0
-
-	// y 축 테스트
-#define AXISTEST_Y02(a, b, fa, fb)			   \
-		p0 = -a * v0[0] + b * v0[2]; p2 = -a * v2[0] + b * v2[2];	\
-		if (p0 < p2) { min = p0; max = p2; } else { min = p2; max = p0; } \
-		rad = fa * box_halfsize[0] + fb * box_halfsize[2];   \
-		if (min > rad || max < -rad) return 0
-
-#define AXISTEST_Y1(a, b, fa, fb)			   \
-		p0 = -a * v0[0] + b * v0[2]; p1 = -a * v1[0] + b * v1[2];  	   \
-		if (p0 < p1) { min = p0; max = p1; } else { min = p1; max = p0; } \
-		rad = fa * box_halfsize[0] + fb * box_halfsize[2];   \
-		if (min > rad || max < -rad) return 0
-
-	// z 축 테스트
-#define AXISTEST_Z12(a, b, fa, fb)			   \
-		p1 = a * v1[0] - b * v1[1];	p2 = a * v2[0] - b * v2[1];			       	   \
-		if (p2 < p1) { min = p2; max = p1; } else { min = p1; max = p2; } \
-		rad = fa * box_halfsize[0] + fb * box_halfsize[1];   \
-		if (min > rad || max < -rad) return 0;
-
-#define AXISTEST_Z0(a, b, fa, fb)			   \
-		p0 = a * v0[0] - b * v0[1]; p1 = a * v1[0] - b * v1[1];			           \
-		if (p0 < p1) { min = p0; max = p1; } else { min = p1; max = p0; } \
-		rad = fa * box_halfsize[0] + fb * box_halfsize[1];   \
-		if (min > rad || max < -rad) return 0;
-
-#define FINDMINMAX(x0, x1, x2, min, max) \
-	min = max = x0;   \
-	if (x1 < min) min = x1; \
-		if (x1 > max) max = x1; \
-			if (x2 < min) min = x2; \
-				if (x2 > max) max = x2;
-
-	// 경계 상자의 중심이 원점에 오도록 삼각형 정점의 좌표를 변환
-	double min, max, p0, p1, p2, rad;
-	DgVec3 box_halfsize = (box_max - box_min) * 0.5;
-	DgPos box_cnt = box_min + box_halfsize;
-	DgVec3 v0 = u0 - box_cnt;
-	DgVec3 v1 = u1 - box_cnt;
-	DgVec3 v2 = u2 - box_cnt;
-
-	// 삼각형 에지를 구한다.
-	DgVec3 e0 = v1 - v0;
-	DgVec3 e1 = v2 - v1;
-	DgVec3 e2 = v0 - v2;
-
-	// 테스트 1: 9개의 축에 대한 SAT를 수행한다.
-	double fex = abs(e0[0]);
-	double fey = abs(e0[1]);
-	double fez = abs(e0[2]);
-	AXISTEST_X01(e0[2], e0[1], fez, fey);
-	AXISTEST_Y02(e0[2], e0[0], fez, fex);
-	AXISTEST_Z12(e0[1], e0[0], fey, fex);
-
-	fex = abs(e1[0]);
-	fey = abs(e1[1]);
-	fez = abs(e1[2]);
-	AXISTEST_X01(e1[2], e1[1], fez, fey);
-	AXISTEST_Y02(e1[2], e1[0], fez, fex);
-	AXISTEST_Z0(e1[1], e1[0], fey, fex);
-
-	fex = abs(e2[0]);
-	fey = abs(e2[1]);
-	fez = abs(e2[2]);
-	AXISTEST_X2(e2[2], e2[1], fez, fey);
-	AXISTEST_Y1(e2[2], e2[0], fez, fex);
-	AXISTEST_Z12(e2[1], e2[0], fey, fex);
-
-	// 테스트 2: {x, y, z} 축에 대한 SAT를 수행한다.
-	FINDMINMAX(v0[0], v1[0], v2[0], min, max);
-	if (min > box_halfsize[0] || max < -box_halfsize[0]) return false;
-	FINDMINMAX(v0[1], v1[1], v2[1], min, max);
-	if (min > box_halfsize[1] || max < -box_halfsize[1]) return false;
-	FINDMINMAX(v0[2], v1[2], v2[2], min, max);
-	if (min > box_halfsize[2] || max < -box_halfsize[2]) return false;
-
-	// 테스트 3: 삼각형이 놓인 평면과 경계 상자와의 교차 검사
-	DgVec3 n = (e0 ^ e1).normalize();
-	if (!intersect_plane_box(n, v0, box_halfsize))
-		return false;
-
-	return true;;
-}
-
-int intersect_tri_tri(DgPos a0, DgPos a1, DgPos a2, DgPos b0, DgPos b1, DgPos b2, DgPos& p, DgPos& q, double eps)
-{
-	// 삼각형, 평면, 평면에서 삼각형 각 점까지 거리
-	DgPos a[3] = { a0, a1, a2 }, b[3] = { b0, b1, b2 };
-	DgPlane planeA(a0, a1, a2), planeB(b0, b1, b2);
-	double da[3], db[3];
-
-	// Case 1: 삼각형 A가 평면 planeB 위/아래쪽에 있는 경우: 비교차
-	for (int i = 0; i < 3; ++i)
-	{
-		da[i] = planeB.eval(a[i]);
-		if (std::fabs(da[i]) < eps) // planeB에 거의 붙어 있다면
-		{
-			da[i] = 0.0;
-			a[i] = ::proj(a[i], planeB);
-		}
-	}
-	if ((da[0] > 0.0 && da[1] > 0.0 && da[2] > 0.0) || (da[0] < 0.0 && da[1] < 0.0 && da[2] < 0.0))
-		return 0;	// 비교차
-
-	// Case 1: 삼각형 B가 평면 planeA 위/아래쪽에 있는 경우: 비교차
-	for (int i = 0; i < 3; ++i)
-	{
-		db[i] = planeA.eval(b[i]);
-		if (std::fabs(db[i]) < eps)	// planeA에 거의 붙어 있다면
-		{
-			db[i] = 0.0;
-			b[i] = ::proj(b[i], planeA);
-		}
-	}
-	if ((db[0] > 0.0 && db[1] > 0.0 && db[2] > 0.0) || (db[0] < 0.0 && db[1] < 0.0 && db[2] < 0.0))
-		return 0;	// 비교차
-
-	// Case 2: 삼각형 A과 B가 동일 평면에 놓인 경우(교차 여부만 반환하고, 다수의 교차점은 계산하지 않음)
-	if (da[0] == 0.0 && da[1] == 0.0 && da[2] == 0.0)
-	{
-		// Case 2(a): 경계원이 교차하지 않는 경우: 비교차
-		DgPos c1 = a[2] + (a[0] - a[2]) / 3.0 + (a[1] - a[2]) / 3.0;
-		DgPos c2 = b[2] + (b[0] - b[2]) / 3.0 + (b[1] - b[2]) / 3.0;
-		double r1 = std::max({ dist(c1, a[0]), dist(c1, a[1]), dist(c1, a[2])});
-		double r2 = std::max({ dist(c2, b[0]), dist(c2, b[1]), dist(c2, b[2]) });
-		if (r1 + r2 < dist(c1, c2))	return 0;	// 비교차
-
-		// Case 2(b): 두 삼각형의 에지쌍이 하나라도 교차하는 경우: 교차(교차점 미반환).
-		DgPos r, s;
-		for (int i = 0; i < 3; ++i)
-			for (int j = 0; j < 3; ++j)
-				if (intersect_edge_edge(a[i], a[(i + 1) % 3], b[j], b[(j + 1) % 3], r, s))
-					return -1;	// 동일 평면 교차
-
-		// Case 2(c): 하나의 삼각형이 다른 삼각형의 내부에 포함된 경우
-		for (int i = 0; i < 3; ++i)
-		{
-			DgVec3 uvw = get_barycentric_coords(a[i], b[0], b[1], b[2]);
-			if (uvw[0] >= 0.0 && uvw[1] >= 0.0 && uvw[2] >= 0.0)
-				return -1;	// Case 2(b)를 통과 했으니, 한 점 검사로 충분
-
-			uvw = get_barycentric_coords(b[i], a[0], a[1], a[2]);
-			if (uvw[0] >= 0.0 && uvw[1] >= 0.0 && uvw[2] >= 0.0)
-				return -1;	// Case 2(b)를 통과 했으니, 한 점 검사로 충분
-		}
-
-		// Case 2(a): 한 평면에 있지만 교차하지 않는 경우: 비교차
-		return 0;	// 비교차
-	}
-
-	// Case 3: (대부분의 경우)삼각형 B가 평면 planeA와 교차하는 경우
-	if (db[0] != 0.0 && db[1] != 0.0 && db[2] != 0.0)
-	{
-		// 삼각형 B과 평면 planeA의 교차 선분 rs를 구한다.
-		DgPos r, s;
-		for (int i0 = 0; i0 < 3; ++i0)
-		{
-			int i1 = (i0 + 1) % 3, i2 = (i0 + 2) % 3;
-			if (db[i0] * db[i1] > 0.0)
-			{
-				r = b[i1] + (db[i1] / (db[i1] - db[i2])) * (b[i2] - b[i1]);
-				s = b[i2] + (db[i2] / (db[i2] - db[i0])) * (b[i0] - b[i2]);
-				break;
-			}
-		}
-
-		// 교차선분 rs와 삼각형 A와 교차 선분 pq를 구한다.
-		return intersect_edge_tri(r, s, a[0], a[1], a[2], p, q);
-	}
-
-	// Case 4: 삼각형 B의 한 점 또는 두 점이 평면 planeA에 놓인 경우
-	int i0 = (db[0] == 0.0) ? 0 : (db[1] == 0.0) ? 1 : 2;
-	int i1 = (i0 + 1) % 3;
-	int i2 = (i0 + 2) % 3;
-	DgPos r(b[i0]), s(b[i0]);
-
-	// 삼각형 B와 평면 planeA와 나머지 교차점 계산
-	if (db[i1] * db[i2] <= 0.0)
-		s = b[i1] + (db[i1] / (db[i1] - db[i2])) * (b[i2] - b[i1]);
-	else
-		return 0; // 한 점 교차인 경우, 비교차
-
-	// 교차선분 rs와 삼각형 A와 교차 선분 pq를 구한다.
-	return intersect_edge_tri(r, s, a[0], a[1], a[2], p, q);
-}
-
-/*********************/
-/* DgPos 클래스 구현 */
-/*********************/
-DgPos::DgPos(double x, double y, double z)
-{
-	mPos[0] = x;
-	mPos[1] = y;
-	mPos[2] = z;
-}
-
-DgPos::DgPos(double* Coords)
-{
-	mPos[0] = Coords[0];
-	mPos[1] = Coords[1];
-	mPos[2] = Coords[2];
-}
-
-DgPos::DgPos(float* Coords)
-{
-	mPos[0] = (double)Coords[0];
-	mPos[1] = (double)Coords[1];
-	mPos[2] = (double)Coords[2];
-}
-
-DgPos::DgPos(const DgPos& cpy)
-{
-	mPos[0] = cpy.mPos[0];
-	mPos[1] = cpy.mPos[1];
-	mPos[2] = cpy.mPos[2];
-}
-
-DgPos::~DgPos()
-{
-}
-
-DgPos& DgPos::setCoords(double x, double y, double z)
-{
-	mPos[0] = x;
-	mPos[1] = y;
-	mPos[2] = z;
-	return *this;
-}
-
-DgPos lerp(const DgPos& p, const DgPos& q, double t)
-{
-	double x = (1.0 - t) * p[0] + t * q[0];
-	double y = (1.0 - t) * p[1] + t * q[1];
-	double z = (1.0 - t) * p[2] + t * q[2];
-	return DgPos(x, y, z);
-}
-
-double DgPos::distance_sq(const DgPos& p, const DgPos& q)
-{
-	return (SQR(p.mPos[0] - q.mPos[0]) + SQR(p.mPos[1] - q.mPos[1]) + SQR(p.mPos[2] - q.mPos[2]));
-}
-
-double DgPos::dist(const DgPos& p, const DgPos& q)
-{
-	return SQRT(distance_sq(p, q));
-}
-
-DgPos& DgPos::operator =(const DgPos& rhs)
-{
-	mPos[0] = rhs.mPos[0];
-	mPos[1] = rhs.mPos[1];
-	mPos[2] = rhs.mPos[2];
-	return *this;
-}
-
-DgPos& DgPos::operator +=(const DgVec3& v)
-{
-	mPos[0] += v.mPos[0];
-	mPos[1] += v.mPos[1];
-	mPos[2] += v.mPos[2];
-	return *this;
-}
-
-DgPos& DgPos::operator-=(const DgVec3& v)
-{
-	mPos[0] -= v.mPos[0];
-	mPos[1] -= v.mPos[1];
-	mPos[2] -= v.mPos[2];
-	return *this;
-}
-
-double& DgPos::operator [](const int& idx)
-{
-	assert(idx >= 0 && idx < 3);
-	return mPos[idx];
-}
-
-const double& DgPos::operator [](const int& idx) const
-{
-	assert(idx >= 0 && idx < 3);
-	return mPos[idx];
-}
-
-DgVec3 operator -(const DgPos& p, const DgPos& q)
-{
-	return DgVec3(
-		p.mPos[0] - q.mPos[0],
-		p.mPos[1] - q.mPos[1],
-		p.mPos[2] - q.mPos[2]);
-}
-
-DgPos operator -(const DgPos& p, const DgVec3& v)
-{
-	return DgPos(
-		p.mPos[0] - v.mPos[0],
-		p.mPos[1] - v.mPos[1],
-		p.mPos[2] - v.mPos[2]);
-}
-
-DgPos operator +(const DgPos& p, const DgVec3& v)
-{
-	return DgPos(
-		p.mPos[0] + v.mPos[0],
-		p.mPos[1] + v.mPos[1],
-		p.mPos[2] + v.mPos[2]);
-}
-
-DgPos operator +(const DgVec3& v, const DgPos& p)
-{
-	return DgPos(
-		p.mPos[0] + v.mPos[0],
-		p.mPos[1] + v.mPos[1],
-		p.mPos[2] + v.mPos[2]);
-}
-
-bool operator ==(const DgPos& p, const DgPos& q)
-{
-	return	(std::fabs(p.mPos[0] - q.mPos[0]) < MTYPE_EPS) &&
-		(std::fabs(p.mPos[1] - q.mPos[1]) < MTYPE_EPS) &&
-		(std::fabs(p.mPos[2] - q.mPos[2]) < MTYPE_EPS);
-}
-
-bool operator !=(const DgPos& p, const DgPos& q)
-{
-	return !(p == q);
-}
-
-bool operator <(const DgPos& p, const DgPos& q)
-{
-	if (1)
-	{
-		if (std::fabs(p.mPos[0] - q.mPos[0]) > MTYPE_EPS)
-			return p.mPos[0] < q.mPos[0];
-		if (std::fabs(p.mPos[1] - q.mPos[1]) > MTYPE_EPS)
-			return p.mPos[1] < q.mPos[1];
-		if (std::fabs(p.mPos[2] - q.mPos[2]) > MTYPE_EPS)
-			return p.mPos[2] < q.mPos[2];
-		return false;
-	}
-	else
-	{
-		if (std::fabs(p.mPos[0] - q.mPos[0]) > MTYPE_EPS)
-			return p.mPos[0] < q.mPos[0];
-		if (std::fabs(p.mPos[1] - q.mPos[1]) > MTYPE_EPS)
-			return p.mPos[1] < q.mPos[1];
-		return p.mPos[2] < q.mPos[2];
-	}
-}
-
-std::ostream& operator <<(std::ostream& os, const DgPos& p)
-{
-	os << "(" << std::setw(5) << p.mPos[0] << ", " << std::setw(5) << p.mPos[1] << ", " << std::setw(5) << p.mPos[2] << ")";
-	return os;
-}
-
-std::istream& operator >>(std::istream& is, DgPos& p)
-{
-	is >> p.mPos[0] >> p.mPos[1] >> p.mPos[2];
-	return is;
-}
-
-/************************/
-/* DgVertex 클래스 구현 */
-/************************/
-
-std::vector<DgEdge*> DgVertex::getEdges(bool bCCW)
-{
-	// 반시계 방향으로 정렬하지 않는다면 에지 배열을 반환한다.
-	if (!bCCW)
-		return mEdges;
-
-	// 고립 정점이라면 빈 배열을 반환한다.
-	if (mEdges.empty())
-		return std::vector<DgEdge*>();
-
-	// 시계 방향 순회
-	std::vector<DgEdge*> edgeList;
-	DgEdge* e = mEdges[0];
-	do {
-		if (e->mMate == nullptr) break; // 조건(1): 경계 에지를 만난 경우
-		edgeList.emplace_back(e);
-		e = e->mMate->mNext;
-	} while (e != mEdges[0]); // 조건(2): 시작에지로 되돌아온 경우
-
-	// 경계 정점인 경우: 조건(1)로 나온 경우
-	if (mEdges.size() != edgeList.size())
-	{
-		// 반시계 방향 순회
-		edgeList.clear();
-		do {
-			edgeList.emplace_back(e);
-			e = e->mNext->mNext->mMate;
-		} while (e != nullptr);
-
-		// Non-manifold 정점의 경우
-		if (mEdges.size() != edgeList.size())
-		{
-			edgeList.clear();
-			throw std::runtime_error("Non-manifold vertex...\n");
-		}
-	}
-	else // 경계 정점이 아닌 경우: 조건(2)로 나온 경우
-		std::reverse(edgeList.begin(), edgeList.end());
-
-	return edgeList;
-}
-
-std::vector<DgVertex*> DgVertex::getOneRingVerts(bool bCCW)
-{
-	std::vector<DgVertex*> verts;
-	for (DgEdge* e : getEdges(bCCW))
-	{
-		verts.push_back(EV(e));
-		if (PREV(e)->mMate == NULL)
-			verts.push_back(PREV(e)->mVert);
-	}
-	return verts;
-}
-
-DgVec3 DgVertex::getAvgNormal(bool bWgt)
-{
-	// 예외 처리
-	DgVec3 N;
-	if (mEdges.empty())
-		return N;
-
-	// 각도 가중치를 고려하는 경우
-	if (bWgt)
-	{
-		std::vector<double> weights;
-		for (DgEdge* e : mEdges)
-		{
-			try {
-				weights.push_back(e->mNext->getAngle(true));
-			}
-			catch (...)
-			{
-				weights.push_back(0.0);
-			}
-		}
-
-		double totWgt = std::accumulate(weights.begin(), weights.end(), 0.0);
-		for (int i = 0; i < (int)mEdges.size(); ++i)
-		{
-			try {
-				double wgt = weights[i] / totWgt;
-				N += wgt * mEdges[i]->mFace->getFaceNormal(true);
-			}
-			catch (...) {
-				continue;
-			}
-		}
-	}
-	else // 단순 평균을 구하는 경우
-	{
-		for (DgEdge* e : mEdges)
-		{
-			try {
-				N += e->mFace->getFaceNormal(true);
-			}
-			catch (...) {
-				continue;
-			}
-		}
-	}
-	if (!N.isZero())
-		N.normalize();
-	return N;
-}
-
-bool DgVertex::isBndry()
-{
-	for (DgEdge* e : mEdges)
-		if (e->mMate == NULL)
-			return true;
-	return false;
-}
-
-/************************/
-/* DgNormal 클래스 구현 */
-/************************/
