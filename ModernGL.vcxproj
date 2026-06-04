@@ -146,6 +146,7 @@
   <ItemGroup>
     <ClCompile Include="DgBoolean.cpp" />
     <ClCompile Include="DgCollision.cpp" />
+    <ClCompile Include="DgMC.cpp" />
     <ClCompile Include="DgSweep.cpp" />
     <ClCompile Include="DgSweepVia.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -173,6 +174,7 @@
   <ItemGroup>
     <ClInclude Include="DgBoolean.h" />
     <ClInclude Include="DgCollision.h" />
+    <ClInclude Include="DgMC.h" />
     <ClInclude Include="DgMesh.h" />
     <ClInclude Include="DgSweep.h" />
     <ClInclude Include="DgSweepVia.h">

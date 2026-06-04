@@ -67,11 +67,28 @@ void ShowWindowSceneLayer(bool* p_open)
 						ImGui::EndPopup();
 						break;
 					}
-					if (ImGui::MenuItem("Export"))
+					if (ImGui::BeginMenu("Export"))
 					{
-						char path[256];
-						snprintf(path, sizeof(path), "volume%zu.vti", i + 1);
-						sdfList[i]->saveToVTI(path);
+						if (ImGui::MenuItem("Volume (.vti)"))
+						{
+							char path[256];
+							snprintf(path, sizeof(path), "volume%zu.vti", i + 1);
+							sdfList[i]->saveToVTI(path);
+						}
+						if (ImGui::MenuItem("Mesh (.obj)"))
+						{
+							char path[256];
+							snprintf(path, sizeof(path), "mesh%zu.obj", i + 1);
+							DgMesh* mc = extractMeshMC(sdfList[i], sdfList[i]->mOffset);
+							if (mc) {
+								save_mesh_obj(mc, path);
+								delete mc;   // 파일만 추출하고 즉시 해제
+							}
+							else {
+								std::cerr << "MC 추출 결과가 비어있음 (iso=" << sdfList[i]->mOffset << ")" << std::endl;
+							}
+						}
+						ImGui::EndMenu();
 					}
 					ImGui::EndPopup();
 				}
