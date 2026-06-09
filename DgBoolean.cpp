@@ -53,13 +53,22 @@ DgVolume* DgBoolean::booleanGPU_pair(
 {
     glUseProgram(sComputeShader);
 
-    // ----- 결과 3D 텍스처 생성 -----
+    // isotropic voxel 기준 dim 계산
+    glm::vec3 range = combinedMax - combinedMin;
+    float maxRange = std::max({ range.x, range.y, range.z });
+    float cellSize = maxRange / (dim - 1);
+    int minDim = dim;
+    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
+    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
+    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+
+    // 결과 3D 텍스처 생성 (isotropic dim 적용)
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-        dim, dim, dim,
+        dimX, dimY, dimZ,
         0, GL_RED, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -68,46 +77,39 @@ DgVolume* DgBoolean::booleanGPU_pair(
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    // ----- 입력 SDF 텍스처 바인딩 -----
-
-    // 볼륨 A: 텍스처 유닛 0
+    // 볼륨 A: 텍스처 슬롯 0
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, volA->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSdfA"), 0);
 
-    // 볼륨 B: 텍스처 유닛 1
+    // 볼륨 B: 텍스처 슬롯 1
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, volB->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSdfB"), 1);
 
-    // 결과 텍스처: 이미지 유닛 2 (쓰기)
+    // 결과 텍스처: 이미지 슬롯 2 (쓰기)
     glBindImageTexture(2, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-    // ----- Uniform 설정 -----
-
-    // 결과 볼륨 AABB & 해상도
+    // Uniform 전달
     glUniform3f(glGetUniformLocation(sComputeShader, "uResultMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uResultMax"),
         combinedMax.x, combinedMax.y, combinedMax.z);
+    // isotropic dim을 셰이더에 전달
     glUniform3i(glGetUniformLocation(sComputeShader, "uResolution"),
-        dim, dim, dim);
+        dimX, dimY, dimZ);
 
-    // 볼륨 A: 로컬 AABB + 역변환
     glm::vec3 minA = volA->getLocalMin();
     glm::vec3 maxA = volA->getLocalMax();
     glm::mat4 invModelA = glm::inverse(volA->getModelMatrix());
-
     glUniform3f(glGetUniformLocation(sComputeShader, "uMinA"), minA.x, minA.y, minA.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uMaxA"), maxA.x, maxA.y, maxA.z);
     glUniformMatrix4fv(glGetUniformLocation(sComputeShader, "uInvModelA"),
         1, GL_FALSE, glm::value_ptr(invModelA));
 
-    // 볼륨 B: 로컬 AABB + 역변환
     glm::vec3 minB = volB->getLocalMin();
     glm::vec3 maxB = volB->getLocalMax();
     glm::mat4 invModelB = glm::inverse(volB->getModelMatrix());
-
     glUniform3f(glGetUniformLocation(sComputeShader, "uMinB"), minB.x, minB.y, minB.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uMaxB"), maxB.x, maxB.y, maxB.z);
     glUniformMatrix4fv(glGetUniformLocation(sComputeShader, "uInvModelB"),
@@ -119,39 +121,26 @@ DgVolume* DgBoolean::booleanGPU_pair(
     else if (mode == BooleanMode::Difference) modeInt = 2;
     glUniform1i(glGetUniformLocation(sComputeShader, "uBooleanMode"), modeInt);
 
-    // ----- Dispatch -----
-    int numGroups = (dim + 7) / 8;
-    glDispatchCompute(numGroups, numGroups, numGroups);
+    // 각 축 dim에 맞춰 워크그룹 수 계산
+    int numGroupsX = (dimX + 7) / 8;
+    int numGroupsY = (dimY + 7) / 8;
+    int numGroupsZ = (dimZ + 7) / 8;
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 
     // GPU 완료 대기
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // ----- 결과 볼륨 생성 -----
-    DgVolume* result = new DgVolume();
-    result->mName = generateName(mode) + " (GPU)";
-    result->mDim[0] = dim;
-    result->mDim[1] = dim;
-    result->mDim[2] = dim;
+    // 결과 볼륨 생성 (createResultVolume 경유로 isotropic dim 일관 적용)
+    DgVolume* result = DgVolume::createResultVolume(
+        generateName(mode) + " (GPU)", dim, combinedMin, combinedMax);
 
-    result->mMin = DgPos(combinedMin.x, combinedMin.y, combinedMin.z);
-    result->mMax = DgPos(combinedMax.x, combinedMax.y, combinedMax.z);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    result->mSpacing[0] = range.x / (dim - 1);
-    result->mSpacing[1] = range.y / (dim - 1);
-    result->mSpacing[2] = range.z / (dim - 1);
-
-    // GPU → CPU 데이터 복사 (레이마칭 등 CPU 측 활용을 위해)
-    int totalSize = dim * dim * dim;
+    // GPU → CPU 복사
+    int totalSize = dimX * dimY * dimZ;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
-    // 텍스처 ID를 결과에 직접 할당 (createTexture 불필요)
     result->mTextureID = resultTexture;
-
-    // 바운딩 박스 메쉬
-    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
     result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 

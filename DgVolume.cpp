@@ -333,17 +333,26 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 {
 	DgVolume* vol = new DgVolume();
 	vol->mName = name;
-	vol->mDim[0] = resolution;
-	vol->mDim[1] = resolution;
-	vol->mDim[2] = resolution;
 
 	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
 	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
 
 	glm::vec3 range = maxPos - minPos;
-	vol->mSpacing[0] = range.x / (resolution - 1);
-	vol->mSpacing[1] = range.y / (resolution - 1);
-	vol->mSpacing[2] = range.z / (resolution - 1);
+
+	// 가장 긴 축을 resolution으로 나눠 정육면체 voxel 크기(cellSize) 결정
+	float maxRange = std::max({ range.x, range.y, range.z });
+	float cellSize = maxRange / (resolution - 1);
+
+	// 각 축의 dim은 축 길이를 cellSize로 나눈 값, 최소 resolution 보장
+	int minDim = resolution;
+	vol->mDim[0] = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
+	vol->mDim[1] = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
+	vol->mDim[2] = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+
+	// 하한선 적용된 축은 spacing을 실제 range에 맞게 재계산
+	vol->mSpacing[0] = range.x / (vol->mDim[0] - 1);
+	vol->mSpacing[1] = range.y / (vol->mDim[1] - 1);
+	vol->mSpacing[2] = range.z / (vol->mDim[2] - 1);
 
 	vol->mMesh = createBoundingBoxMesh(vol->mMin, vol->mMax);
 

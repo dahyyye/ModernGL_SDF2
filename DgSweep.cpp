@@ -165,20 +165,23 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
-    int totalSize = resolution * resolution * resolution;
+    // isotropic voxel 적용 후 실제 dim은 축마다 다를 수 있음
+    int dimX = result->mDim[0];
+    int dimY = result->mDim[1];
+    int dimZ = result->mDim[2];
+    int totalSize = dimX * dimY * dimZ;
     result->mData.resize(totalSize, FLT_MAX);
 
     int skipCount = 0;
     int brentCount = 0;
 
-    // --- 메인 루프: 세그먼트 순회 ---
     for (int seg = 0; seg < samplingSteps - 1; ++seg)
     {
-        for (int k = 0; k < resolution; ++k)
+        for (int k = 0; k < dimZ; ++k)
         {
-            for (int j = 0; j < resolution; ++j)
+            for (int j = 0; j < dimY; ++j)
             {
-                for (int i = 0; i < resolution; ++i)
+                for (int i = 0; i < dimX; ++i)
                 {
                     glm::vec3 worldPos(
                         combinedMin.x + i * result->mSpacing[0],
@@ -186,19 +189,16 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
                         combinedMin.z + k * result->mSpacing[2]
                     );
 
-                    int index = i + j * resolution + k * resolution * resolution;
+                    int index = i + j * dimX + k * dimX * dimY;
 
-                    // 역궤적 선분 생성
                     glm::vec3 p0 = glm::vec3(invTransforms[seg] * glm::vec4(worldPos, 1.0f));
                     glm::vec3 p1 = glm::vec3(invTransforms[seg + 1] * glm::vec4(worldPos, 1.0f));
 
-                    // 양 끝점 SDF
                     float sdf0 = DgBoolean::sampleLocalSDF(brush, p0);
                     float sdf1 = DgBoolean::sampleLocalSDF(brush, p1);
                     float segLength = glm::length(p1 - p0);
 
-                    // 외부 판별
-                    if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength*1.5)
+                    if (sdf0 > 0.0f && sdf1 > 0.0f && (sdf0 + sdf1) > segLength * 1.5)
                     {
                         result->mData[index] = std::min(result->mData[index],
                             std::min(sdf0, sdf1));
@@ -206,13 +206,9 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
                         continue;
                     }
 
-                    // Brent's method로 최소값 탐색
                     float bestAlpha;
                     float bestSDF = brentMinimize(brush, p0, p1, bestAlpha);
-
-                    // 양 끝점과도 비교
                     bestSDF = std::min(bestSDF, std::min(sdf0, sdf1));
-
                     result->mData[index] = std::min(result->mData[index], bestSDF);
                     brentCount++;
                 }
@@ -220,15 +216,13 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
         }
 
         if (seg % 10 == 0)
-        {
             std::cout << "Brent: " << (seg * 100 / (samplingSteps - 1)) << "%" << std::endl;
-        }
     }
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
 
-    int totalVoxelSeg = (samplingSteps - 1) * resolution * resolution * resolution;
+    int totalVoxelSeg = (samplingSteps - 1) * dimX * dimY * dimZ;
     std::cout << "Brent Swept Volume: " << duration << " sec" << std::endl;
     std::cout << "  Skipped (Lipschitz): " << skipCount
         << " (" << (100.0 * skipCount / totalVoxelSeg) << "%)" << std::endl;
@@ -236,7 +230,6 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
         << " (" << (100.0 * brentCount / totalVoxelSeg) << "%)" << std::endl;
 
     result->createTexture();
-
     return result;
 }
 
@@ -248,7 +241,6 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 {
     if (!initializeBrentGPU()) return nullptr;
 
-    //clock_t start = clock();
     auto cpuStart = std::chrono::high_resolution_clock::now();
 
     // 바운딩 박스 계산
@@ -275,6 +267,15 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
+    // isotropic voxel 기준 dim 계산 (createResultVolume과 동일한 로직)
+    glm::vec3 range = combinedMax - combinedMin;
+    float maxRange = std::max({ range.x, range.y, range.z });
+    float cellSize = maxRange / (resolution - 1);
+    int minDim = resolution;
+    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
+    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
+    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+
     // GPU에 넘기기 위한 구조체
     struct GPUKeyFrame {
         glm::vec4 position; // xyz = 위치, w = 0 (패딩)
@@ -284,14 +285,14 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     // Catmull-Rom 키프레임을 직접 GPU에 전송
     int numKeyframes = (int)trajectory.keyframes.size();
-    int numSegs = numKeyframes - 1; // 세그먼트 수 = 키프레임 수 - 1
+    int numSegs = numKeyframes - 1;
     std::vector<GPUKeyFrame> gpuKFs(numKeyframes);
 
     for (int i = 0; i < numKeyframes; ++i) {
         gpuKFs[i].position = glm::vec4(trajectory.keyframes[i].position, 0.0f);
         glm::quat q = trajectory.keyframes[i].rotation;
         gpuKFs[i].rotation = glm::vec4(q.x, q.y, q.z, q.w);
-		gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
+        gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
@@ -304,13 +305,13 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     // Compute Shader 실행
     glUseProgram(sBrentComputeShader);
 
-    // 결과 3D 텍스처 생성
+    // 결과 3D 텍스처 생성 (isotropic dim 적용)
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-        resolution, resolution, resolution,
+        dimX, dimY, dimZ,
         0, GL_RED, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -332,24 +333,27 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMax"),
         combinedMax.x, combinedMax.y, combinedMax.z);
+    // isotropic dim을 셰이더에 전달
     glUniform3i(glGetUniformLocation(sBrentComputeShader, "uResolution"),
-        resolution, resolution, resolution);
+        dimX, dimY, dimZ);
 
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMin"),
         localMin.x, localMin.y, localMin.z);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMax"),
         localMax.x, localMax.y, localMax.z);
 
-	// 셰이더의 uSamplingSteps에 샘플링 스텝 수 전달
+    // 셰이더의 uSamplingSteps에 샘플링 스텝 수 전달
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uSamplingSteps"), samplingSteps);
     // 셰이더의 uNumSegments에 세그먼트 수 전달
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
-	// 셰이더의 uMaxBrentIter에 최대 브렌트 반복 횟수 전달 (skipReadback이 true면 6, 아니면 10)
+    // 셰이더의 uMaxBrentIter에 최대 브렌트 반복 횟수 전달
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
 
-    // Dispatch
-    int numGroups = (resolution + 7) / 8;
-    glDispatchCompute(numGroups, numGroups, numGroups);
+    // 각 축 dim에 맞춰 워크그룹 수 계산
+    int numGroupsX = (dimX + 7) / 8;
+    int numGroupsY = (dimY + 7) / 8;
+    int numGroupsZ = (dimZ + 7) / 8;
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 
     // GPU 완료 대기
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -357,19 +361,28 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
 
+    // [DEBUG] isotropic dim 확인
+    std::cout << "[DEBUG] combinedMin: ("
+        << combinedMin.x << ", " << combinedMin.y << ", " << combinedMin.z << ")" << std::endl;
+    std::cout << "[DEBUG] combinedMax: ("
+        << combinedMax.x << ", " << combinedMax.y << ", " << combinedMax.z << ")" << std::endl;
+    std::cout << "[DEBUG] range: ("
+        << (combinedMax.x - combinedMin.x) << ", "
+        << (combinedMax.y - combinedMin.y) << ", "
+        << (combinedMax.z - combinedMin.z) << ")" << std::endl;
+    std::cout << "[DEBUG] dim: ("
+        << result->mDim[0] << ", " << result->mDim[1] << ", " << result->mDim[2] << ")" << std::endl;
+    std::cout << "[DEBUG] cellSize: " << result->mSpacing[0] << std::endl;
+
     // preview모드 아닐 땐 GPU → CPU 복사
     if (!skipReadback) {
-        int totalSize = resolution * resolution * resolution;
+        int totalSize = dimX * dimY * dimZ;
         result->mData.resize(totalSize);
         glBindTexture(GL_TEXTURE_3D, resultTexture);
         glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
     }
 
     result->mTextureID = resultTexture;
-
-    //clock_t finish = clock();
-    //double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    //std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
 
     glFinish();
     auto cpuEnd = std::chrono::high_resolution_clock::now();
@@ -409,27 +422,21 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
 {
     clock_t start = clock();
 
-    // 브러시 로컬 정보
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
-    
-    // 궤적 중심점들의 AABB 계산
-    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
 
+    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-
         combinedMin = glm::min(combinedMin, worldCenter);
         combinedMax = glm::max(combinedMax, worldCenter);
     }
 
-    // 반경만큼 패딩
     float radius = glm::length(localMax - localCenter);
-
     float maxScaleFactor = 1.0f;
     for (const auto& kf : trajectory.keyframes) {
         float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
@@ -438,25 +445,26 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
 
-    // SDF 초기화
-    int totalSize = resolution * resolution * resolution;
+    // isotropic voxel 적용 후 실제 dim은 축마다 다를 수 있음
+    int dimX = result->mDim[0];
+    int dimY = result->mDim[1];
+    int dimZ = result->mDim[2];
+    int totalSize = dimX * dimY * dimZ;
     result->mData.resize(totalSize, FLT_MAX);
 
-    // 스탬핑
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::mat4 invTransform = glm::inverse(transform);
 
-        for (int k = 0; k < resolution; ++k)
+        for (int k = 0; k < dimZ; ++k)
         {
-            for (int j = 0; j < resolution; ++j)
+            for (int j = 0; j < dimY; ++j)
             {
-                for (int i = 0; i < resolution; ++i)
+                for (int i = 0; i < dimX; ++i)
                 {
                     glm::vec3 worldPos(
                         combinedMin.x + i * result->mSpacing[0],
@@ -465,8 +473,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
                     );
 
                     float sdf = DgBoolean::resampleSDF(brush, invTransform, worldPos);
-
-                    int index = i + j * resolution + k * resolution * resolution;
+                    int index = i + j * dimX + k * dimX * dimY;
                     result->mData[index] = std::min(result->mData[index], sdf);
                 }
             }
@@ -480,9 +487,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
     std::cout << "Swept Volume 생성 완료: " << duration << "초" << std::endl;
 
-    // 텍스처 생성
     result->createTexture();
-
     return result;
 }
 
@@ -496,20 +501,18 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
 
     clock_t start = clock();
 
-    // 1. 바운딩 박스 계산
+    // 바운딩 박스 계산
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
     float radius = glm::length(localMax - localCenter);
 
     glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
-
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-
         combinedMin = glm::min(combinedMin, worldCenter);
         combinedMax = glm::max(combinedMax, worldCenter);
     }
@@ -521,6 +524,15 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     }
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
+
+    // isotropic voxel 기준 dim 계산 (createResultVolume과 동일한 로직)
+    glm::vec3 range = combinedMax - combinedMin;
+    float maxRange = std::max({ range.x, range.y, range.z });
+    float cellSize = maxRange / (resolution - 1);
+    int minDim = resolution;
+    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
+    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
+    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
 
     // 변환 행렬
     std::vector<glm::mat4> invTransforms(samplingSteps);
@@ -534,25 +546,25 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     // Compute Shader 실행
     glUseProgram(sComputeShader);
 
-	// SSBO에 변환 행렬 업로드
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);         // SSBO 바인딩
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 
-		invTransforms.size() * sizeof(glm::mat4),       //크기: 행렬 개수 * 행렬 크기
-        invTransforms.data(),                           // CPU 메모리 주소
-		GL_DYNAMIC_DRAW);                               // 사용 빈도: 동적 업데이트
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);  // 바인딩 포인트 2에 연결
+    // SSBO에 변환 행렬 업로드
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sTransformSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+        invTransforms.size() * sizeof(glm::mat4),
+        invTransforms.data(),
+        GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sTransformSSBO);
 
-    // 결과 3D 텍스처 생성
+    // 결과 3D 텍스처 생성 (isotropic dim 적용)
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
-    glBindTexture(GL_TEXTURE_3D, resultTexture);    // 작업 대상으로 지정
+    glBindTexture(GL_TEXTURE_3D, resultTexture);
 
-	glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,         // 빈 3D 텍스처 생성
-        resolution, resolution, resolution,
+    glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
+        dimX, dimY, dimZ,
         0, GL_RED, GL_FLOAT, nullptr);
 
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);       // 텍스처 샘플링 설정
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);       //텍스처 호출 시 주변 값을 보간해서 반환하도록 함
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
@@ -570,8 +582,9 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uVolumeMax"),
         combinedMax.x, combinedMax.y, combinedMax.z);
+    // isotropic dim을 셰이더에 전달
     glUniform3i(glGetUniformLocation(sComputeShader, "uResolution"),
-        resolution, resolution, resolution);
+        dimX, dimY, dimZ);
 
     glUniform3f(glGetUniformLocation(sComputeShader, "uBrushMin"),
         localMin.x, localMin.y, localMin.z);
@@ -580,24 +593,24 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
 
     glUniform1i(glGetUniformLocation(sComputeShader, "uSamplingSteps"), samplingSteps);
 
-    // Dispatch
-	int numGroups = (resolution + 7) / 8;       // 나누어떨어지지 않을 때를 대비해 올림처리
-	glDispatchCompute(numGroups, numGroups, numGroups); // 워크 그룹 동시 실행
+    // 각 축 dim에 맞춰 워크그룹 수 계산
+    int numGroupsX = (dimX + 7) / 8;
+    int numGroupsY = (dimY + 7) / 8;
+    int numGroupsZ = (dimZ + 7) / 8;
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 
     // GPU 완료 대기
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // 5. 결과 볼륨 생성
+    // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (GPU)", resolution, combinedMin, combinedMax);
 
     // GPU → CPU 복사
-    int totalSize = resolution * resolution * resolution;
-
+    int totalSize = dimX * dimY * dimZ;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
-    // 텍스처 생성    
     result->mTextureID = resultTexture;
 
     clock_t finish = clock();
