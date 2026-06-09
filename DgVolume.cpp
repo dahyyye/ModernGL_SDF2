@@ -343,16 +343,15 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 	float maxRange = std::max({ range.x, range.y, range.z });
 	float cellSize = maxRange / (resolution - 1);
 
-	// 각 축의 dim은 축 길이를 cellSize로 나눈 값, 최소 resolution 보장
-	int minDim = resolution;
-	vol->mDim[0] = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
-	vol->mDim[1] = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
-	vol->mDim[2] = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+	// 각 축의 dim은 cellSize 기준으로 결정 (최소 2 보장)
+	vol->mDim[0] = std::max(2, (int)std::round(range.x / cellSize) + 1);
+	vol->mDim[1] = std::max(2, (int)std::round(range.y / cellSize) + 1);
+	vol->mDim[2] = std::max(2, (int)std::round(range.z / cellSize) + 1);
 
-	// 하한선 적용된 축은 spacing을 실제 range에 맞게 재계산
-	vol->mSpacing[0] = range.x / (vol->mDim[0] - 1);
-	vol->mSpacing[1] = range.y / (vol->mDim[1] - 1);
-	vol->mSpacing[2] = range.z / (vol->mDim[2] - 1);
+	// 세 축 모두 동일한 cellSize (isotropic voxel)
+	vol->mSpacing[0] = cellSize;
+	vol->mSpacing[1] = cellSize;
+	vol->mSpacing[2] = cellSize;
 
 	vol->mMesh = createBoundingBoxMesh(vol->mMin, vol->mMax);
 

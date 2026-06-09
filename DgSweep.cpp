@@ -267,14 +267,13 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    // isotropic voxel 기준 dim 계산 (createResultVolume과 동일한 로직)
+    // 가장 긴 축 기준 isotropic voxel dim 계산 (createResultVolume과 동일한 로직)
     glm::vec3 range = combinedMax - combinedMin;
     float maxRange = std::max({ range.x, range.y, range.z });
     float cellSize = maxRange / (resolution - 1);
-    int minDim = resolution;
-    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
-    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
-    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+    int dimX = std::max(2, (int)std::round(range.x / cellSize) + 1);
+    int dimY = std::max(2, (int)std::round(range.y / cellSize) + 1);
+    int dimZ = std::max(2, (int)std::round(range.z / cellSize) + 1);
 
     // GPU에 넘기기 위한 구조체
     struct GPUKeyFrame {
@@ -525,14 +524,13 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    // isotropic voxel 기준 dim 계산 (createResultVolume과 동일한 로직)
+    // 가장 긴 축 기준 isotropic voxel dim 계산 (createResultVolume과 동일한 로직)
     glm::vec3 range = combinedMax - combinedMin;
     float maxRange = std::max({ range.x, range.y, range.z });
     float cellSize = maxRange / (resolution - 1);
-    int minDim = resolution;
-    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
-    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
-    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+    int dimX = std::max(2, (int)std::round(range.x / cellSize) + 1);
+    int dimY = std::max(2, (int)std::round(range.y / cellSize) + 1);
+    int dimZ = std::max(2, (int)std::round(range.z / cellSize) + 1);
 
     // 변환 행렬
     std::vector<glm::mat4> invTransforms(samplingSteps);
