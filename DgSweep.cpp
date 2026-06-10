@@ -371,6 +371,13 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     //double duration = (double)(finish - start) / CLOCKS_PER_SEC;
     //std::cout << "Brent GPU Swept Volume: " << duration << " sec" << std::endl;
 
+    glm::vec3 range = combinedMax - combinedMin;
+    std::cout << "[DEBUG] combinedMin: (" << combinedMin.x << ", " << combinedMin.y << ", " << combinedMin.z << ")" << std::endl;
+    std::cout << "[DEBUG] combinedMax: (" << combinedMax.x << ", " << combinedMax.y << ", " << combinedMax.z << ")" << std::endl;
+    std::cout << "[DEBUG] range: (" << range.x << ", " << range.y << ", " << range.z << ")" << std::endl;
+    std::cout << "[DEBUG] dim: (" << result->mDim[0] << ", " << result->mDim[1] << ", " << result->mDim[2] << ")" << std::endl;
+    std::cout << "[DEBUG] cellSize: (" << result->mSpacing[0] << ", " << result->mSpacing[1] << ", " << result->mSpacing[2] << ")" << std::endl;
+
     glFinish();
     auto cpuEnd = std::chrono::high_resolution_clock::now();
     double ms = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
