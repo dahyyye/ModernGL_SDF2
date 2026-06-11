@@ -1,18 +1,18 @@
-#include "DgViewer.h"
+ï»¿#include "DgViewer.h"
 #include "DgBoolean.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 
 // ===================================================================
-//  GPU Á¤Àû º¯¼ö
+//  GPU ì •ì  ë³€ìˆ˜
 // ===================================================================
 GLuint DgBoolean::sComputeShader = 0;
 bool   DgBoolean::sInitialized = false;
 
 
 // ===================================================================
-//  ¸ŞÀÎ ÁøÀÔÁ¡ (GPU)
+//  ë©”ì¸ ì§„ì…ì  (GPU)
 // ===================================================================
 DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim)
 {
@@ -22,7 +22,7 @@ DgVolume* DgBoolean::Boolean(const std::vector<DgVolume*>& volumes, BooleanMode 
 
 
 // ===================================================================
-//  GPU ÃÊ±âÈ­
+//  GPU ì´ˆê¸°í™”
 // ===================================================================
 bool DgBoolean::initializeGPU()
 {
@@ -30,7 +30,7 @@ bool DgBoolean::initializeGPU()
 
     sComputeShader = loadComputeShader(".\\shaders\\boolean.comp");
     if (sComputeShader == 0) {
-        std::cerr << "Boolean Compute Shader ÃÊ±âÈ­ ½ÇÆĞ" << std::endl;
+        std::cerr << "Boolean Compute Shader ì´ˆê¸°í™” ì‹¤íŒ¨" << std::endl;
         return false;
     }
 
@@ -40,11 +40,11 @@ bool DgBoolean::initializeGPU()
 
 
 // ===================================================================
-//  GPU Boolean: 2-ÀÔ·Â ÀÌÇ× ¿¬»ê (ÇÙ½É)
+//  GPU Boolean: 2-ì…ë ¥ ì´í•­ ì—°ì‚° (í•µì‹¬)
 //
-//  ÀÌ ÇÔ¼ö°¡ ½ÇÁ¦·Î Compute Shader¸¦ µğ½ºÆĞÄ¡ÇÏ´Â ´ÜÀ§.
-//  volA¿Í volB °¢°¢ÀÇ 3D ÅØ½ºÃ³¸¦ ¹ÙÀÎµùÇÏ°í,
-//  °á°ú º¼·ıÀÇ ¸ğµç º¹¼¿À» º´·Ä °è»êÇÑ´Ù.
+//  ì´ í•¨ìˆ˜ê°€ ì‹¤ì œë¡œ Compute Shaderë¥¼ ë””ìŠ¤íŒ¨ì¹˜í•˜ëŠ” ë‹¨ìœ„.
+//  volAì™€ volB ê°ê°ì˜ 3D í…ìŠ¤ì²˜ë¥¼ ë°”ì¸ë”©í•˜ê³ ,
+//  ê²°ê³¼ ë³¼ë¥¨ì˜ ëª¨ë“  ë³µì…€ì„ ë³‘ë ¬ ê³„ì‚°í•œë‹¤.
 // ===================================================================
 DgVolume* DgBoolean::booleanGPU_pair(
     DgVolume* volA, DgVolume* volB,
@@ -53,16 +53,12 @@ DgVolume* DgBoolean::booleanGPU_pair(
 {
     glUseProgram(sComputeShader);
 
-    // isotropic voxel ±âÁØ dim °è»ê
+    // isotropic dim ê³„ì‚° (í•œ ë²ˆë§Œ â€” í…ìŠ¤ì²˜Â·ë³¼ë¥¨ ì–‘ìª½ì— ë™ì¼í•˜ê²Œ ì‚¬ìš©)
     glm::vec3 range = combinedMax - combinedMin;
-    float maxRange = std::max({ range.x, range.y, range.z });
-    float cellSize = maxRange / (dim - 1);
-    int minDim = dim;
-    int dimX = std::max(minDim, (int)std::round(range.x / cellSize) + 1);
-    int dimY = std::max(minDim, (int)std::round(range.y / cellSize) + 1);
-    int dimZ = std::max(minDim, (int)std::round(range.z / cellSize) + 1);
+    int dimX, dimY, dimZ; float cellSize;
+    DgVolume::calcIsotropicDim(range, dim, dimX, dimY, dimZ, cellSize);
 
-    // °á°ú 3D ÅØ½ºÃ³ »ı¼º (isotropic dim Àû¿ë)
+    // ê²°ê³¼ 3D í…ìŠ¤ì²˜ ìƒì„± (isotropic dim ì ìš©)
     GLuint resultTexture;
     glGenTextures(1, &resultTexture);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
@@ -77,25 +73,25 @@ DgVolume* DgBoolean::booleanGPU_pair(
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    // º¼·ı A: ÅØ½ºÃ³ ½½·Ô 0
+    // ë³¼ë¥¨ A: í…ìŠ¤ì²˜ ìŠ¬ë¡¯ 0
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_3D, volA->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSdfA"), 0);
 
-    // º¼·ı B: ÅØ½ºÃ³ ½½·Ô 1
+    // ë³¼ë¥¨ B: í…ìŠ¤ì²˜ ìŠ¬ë¡¯ 1
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_3D, volB->mTextureID);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSdfB"), 1);
 
-    // °á°ú ÅØ½ºÃ³: ÀÌ¹ÌÁö ½½·Ô 2 (¾²±â)
+    // ê²°ê³¼ í…ìŠ¤ì²˜: ì´ë¯¸ì§€ ìŠ¬ë¡¯ 2 (ì“°ê¸°)
     glBindImageTexture(2, resultTexture, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_R32F);
 
-    // Uniform Àü´Ş
+    // Uniform ì „ë‹¬
     glUniform3f(glGetUniformLocation(sComputeShader, "uResultMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uResultMax"),
         combinedMax.x, combinedMax.y, combinedMax.z);
-    // isotropic dimÀ» ¼ÎÀÌ´õ¿¡ Àü´Ş
+    // ì…°ì´ë”ì— isotropic dim ì „ë‹¬
     glUniform3i(glGetUniformLocation(sComputeShader, "uResolution"),
         dimX, dimY, dimZ);
 
@@ -115,32 +111,31 @@ DgVolume* DgBoolean::booleanGPU_pair(
     glUniformMatrix4fv(glGetUniformLocation(sComputeShader, "uInvModelB"),
         1, GL_FALSE, glm::value_ptr(invModelB));
 
-    // Boolean ¸ğµå
+    // Boolean ëª¨ë“œ
     int modeInt = 0;
     if (mode == BooleanMode::Intersection) modeInt = 1;
     else if (mode == BooleanMode::Difference) modeInt = 2;
     glUniform1i(glGetUniformLocation(sComputeShader, "uBooleanMode"), modeInt);
 
-    // °¢ Ãà dim¿¡ ¸ÂÃç ¿öÅ©±×·ì ¼ö °è»ê
+    // ê° ì¶• dimì— ë§ì¶° ì›Œí¬ê·¸ë£¹ ìˆ˜ ê³„ì‚°
     int numGroupsX = (dimX + 7) / 8;
     int numGroupsY = (dimY + 7) / 8;
     int numGroupsZ = (dimZ + 7) / 8;
     glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 
-    // GPU ¿Ï·á ´ë±â
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    // °á°ú º¼·ı »ı¼º (createResultVolume °æÀ¯·Î isotropic dim ÀÏ°ü Àû¿ë)
+    // ê²°ê³¼ ë³¼ë¥¨ ìƒì„± â€” í…ìŠ¤ì²˜ì™€ ë™ì¼í•œ dim ì „ë‹¬ (ì¬ê³„ì‚° ì—†ìŒ)
     DgVolume* result = DgVolume::createResultVolume(
-        generateName(mode) + " (GPU)", dim, combinedMin, combinedMax);
+        generateName(mode) + " (GPU)", dimX, dimY, dimZ, cellSize, combinedMin, combinedMax);
 
-    // GPU ¡æ CPU º¹»ç
     int totalSize = dimX * dimY * dimZ;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
 
     result->mTextureID = resultTexture;
+    result->mMesh = createBoundingBoxMesh(result->mMin, result->mMax);
     result->mPosition = glm::vec3(0.0f);
     result->mRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
@@ -150,11 +145,11 @@ DgVolume* DgBoolean::booleanGPU_pair(
 
 
 // ===================================================================
-//  GPU Boolean: Ã¼ÀÌ´× (3°³ ÀÌ»ó º¼·ı Áö¿ø)
+//  GPU Boolean: ì²´ì´ë‹ (3ê°œ ì´ìƒ ë³¼ë¥¨ ì§€ì›)
 //
-//  A ¡ú B ¡ú C ¡æ (A ¡ú B) = temp ¡æ temp ¡ú C = result
-//  ÀÌÇ× ¿¬»êÀ» ¼øÂ÷ Àû¿ëÇÏ´Â ¹æ½Ä.
-//  °¢ Áß°£ °á°ú´Â ÀÌ¹Ì ÅØ½ºÃ³¸¦ °®°í ÀÖÀ¸¹Ç·Î ´ÙÀ½ ´Ü°èÀÇ ÀÔ·ÂÀ¸·Î Áï½Ã »ç¿ë °¡´É.
+//  A âˆª B âˆª C â†’ (A âˆª B) = temp â†’ temp âˆª C = result
+//  ì´í•­ ì—°ì‚°ì„ ìˆœì°¨ ì ìš©í•˜ëŠ” ë°©ì‹.
+//  ê° ì¤‘ê°„ ê²°ê³¼ëŠ” ì´ë¯¸ í…ìŠ¤ì²˜ë¥¼ ê°–ê³  ìˆìœ¼ë¯€ë¡œ ë‹¤ìŒ ë‹¨ê³„ì˜ ì…ë ¥ìœ¼ë¡œ ì¦‰ì‹œ ì‚¬ìš© ê°€ëŠ¥.
 // ===================================================================
 DgVolume* DgBoolean::BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMode mode, int dim)
 {
@@ -162,11 +157,11 @@ DgVolume* DgBoolean::BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMo
 
     clock_t start = clock();
 
-    // ÀüÃ¼ AABB °è»ê (CPU¿¡¼­ ¹Ì¸®)
+    // ì „ì²´ AABB ê³„ì‚° (CPUì—ì„œ ë¯¸ë¦¬)
     glm::vec3 combinedMin, combinedMax;
     computeAABB(volumes, combinedMin, combinedMax, mode);
 
-    // --- 2°³ÀÏ ¶§: ´ÜÀÏ µğ½ºÆĞÄ¡ ---
+    // --- 2ê°œì¼ ë•Œ: ë‹¨ì¼ ë””ìŠ¤íŒ¨ì¹˜ ---
     if (volumes.size() == 2)
     {
         DgVolume* result = booleanGPU_pair(
@@ -175,17 +170,17 @@ DgVolume* DgBoolean::BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMo
 
         clock_t finish = clock();
         double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-        std::cout << "Boolean GPU: " << duration << "ÃÊ" << std::endl;
+        std::cout << "Boolean GPU: " << duration << "ì´ˆ" << std::endl;
 
         return result;
     }
 
-    // --- 3°³ ÀÌ»óÀÏ ¶§: ¼øÂ÷ Ã¼ÀÌ´× ---
+    // --- 3ê°œ ì´ìƒì¼ ë•Œ: ìˆœì°¨ ì²´ì´ë‹ ---
     //
-    //  DifferenceÀÇ °æ¿ì: A - B - C = (A - B) - C
-    //  °¢ ´Ü°èÀÇ AABB´Â ÀüÃ¼ ÅëÇÕ AABB¸¦ ±×´ë·Î »ç¿ë.
-    //  (Áß°£ °á°úÀÇ AABB¸¦ ´Ù½Ã °è»êÇÏ¸é ´õ Å¸ÀÌÆ®ÇÏÁö¸¸,
-    //   GPU µğ½ºÆĞÄ¡ ºñ¿ë ´ëºñ ÀÌµæÀÌ ¹Ì¹ÌÇÏ¹Ç·Î ÅëÇÕ AABB ÀçÈ°¿ë)
+    //  Differenceì˜ ê²½ìš°: A - B - C = (A - B) - C
+    //  ê° ë‹¨ê³„ì˜ AABBëŠ” ì „ì²´ í†µí•© AABBë¥¼ ê·¸ëŒ€ë¡œ ì‚¬ìš©.
+    //  (ì¤‘ê°„ ê²°ê³¼ì˜ AABBë¥¼ ë‹¤ì‹œ ê³„ì‚°í•˜ë©´ ë” íƒ€ì´íŠ¸í•˜ì§€ë§Œ,
+    //   GPU ë””ìŠ¤íŒ¨ì¹˜ ë¹„ìš© ëŒ€ë¹„ ì´ë“ì´ ë¯¸ë¯¸í•˜ë¯€ë¡œ í†µí•© AABB ì¬í™œìš©)
 
     DgVolume* accumulated = booleanGPU_pair(
         volumes[0], volumes[1], mode, dim,
@@ -197,14 +192,14 @@ DgVolume* DgBoolean::BooleanGPU(const std::vector<DgVolume*>& volumes, BooleanMo
             accumulated, volumes[i], mode, dim,
             combinedMin, combinedMax);
 
-        // Áß°£ °á°ú Á¤¸®
+        // ì¤‘ê°„ ê²°ê³¼ ì •ë¦¬
         delete accumulated;
         accumulated = next;
     }
 
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
-    std::cout << "Boolean GPU (" << volumes.size() << "°³ º¼·ı): " << duration << "ÃÊ" << std::endl;
+    std::cout << "Boolean GPU (" << volumes.size() << "ê°œ ë³¼ë¥¨): " << duration << "ì´ˆ" << std::endl;
 
     return accumulated;
 }
@@ -215,10 +210,10 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
 {
     if (volumes.empty()) return;
 
-    // Ã¹ ¹øÂ° º¼·ıÀÇ ¿ùµå AABB
+    // ì²« ë²ˆì§¸ ë³¼ë¥¨ì˜ ì›”ë“œ AABB
     volumes[0]->getWorldAABB(combinedMin, combinedMax);
 
-    // ³ª¸ÓÁö º¼·ıµé°ú °áÇÕ
+    // ë‚˜ë¨¸ì§€ ë³¼ë¥¨ë“¤ê³¼ ê²°í•©
     for (size_t i = 1; i < volumes.size(); i++) {
         glm::vec3 volMin, volMax;
         volumes[i]->getWorldAABB(volMin, volMax);
@@ -238,7 +233,7 @@ void DgBoolean::computeAABB(const std::vector<DgVolume*>& volumes,
         }
     }
 
-    // ÆĞµù Ãß°¡
+    // íŒ¨ë”© ì¶”ê°€
     glm::vec3 size = combinedMax - combinedMin;
     float padding = glm::max(size.x, glm::max(size.y, size.z)) * 0.05f;
     combinedMin -= glm::vec3(padding);
@@ -258,29 +253,29 @@ std::string DgBoolean::generateName(BooleanMode mode)
 
 float DgBoolean::sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos)
 {
-    // ¿ø·¡ º¼·ıÀÇ Å©±â¸¦ °¡Á®¿È (·ÎÄÃ -> uvw º¯È¯¿ë)
+    // ì›ë˜ ë³¼ë¥¨ì˜ í¬ê¸°ë¥¼ ê°€ì ¸ì˜´ (ë¡œì»¬ -> uvw ë³€í™˜ìš©)
     glm::vec3 volMin = vol->getLocalMin();
     glm::vec3 volMax = vol->getLocalMax();
     glm::vec3 range = volMax - volMin;
 
-    // 0À¸·Î ³ª´©±â ¹æÁö (range°¡ ³Ê¹« ÀÛÀ¸¸é ³ª´°¼À¿¡¼­ ¿À·ù³²)
+    // 0ìœ¼ë¡œ ë‚˜ëˆ„ê¸° ë°©ì§€ (rangeê°€ ë„ˆë¬´ ì‘ìœ¼ë©´ ë‚˜ëˆ—ì…ˆì—ì„œ ì˜¤ë¥˜ë‚¨)
     if (range.x < 0.0001f || range.y < 0.0001f || range.z < 0.0001f) {
         return 1.0f;
     }
 
-    // UVW ÁÂÇ¥ °è»êÇÏ¸é °¢ x, y, z°¡ ±âÁ¸ ·ÎÄÃ ÁÂÇ¥ÀÇ ¹üÀ§¸¦ [0,1]·Î Á¤±ÔÈ­½ÃÄÑÁÜ
+    // UVW ì¢Œí‘œ ê³„ì‚°í•˜ë©´ ê° x, y, zê°€ ê¸°ì¡´ ë¡œì»¬ ì¢Œí‘œì˜ ë²”ìœ„ë¥¼ [0,1]ë¡œ ì •ê·œí™”ì‹œì¼œì¤Œ
     glm::vec3 uvw = (localPos - volMin) / range;
 
-    // ¹üÀ§ ¹ÛÀÌ¸é °æ°è±îÁöÀÇ °Å¸®¸¦ ´õÇØ¼­ ¹İÈ¯
+    // ë²”ìœ„ ë°–ì´ë©´ ê²½ê³„ê¹Œì§€ì˜ ê±°ë¦¬ë¥¼ ë”í•´ì„œ ë°˜í™˜
     float outsideDist = 0.0f;
 
     if (uvw.x < 0.0f || uvw.x > 1.0f ||
         uvw.y < 0.0f || uvw.y > 1.0f ||
         uvw.z < 0.0f || uvw.z > 1.0f)
     {
-        // °æ°è±îÁöÀÇ °Å¸® °è»ê
+        // ê²½ê³„ê¹Œì§€ì˜ ê±°ë¦¬ ê³„ì‚°
         glm::vec3 clamped = glm::clamp(uvw, glm::vec3(0.0f), glm::vec3(1.0f));
-        glm::vec3 diff = (uvw - clamped) * range;  // ¿ùµå ´ÜÀ§·Î º¯È¯
+        glm::vec3 diff = (uvw - clamped) * range;  // ì›”ë“œ ë‹¨ìœ„ë¡œ ë³€í™˜
         outsideDist = glm::length(diff);
 
         uvw = clamped;
@@ -293,7 +288,7 @@ float DgBoolean::sampleLocalSDF(DgVolume* vol, const glm::vec3& localPos)
 
 float DgBoolean::resampleSDF(DgVolume* vol, const glm::mat4& invModel, const glm::vec3& worldPos)
 {
-    // »õ·Î¿î ¹Ù¿îµù ¹Ú½ºÀÇ ¿ùµå ÁÂÇ¥ ¡æ ·ÎÄÃÁÂÇ¥
+    // ìƒˆë¡œìš´ ë°”ìš´ë”© ë°•ìŠ¤ì˜ ì›”ë“œ ì¢Œí‘œ â†’ ë¡œì»¬ì¢Œí‘œ
     glm::vec3 localPos = glm::vec3(invModel * glm::vec4(worldPos, 1.0f));
 
     return sampleLocalSDF(vol, localPos);
@@ -303,12 +298,12 @@ float DgBoolean::trilinearInterpolate(const float* data,
     int dimX, int dimY, int dimZ,
     const glm::vec3& uvw)
 {
-	// UVW ÁÂÇ¥¸¦ °İÀÚ ÀÎµ¦½º·Î º¯È¯
+	// UVW ì¢Œí‘œë¥¼ ê²©ì ì¸ë±ìŠ¤ë¡œ ë³€í™˜
     float fx = uvw.x * (dimX - 1);
     float fy = uvw.y * (dimY - 1);
     float fz = uvw.z * (dimZ - 1);
 
-    //ÁÖº¯ 8°³ °İÀÚÁ¡ÀÇ Á¤¼ö ÀÎµ¦½º Ã£±â
+    //ì£¼ë³€ 8ê°œ ê²©ìì ì˜ ì •ìˆ˜ ì¸ë±ìŠ¤ ì°¾ê¸°
     int x0 = std::max(0, std::min((int)std::floor(fx), dimX - 1));
     int y0 = std::max(0, std::min((int)std::floor(fy), dimY - 1));
     int z0 = std::max(0, std::min((int)std::floor(fz), dimZ - 1));
@@ -317,12 +312,12 @@ float DgBoolean::trilinearInterpolate(const float* data,
     int y1 = std::min(y0 + 1, dimY - 1);
     int z1 = std::min(z0 + 1, dimZ - 1);
 
-    //º¸°£ °¡ÁßÄ¡ °è»ê
+    //ë³´ê°„ ê°€ì¤‘ì¹˜ ê³„ì‚°
     float tx = fx - std::floor(fx);
     float ty = fy - std::floor(fy);
     float tz = fz - std::floor(fz);
 
-	// 8°³ °İÀÚÁ¡ÀÇ °ª °¡Á®¿À±â
+	// 8ê°œ ê²©ìì ì˜ ê°’ ê°€ì ¸ì˜¤ê¸°
     int sliceXY = dimX * dimY;
 
     float c000 = data[x0 + y0 * dimX + z0 * sliceXY];
@@ -334,16 +329,16 @@ float DgBoolean::trilinearInterpolate(const float* data,
     float c011 = data[x0 + y1 * dimX + z1 * sliceXY];
     float c111 = data[x1 + y1 * dimX + z1 * sliceXY];
 
-    // XÃà º¸°£ (8°³ ¡æ 4°³)
+    // Xì¶• ë³´ê°„ (8ê°œ â†’ 4ê°œ)
     float c00 = c000 * (1 - tx) + c100 * tx;
     float c01 = c001 * (1 - tx) + c101 * tx;
     float c10 = c010 * (1 - tx) + c110 * tx;
     float c11 = c011 * (1 - tx) + c111 * tx;
 
-    // YÃà º¸°£ (4°³ ¡æ 2°³)
+    // Yì¶• ë³´ê°„ (4ê°œ â†’ 2ê°œ)
     float c0 = c00 * (1 - ty) + c10 * ty;
     float c1 = c01 * (1 - ty) + c11 * ty;
 
-    // ZÃà º¸°£ (2°³ ¡æ 1°³)
+    // Zì¶• ë³´ê°„ (2ê°œ â†’ 1ê°œ)
     return c0 * (1 - tz) + c1 * tz;
 }

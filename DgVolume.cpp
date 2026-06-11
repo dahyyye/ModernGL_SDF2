@@ -329,7 +329,8 @@ bool DgVolume::saveToVTI(const char* filename)
 }
 
 DgVolume* DgVolume::createResultVolume(const std::string& name,
-	int resolution, const glm::vec3& minPos, const glm::vec3& maxPos)
+	int dimX, int dimY, int dimZ, float cellSize,
+	const glm::vec3& minPos, const glm::vec3& maxPos)
 {
 	DgVolume* vol = new DgVolume();
 	vol->mName = name;
@@ -337,18 +338,12 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
 	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
 
-	glm::vec3 range = maxPos - minPos;
+	// 호출자가 계산한 dim을 그대로 사용 (내부 재계산 없음)
+	vol->mDim[0] = dimX;
+	vol->mDim[1] = dimY;
+	vol->mDim[2] = dimZ;
 
-	// 가장 긴 축을 resolution으로 나눠 정육면체 voxel 크기(cellSize) 결정
-	float maxRange = std::max({ range.x, range.y, range.z });
-	float cellSize = maxRange / (resolution - 1);
-
-	// 각 축의 dim은 cellSize 기준으로 결정 (최소 2 보장)
-	vol->mDim[0] = std::max(2, (int)std::round(range.x / cellSize) + 1);
-	vol->mDim[1] = std::max(2, (int)std::round(range.y / cellSize) + 1);
-	vol->mDim[2] = std::max(2, (int)std::round(range.z / cellSize) + 1);
-
-	// 세 축 모두 동일한 cellSize (isotropic voxel)
+	// isotropic cellSize 기반 spacing (세 축 동일)
 	vol->mSpacing[0] = cellSize;
 	vol->mSpacing[1] = cellSize;
 	vol->mSpacing[2] = cellSize;

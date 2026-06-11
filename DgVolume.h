@@ -172,8 +172,20 @@ public:
 		mRotation = glm::normalize(mRotation);  // 누적 오차 방지
 	}
 
+	static void calcIsotropicDim(const glm::vec3& range, int resolution,
+		int& dimX, int& dimY, int& dimZ, float& cellSize)
+	{
+		// 가장 긴 축을 resolution으로 나눠 정육면체 voxel 크기(cellSize) 결정
+		float maxRange = std::max({ range.x, range.y, range.z });
+		cellSize = maxRange / (resolution - 1);
+		dimX = std::max(2, (int)std::round(range.x / cellSize) + 1);
+		dimY = std::max(2, (int)std::round(range.y / cellSize) + 1);
+		dimZ = std::max(2, (int)std::round(range.z / cellSize) + 1);
+	}
+
 	static DgVolume* createResultVolume(const std::string& name,
-		int resolution, const glm::vec3& minPos, const glm::vec3& maxPos);
+		int dimX, int dimY, int dimZ, float cellSize,
+		const glm::vec3& minPos, const glm::vec3& maxPos);
 
 	void getWorldAABB(glm::vec3& outMin, glm::vec3& outMax) const;
 private:
