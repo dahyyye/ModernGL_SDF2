@@ -773,7 +773,9 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader¿ë
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cppÀÇ SDF º¼·ý ·»´õ¸µ ºÎºÐ¿¡ Ãß°¡
-			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.388f, 0.816f, 0.804f);   // º¼·ý ±âº» »ö»ó (È¸»ö : 0.6 0.6 0.6)
+			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.255f, 0.412f, 0.882);   // º¼·ý ±âº» »ö»ó (È¸»ö : 0.6 0.6 0.6)
+			// 0.980f, 0.522f, 0.549f ¿¬»¡°­
+			//	0.388f, 0.816f, 0.804f Ã»·Ï
 			// 0.255f, 0.412f, 0.882 ÆÄ¶û
 			// 0.467f, 1.000f, 0.522f Â¸ÇÑ ¿¬µÎ;
 			// 0.537f, 0.886f, 0.780f ¹ÎÆ®

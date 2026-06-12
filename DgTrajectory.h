@@ -68,6 +68,30 @@ public:
             + (-k00 + 3.0f * k0 - 3.0f * k1 + k2) * lt3);      // 3차항, 변곡을 만듦
     }
 
+    static glm::vec3 catmullRomEvalScale(const std::vector<DgTrajectoryFrame>& kfs, int seg, float lt)
+    {
+        int N = (int)kfs.size();
+
+        glm::vec3 k00 = (seg == 0)
+            ? (2.0f * kfs[0].scale - kfs[1].scale)
+            : kfs[seg - 1].scale;
+
+        glm::vec3 k0 = kfs[seg].scale;
+        glm::vec3 k1 = kfs[seg + 1].scale;
+
+        glm::vec3 k2 = (seg + 2 < N)
+            ? kfs[seg + 2].scale
+            : (2.0f * kfs[N - 1].scale - kfs[N - 2].scale);
+
+        float lt2 = lt * lt;
+        float lt3 = lt2 * lt;
+
+        return 0.5f * ((2.0f * k0)
+            + (-k00 + k1) * lt
+            + (2.0f * k00 - 5.0f * k0 + 4.0f * k1 - k2) * lt2
+            + (-k00 + 3.0f * k0 - 3.0f * k1 + k2) * lt3);
+    }
+
     /*!
      *  \brief  t (0~1) 에서의 변환 행렬 반환
      *  \param  t   0~1 범위의 궤적 파라미터
@@ -92,7 +116,7 @@ public:
         glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
         
         // scale lerp 보간 
-        glm::vec3 scl = glm::mix(keyframes[seg].scale, keyframes[seg + 1].scale, lt);
+        glm::vec3 scl = catmullRomEvalScale(keyframes, seg, lt);
 
         // 변환 행렬 반환: T = Trans * Rot * Scale
         return glm::translate(glm::mat4(1.0f), pos)
@@ -162,7 +186,7 @@ public:
             glm::quat rot = glm::slerp(keyframes[seg].rotation, keyframes[seg + 1].rotation, lt);
 
             // scale lerp 보간
-            glm::vec3 scl = glm::mix(keyframes[seg].scale, keyframes[seg + 1].scale, lt);
+            glm::vec3 scl = catmullRomEvalScale(keyframes, seg, lt);
 
             frames.emplace_back(pos, rot, scl);
         }
