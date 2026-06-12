@@ -773,7 +773,7 @@ void DgScene::renderScene()
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uProj"), 1, GL_FALSE, glm::value_ptr(projMat));  // fragment shader용
 			glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "uModelInverse"), 1, GL_FALSE, glm::value_ptr(modelInverse));
 			glUniform1f(glGetUniformLocation(shaderProgram, "uOffset"), pVolume->mOffset);		// DgScene.cpp의 SDF 볼륨 렌더링 부분에 추가
-			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.255f, 0.412f, 0.882f);   // 볼륨 기본 색상 (회색 : 0.6 0.6 0.6)
+			glUniform3f(glGetUniformLocation(shaderProgram, "uBaseColor"), 0.388f, 0.816f, 0.804f);   // 볼륨 기본 색상 (회색 : 0.6 0.6 0.6)
 			// 0.255f, 0.412f, 0.882 파랑
 			// 0.467f, 1.000f, 0.522f 쨍한 연두;
 			// 0.537f, 0.886f, 0.780f 민트
