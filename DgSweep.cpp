@@ -13,6 +13,39 @@ GLuint DgSweep::sBrentComputeShader = 0;
 GLuint DgSweep::sBrentTransformSSBO = 0;
 bool DgSweep::sBrentInitialized = false;
 
+void DgSweep::computeSweptAABB(
+    DgVolume* brush,
+    const DgTrajectory& trajectory,
+    int samplingSteps,
+    glm::vec3& outMin,
+    glm::vec3& outMax)
+{
+    glm::vec3 localMin = brush->getLocalMin();
+    glm::vec3 localMax = brush->getLocalMax();
+    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+    float radius = glm::length(localMax - localCenter);
+
+    outMin = glm::vec3(FLT_MAX);
+    outMax = glm::vec3(-FLT_MAX);
+
+    for (int step = 0; step < samplingSteps; ++step)
+    {
+        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
+        glm::mat4 transform = trajectory.getTransformAt(t);
+        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
+        outMin = glm::min(outMin, worldCenter);
+        outMax = glm::max(outMax, worldCenter);
+    }
+
+    float maxScaleFactor = 1.0f;
+    for (const auto& kf : trajectory.keyframes) {
+        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
+        maxScaleFactor = std::max(maxScaleFactor, s);
+    }
+    outMin -= glm::vec3(radius * maxScaleFactor);
+    outMax += glm::vec3(radius * maxScaleFactor);
+}
+
 // Brent's method로 선분 위 SDF 최소값 탐색
 static float brentMinimize(DgVolume* brush,
     const glm::vec3& p0, const glm::vec3& p1,
@@ -137,31 +170,16 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
 {
     clock_t start = clock();
 
-    glm::vec3 localMin = brush->getLocalMin();
-    glm::vec3 localMax = brush->getLocalMax();
-    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
+    glm::vec3 combinedMin, combinedMax;
+    computeSweptAABB(brush, trajectory, samplingSteps, combinedMin, combinedMax);
 
+    // invTransforms는 별도로 계산 (헬퍼에서 처리 안 함)
     std::vector<glm::mat4> invTransforms(samplingSteps);
-
-    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-        combinedMin = glm::min(combinedMin, worldCenter);
-        combinedMax = glm::max(combinedMax, worldCenter);
-        invTransforms[step] = glm::inverse(transform);
+        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
     }
-
-    float radius = glm::length(localMax - localCenter);
-    float maxScaleFactor = 1.0f;
-    for (const auto& kf : trajectory.keyframes) {
-        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
-        maxScaleFactor = std::max(maxScaleFactor, s);
-    }
-    combinedMin -= glm::vec3(radius * maxScaleFactor);
-    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
@@ -252,28 +270,11 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     auto cpuStart = std::chrono::high_resolution_clock::now();
 
     // 바운딩 박스 계산
+    glm::vec3 combinedMin, combinedMax;
+    computeSweptAABB(brush, trajectory, samplingSteps, combinedMin, combinedMax);
+
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
-    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
-    float radius = glm::length(localMax - localCenter);
-
-    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
-    for (int step = 0; step < samplingSteps; ++step)
-    {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-        combinedMin = glm::min(combinedMin, worldCenter);
-        combinedMax = glm::max(combinedMax, worldCenter);
-    }
-
-    float maxScaleFactor = 1.0f;
-    for (const auto& kf : trajectory.keyframes) {
-        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
-        maxScaleFactor = std::max(maxScaleFactor, s);
-    }
-    combinedMin -= glm::vec3(radius * maxScaleFactor);
-    combinedMax += glm::vec3(radius * maxScaleFactor);
 
     // GPU에 넘기기 위한 구조체
     struct GPUKeyFrame {
@@ -417,33 +418,8 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     clock_t start = clock();
 
     // 브러시 로컬 정보
-    glm::vec3 localMin = brush->getLocalMin();
-    glm::vec3 localMax = brush->getLocalMax();
-    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
-    
-    // 궤적 중심점들의 AABB 계산
-    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
-
-    for (int step = 0; step < samplingSteps; ++step)
-    {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-
-        combinedMin = glm::min(combinedMin, worldCenter);
-        combinedMax = glm::max(combinedMax, worldCenter);
-    }
-
-    // 반경만큼 패딩
-    float radius = glm::length(localMax - localCenter);
-
-    float maxScaleFactor = 1.0f;
-    for (const auto& kf : trajectory.keyframes) {
-        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
-        maxScaleFactor = std::max(maxScaleFactor, s);
-    }
-    combinedMin -= glm::vec3(radius * maxScaleFactor);
-    combinedMax += glm::vec3(radius * maxScaleFactor);
+    glm::vec3 combinedMin, combinedMax;
+    computeSweptAABB(brush, trajectory, samplingSteps, combinedMin, combinedMax);
 
     // 결과 볼륨 생성
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
@@ -504,38 +480,17 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     clock_t start = clock();
 
     // 1. 바운딩 박스 계산
+    glm::vec3 combinedMin, combinedMax;
+    computeSweptAABB(brush, trajectory, samplingSteps, combinedMin, combinedMax);
+
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
-    glm::vec3 localCenter = (localMin + localMax) * 0.5f;
-    float radius = glm::length(localMax - localCenter);
 
-    glm::vec3 combinedMin(FLT_MAX), combinedMax(-FLT_MAX);
-
-    for (int step = 0; step < samplingSteps; ++step)
-    {
-        float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        glm::vec3 worldCenter = glm::vec3(transform * glm::vec4(localCenter, 1.0f));
-
-        combinedMin = glm::min(combinedMin, worldCenter);
-        combinedMax = glm::max(combinedMax, worldCenter);
-    }
-
-    float maxScaleFactor = 1.0f;
-    for (const auto& kf : trajectory.keyframes) {
-        float s = std::max({ kf.scale.x, kf.scale.y, kf.scale.z });
-        maxScaleFactor = std::max(maxScaleFactor, s);
-    }
-    combinedMin -= glm::vec3(radius * maxScaleFactor);
-    combinedMax += glm::vec3(radius * maxScaleFactor);
-
-    // 변환 행렬
     std::vector<glm::mat4> invTransforms(samplingSteps);
     for (int step = 0; step < samplingSteps; ++step)
     {
         float t = (samplingSteps > 1) ? (float)step / (samplingSteps - 1) : 0.0f;
-        glm::mat4 transform = trajectory.getTransformAt(t);
-        invTransforms[step] = glm::inverse(transform);
+        invTransforms[step] = glm::inverse(trajectory.getTransformAt(t));
     }
 
     // Compute Shader 실행

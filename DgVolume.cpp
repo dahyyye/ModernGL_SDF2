@@ -39,14 +39,20 @@ DgVolume::DgVolume(DgVolume& cpy)
 
 	mPosition = cpy.mPosition;
 	mRotation = cpy.mRotation;
+	mScale = cpy.mScale;      
+	mSelected = cpy.mSelected;  
 
 	mData = cpy.mData;
-	mTextureID = 0;  // 텍스처는 새로 올려야 하므로 0으로
+	mTextureID = 0;
+	mOffset = cpy.mOffset;
+
 	mIsSweptVolume = cpy.mIsSweptVolume;
 	mSweepResolution = cpy.mSweepResolution;
 	mSweepTimeSteps = cpy.mSweepTimeSteps;
 	mSweepMethod = cpy.mSweepMethod;
-	mOffset = cpy.mOffset;
+
+	mSourceTrajectory = nullptr; 
+	mBrushVolume = nullptr;  
 }
 
 DgVolume::~DgVolume()

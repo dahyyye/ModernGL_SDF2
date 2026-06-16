@@ -38,4 +38,12 @@ private:
         int resolution, int timeSteps);
     static DgVolume* generateGPU(DgVolume* brush, const DgTrajectory& trajectory,
         int resolution, int timeSteps); 
+
+    static void computeSweptAABB(
+        DgVolume* brush,
+        const DgTrajectory& trajectory,
+        int samplingSteps,
+        glm::vec3& outMin,
+        glm::vec3& outMax
+    );
 };
