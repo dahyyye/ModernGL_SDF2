@@ -31,24 +31,9 @@ CollisionResult DgCollision::detectCollision(DgVolume* sv, DgMesh* obstacle)
     // SV 월드 AABB 계산
     glm::vec3 svLocalMin = sv->getLocalMin();
     glm::vec3 svLocalMax = sv->getLocalMax();
-    glm::mat4 modelMat = sv->getModelMatrix();
 
-    glm::vec3 svWorldMin(FLT_MAX), svWorldMax(-FLT_MAX);
-    glm::vec3 corners[8] = {
-        {svLocalMin.x, svLocalMin.y, svLocalMin.z},
-        {svLocalMax.x, svLocalMin.y, svLocalMin.z},
-        {svLocalMax.x, svLocalMax.y, svLocalMin.z},
-        {svLocalMin.x, svLocalMax.y, svLocalMin.z},
-        {svLocalMin.x, svLocalMin.y, svLocalMax.z},
-        {svLocalMax.x, svLocalMin.y, svLocalMax.z},
-        {svLocalMax.x, svLocalMax.y, svLocalMax.z},
-        {svLocalMin.x, svLocalMax.y, svLocalMax.z},
-    };
-    for (auto& c : corners) {
-        glm::vec3 wc = glm::vec3(modelMat * glm::vec4(c, 1.0f));
-        svWorldMin = glm::min(svWorldMin, wc);
-        svWorldMax = glm::max(svWorldMax, wc);
-    }
+    glm::vec3 svWorldMin, svWorldMax;
+    sv->getWorldAABB(svWorldMin, svWorldMax);
 
     // 장애물 AABB (이미 월드 좌표)
     glm::vec3 obsMin(FLT_MAX), obsMax(-FLT_MAX);
