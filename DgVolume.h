@@ -80,12 +80,6 @@ public:
 	/*! \brief 입력 메쉬의 격자 공간을 정의(AABB) */
 	void setGridSpace(const DgMesh& mesh, float padding = 0.1f);
 
-	/*! \brief 격자 샘플에 대하여 부호거리 값을 mData에 저장 */
-	void computeSDF();
-
-	/*! \brief 메쉬와 점 p 간의 최단 거리와 그 거리를 갖는 삼각형을 반환 */
-	std::pair<DgFace*, float> findClosestDistanceToMesh(DgMesh* mesh, const glm::vec3& p);
-
 	/*! \brief VTI 로드 함수 */
 	bool loadFromVTI(const char* filename);
 

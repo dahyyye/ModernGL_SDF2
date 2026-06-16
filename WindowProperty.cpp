@@ -368,17 +368,6 @@ void OpenProperty() {
 
 		ImGui::Separator();
 
-		// 전후 비교없는 Fast Sweeping 
-		/*if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
-		{
-			DgVolume* brush = DgScene::instance().mDrawingVolume;
-			if (brush)
-			{
-				DgSweep::fastSweeping(brush);
-				std::cout << "Fast Sweeping 적용 (Drawing Volume)" << std::endl;
-			}
-		}*/
-
 		if (ImGui::Button("Fast Sweeping", ImVec2(-1, 0)))
 		{
 			DgVolume* target = nullptr;
