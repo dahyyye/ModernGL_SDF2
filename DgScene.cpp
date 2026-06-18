@@ -615,7 +615,7 @@ void DgScene::renderScene()
 	mFrameBuf.bind();
 	{
 		glViewport(0, 0, (GLsizei)mSceneSize[0], (GLsizei)mSceneSize[1]);
-		glClearColor(1.0, 1.0, 1.0, 1.0);
+		glClearColor(0.9, 0.9, 0.9, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);				
 
 		// 투영 변환 행렬 설정
@@ -1016,8 +1016,11 @@ void DgScene::renderFps()
 			ImGui::Text("Selected: %d volume(s)", selectedCount);
 		}
 
-		ImGui::Text("Edit Mode: %s", mEditMode == EditMode::Move ? "Move" : "Select");
-
+		const char* modeName = "Select";
+		if (mEditMode == EditMode::Move)   modeName = "Move";
+		else if (mEditMode == EditMode::Rotate) modeName = "Rotate";
+		else if (mEditMode == EditMode::Scale)  modeName = "Scale";
+		ImGui::Text("Edit Mode: %s", modeName);
 		if (ImGui::BeginPopupContextWindow())
 		{
 			if (ImGui::MenuItem("Custom", NULL, corner == -1)) corner = -1;
