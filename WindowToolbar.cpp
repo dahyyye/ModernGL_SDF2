@@ -69,15 +69,15 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Torus", DgUtil::toImTextureID(icon_tex_id[3]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Torus_128.vti", "Torus");
+		loadVolumeVTI(".\\res\\volume\\(mini)Torus_256.vti", "Torus");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cylinder", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_128.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\Cylinder_256.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Capsule", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Capsule_128.vti", "Capsule");
+		loadVolumeVTI(".\\res\\volume\\Capsule_256.vti", "Capsule");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("QuadPramid", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
@@ -85,12 +85,12 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Cone_128.vti", "Cone");
+		loadVolumeVTI(".\\res\\volume\\Cone_256.vti", "Cone");
 		//loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Bunny", DgUtil::toImTextureID(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_128.vti", "Bunny");
+		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_256.vti", "Bunny");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("knots", DgUtil::toImTextureID(icon_tex_id[9]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
