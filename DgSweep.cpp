@@ -13,42 +13,26 @@ GLuint DgSweep::sBrentComputeShader = 0;
 GLuint DgSweep::sBrentTransformSSBO = 0;
 bool DgSweep::sBrentInitialized = false;
 
-// isotropic voxel dim 계산 헬퍼
-// 가장 긴 축을 resolution으로 나눠 cellSize를 결정하고 각 축 dim을 반환
-static void calcIsotropicDim(const glm::vec3& range, int resolution,
-    int& dimX, int& dimY, int& dimZ, float& cellSize)
-{
-    float maxRange = std::max({ range.x, range.y, range.z });
-    cellSize = maxRange / (resolution - 1);
-    dimX = std::max(2, (int)std::round(range.x / cellSize) + 1);
-    dimY = std::max(2, (int)std::round(range.y / cellSize) + 1);
-    dimZ = std::max(2, (int)std::round(range.z / cellSize) + 1);
-}
-
 // Brent's method로 선분 위 SDF 최소값 탐색
 static float brentMinimize(DgVolume* brush,
     const glm::vec3& p0, const glm::vec3& p1,
     float& outAlpha,
     int maxIter = 20, float tol = 1e-4f)
 {
-    // SDF 평가 람다
     auto f = [&](float alpha) -> float {
         return DgBoolean::sampleLocalSDF(brush, glm::mix(p0, p1, alpha));
         };
 
     float a = 0.0f, b = 1.0f;
+    const float golden = 0.381966f;
 
-    // Golden ratio
-    const float golden = 0.381966f;  // (3 - sqrt(5)) / 2
-
-    // 초기 내부점: 구간의 golden section 위치
     float x = a + golden * (b - a);
     float w = x, v = x;
     float fx = f(x);
     float fw = fx, fv = fx;
 
-    float d = 0.0f;   // 이전 스텝 크기
-    float e = 0.0f;   // 그 이전 스텝 크기
+    float d = 0.0f;
+    float e = 0.0f;
 
     for (int iter = 0; iter < maxIter; ++iter)
     {
@@ -56,17 +40,14 @@ static float brentMinimize(DgVolume* brush,
         float tol1 = tol * std::abs(x) + 1e-10f;
         float tol2 = 2.0f * tol1;
 
-        // 수렴 확인
         if (std::abs(x - mid) <= (tol2 - 0.5f * (b - a)))
             break;
 
         bool useParabolic = false;
         float u = 0.0f;
 
-        // 포물선 보간 시도
         if (std::abs(e) > tol1)
         {
-            // x, w, v 세 점으로 포물선 피팅
             float r = (x - w) * (fx - fv);
             float q = (x - v) * (fx - fw);
             float p = (x - v) * q - (x - w) * r;
@@ -78,16 +59,13 @@ static float brentMinimize(DgVolume* brush,
             float etemp = e;
             e = d;
 
-            // 포물선 스텝이 유효한지 확인
             if (std::abs(p) < std::abs(0.5f * q * etemp)
                 && p > q * (a - x)
                 && p < q * (b - x))
             {
-                // 포물선 스텝 채택
                 d = p / q;
                 u = x + d;
 
-                // 경계에 너무 가까우면 보정
                 if ((u - a) < tol2 || (b - u) < tol2)
                     d = (x < mid) ? tol1 : -tol1;
 
@@ -95,23 +73,19 @@ static float brentMinimize(DgVolume* brush,
             }
         }
 
-        // 포물선 실패 → Golden Section
         if (!useParabolic)
         {
-            // x(0.382) < mid(0.5)? → YES → 오른쪽이 넓음
-            e = (x < mid) ? (b - x) : (a - x); // e = 1 - 0.382 = 0.618
-			d = golden * e;                    // d = 0.382 * 0.618 = 0.236
+            e = (x < mid) ? (b - x) : (a - x);
+            d = golden * e;
         }
 
-        // 새 평가점
         if (std::abs(d) >= tol1)
-            u = x + d;                         // u = 0.382 + 0.236 = 0.618
+            u = x + d;
         else
             u = x + ((d > 0.0f) ? tol1 : -tol1);
 
         float fu = f(u);
 
-        // 구간 및 최적점 업데이트
         if (fu <= fx)
         {
             if (u < x) b = x;
@@ -175,16 +149,9 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    glm::vec3 range = combinedMax - combinedMin;
-    int dimX, dimY, dimZ; float cellSize;
-    DgVolume::calcIsotropicDim(range, resolution, dimX, dimY, dimZ, cellSize);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent)", resolution, combinedMin, combinedMax);
 
-    glm::vec3 actualMax = combinedMin + glm::vec3(
-        (dimX - 1) * cellSize, (dimY - 1) * cellSize, (dimZ - 1) * cellSize);
-    DgVolume* result = DgVolume::createResultVolume(
-        "Swept Volume (Brent)", dimX, dimY, dimZ, cellSize, combinedMin, actualMax);
-
-    int totalSize = dimX * dimY * dimZ;
+    int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
 
     int skipCount = 0;
@@ -192,11 +159,11 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
 
     for (int seg = 0; seg < samplingSteps - 1; ++seg)
     {
-        for (int k = 0; k < dimZ; ++k)
+        for (int k = 0; k < resolution; ++k)
         {
-            for (int j = 0; j < dimY; ++j)
+            for (int j = 0; j < resolution; ++j)
             {
-                for (int i = 0; i < dimX; ++i)
+                for (int i = 0; i < resolution; ++i)
                 {
                     glm::vec3 worldPos(
                         combinedMin.x + i * result->mSpacing[0],
@@ -204,17 +171,10 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
                         combinedMin.z + k * result->mSpacing[2]
                     );
 
-                    int index = i + j * dimX + k * dimX * dimY;
+                    int index = i + j * resolution + k * resolution * resolution;
 
                     glm::vec3 p0 = glm::vec3(invTransforms[seg] * glm::vec4(worldPos, 1.0f));
                     glm::vec3 p1 = glm::vec3(invTransforms[seg + 1] * glm::vec4(worldPos, 1.0f));
-
-                    if (k == 17 && i >= 74 && i <= 78 && j >= 2 && j <= 6 && seg >= 40 && seg <= 45) {
-                        float sdf0 = DgBoolean::sampleLocalSDF(brush, p0);
-                        std::cout << "[DBG] seg=" << seg << " j=" << j << " i=" << i
-                            << " p0=(" << p0.x << "," << p0.y << "," << p0.z << ")"
-                            << " sdf=" << sdf0 << std::endl;
-                    }
 
                     float sdf0 = DgBoolean::sampleLocalSDF(brush, p0);
                     float sdf1 = DgBoolean::sampleLocalSDF(brush, p1);
@@ -244,7 +204,7 @@ DgVolume* DgSweep::generateBrentCPU(DgVolume* brush,
     clock_t finish = clock();
     double duration = (double)(finish - start) / CLOCKS_PER_SEC;
 
-    int totalVoxelSeg = (samplingSteps - 1) * dimX * dimY * dimZ;
+    int totalVoxelSeg = (samplingSteps - 1) * resolution * resolution * resolution;
     std::cout << "Brent Swept Volume: " << duration << " sec" << std::endl;
     std::cout << "  Skipped (Lipschitz): " << skipCount
         << " (" << (100.0 * skipCount / totalVoxelSeg) << "%)" << std::endl;
@@ -265,11 +225,6 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     auto cpuStart = std::chrono::high_resolution_clock::now();
 
-    std::cout << "[BRUSH] dim=" << brush->mDim[0] << "x" << brush->mDim[1] << "x" << brush->mDim[2]
-        << " min=" << brush->getLocalMin().x << "," << brush->getLocalMin().y << "," << brush->getLocalMin().z
-        << " max=" << brush->getLocalMax().x << "," << brush->getLocalMax().y << "," << brush->getLocalMax().z
-
-        << std::endl;
     glm::vec3 localMin = brush->getLocalMin();
     glm::vec3 localMax = brush->getLocalMax();
     glm::vec3 localCenter = (localMin + localMax) * 0.5f;
@@ -292,17 +247,6 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     }
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
-
-    glm::vec3 range = combinedMax - combinedMin;
-    int dimX, dimY, dimZ; float cellSize;
-    DgVolume::calcIsotropicDim(range, resolution, dimX, dimY, dimZ, cellSize);
-
-    glm::vec3 actualMax = combinedMin + glm::vec3(
-        (dimX - 1) * cellSize, (dimY - 1) * cellSize, (dimZ - 1) * cellSize);
-
-    std::cout << "[DEBUG] combinedMin=" << combinedMin.x << "," << combinedMin.y << "," << combinedMin.z
-        << " actualMax=" << actualMax.x << "," << actualMax.y << "," << actualMax.z
-        << " cellSize=" << cellSize << std::endl;
 
     struct GPUKeyFrame {
         glm::vec4 position;
@@ -335,7 +279,7 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glBindTexture(GL_TEXTURE_3D, resultTexture);
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-        dimX, dimY, dimZ,
+        resolution, resolution, resolution,
         0, GL_RED, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -353,9 +297,9 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uVolumeMax"),
-        actualMax.x, actualMax.y, actualMax.z);
+        combinedMax.x, combinedMax.y, combinedMax.z);
     glUniform3i(glGetUniformLocation(sBrentComputeShader, "uResolution"),
-        dimX, dimY, dimZ);
+        resolution, resolution, resolution);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMin"),
         localMin.x, localMin.y, localMin.z);
     glUniform3f(glGetUniformLocation(sBrentComputeShader, "uBrushMax"),
@@ -364,18 +308,15 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
 
-    int numGroupsX = (dimX + 7) / 8;
-    int numGroupsY = (dimY + 7) / 8;
-    int numGroupsZ = (dimZ + 7) / 8;
-    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
+    int numGroups = (resolution + 7) / 8;
+    glDispatchCompute(numGroups, numGroups, numGroups);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    DgVolume* result = DgVolume::createResultVolume(
-        "Swept Volume (Brent GPU)", dimX, dimY, dimZ, cellSize, combinedMin, actualMax);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
 
     if (!skipReadback) {
-        int totalSize = dimX * dimY * dimZ;
+        int totalSize = resolution * resolution * resolution;
         result->mData.resize(totalSize);
         glBindTexture(GL_TEXTURE_3D, resultTexture);
         glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
@@ -383,57 +324,12 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
 
     result->mTextureID = resultTexture;
 
-    if (!skipReadback) {
-        auto dumpSlice = [&](const std::string& path, int axis, int sliceIdx) {
-            std::ofstream f(path);
-            if (!f.is_open()) return;
-            f << "dim: " << dimX << " x " << dimY << " x " << dimZ << "\n";
-            f << "axis=" << axis << " slice=" << sliceIdx << "\n\n";
-            if (axis == 0) { // YZ slice (X=sliceIdx)
-                for (int z = 0; z < dimZ; ++z) {
-                    for (int y = 0; y < dimY; ++y) {
-                        int idx = sliceIdx + y * dimX + z * dimX * dimY;
-                        f << std::fixed << std::setprecision(3) << result->mData[idx] << "\t";
-                    }
-                    f << "\n";
-                }
-            }
-            else if (axis == 1) { // XZ slice (Y=sliceIdx)
-                for (int z = 0; z < dimZ; ++z) {
-                    for (int x = 0; x < dimX; ++x) {
-                        int idx = x + sliceIdx * dimX + z * dimX * dimY;
-                        f << std::fixed << std::setprecision(3) << result->mData[idx] << "\t";
-                    }
-                    f << "\n";
-                }
-            }
-            else { // XY slice (Z=sliceIdx)
-                for (int y = 0; y < dimY; ++y) {
-                    for (int x = 0; x < dimX; ++x) {
-                        int idx = x + y * dimX + sliceIdx * dimX * dimY;
-                        f << std::fixed << std::setprecision(3) << result->mData[idx] << "\t";
-                    }
-                    f << "\n";
-                }
-            }
-            f.close();
-            std::cout << "[Dump] " << path << std::endl;
-        };
-
-        dumpSlice("C:\\Users\\user\\Documents\\GitHub\\ModernGL_SDF2\\sdf_z15.txt", 2, 15);
-        dumpSlice("C:\\Users\\user\\Documents\\GitHub\\ModernGL_SDF2\\sdf_z16.txt", 2, 16);
-        dumpSlice("C:\\Users\\user\\Documents\\GitHub\\ModernGL_SDF2\\sdf_z17.txt", 2, 17);
-        dumpSlice("C:\\Users\\user\\Documents\\GitHub\\ModernGL_SDF2\\sdf_z18.txt", 2, 18);
-        dumpSlice("C:\\Users\\user\\Documents\\GitHub\\ModernGL_SDF2\\sdf_z19.txt", 2, 19);
-    }
-
     glFinish();
     auto cpuEnd = std::chrono::high_resolution_clock::now();
     double ms = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
     std::cout << "[BrentGPU] "
         << (skipReadback ? "Preview" : "Full")
         << " | res=" << resolution
-        << " | dimX=" << dimX << " dimY=" << dimY << " dimZ=" << dimZ
         << " | steps=" << samplingSteps
         << " | time=" << ms << " ms" << std::endl;
 
@@ -489,16 +385,9 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    glm::vec3 range = combinedMax - combinedMin;
-    int dimX, dimY, dimZ; float cellSize;
-    DgVolume::calcIsotropicDim(range, resolution, dimX, dimY, dimZ, cellSize);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (CPU)", resolution, combinedMin, combinedMax);
 
-    glm::vec3 actualMax = combinedMin + glm::vec3(
-        (dimX - 1) * cellSize, (dimY - 1) * cellSize, (dimZ - 1) * cellSize);
-    DgVolume* result = DgVolume::createResultVolume(
-        "Swept Volume (CPU)", dimX, dimY, dimZ, cellSize, combinedMin, actualMax);
-
-    int totalSize = dimX * dimY * dimZ;
+    int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize, FLT_MAX);
 
     for (int step = 0; step < samplingSteps; ++step)
@@ -507,11 +396,11 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
         glm::mat4 transform = trajectory.getTransformAt(t);
         glm::mat4 invTransform = glm::inverse(transform);
 
-        for (int k = 0; k < dimZ; ++k)
+        for (int k = 0; k < resolution; ++k)
         {
-            for (int j = 0; j < dimY; ++j)
+            for (int j = 0; j < resolution; ++j)
             {
-                for (int i = 0; i < dimX; ++i)
+                for (int i = 0; i < resolution; ++i)
                 {
                     glm::vec3 worldPos(
                         combinedMin.x + i * result->mSpacing[0],
@@ -520,7 +409,7 @@ DgVolume* DgSweep::generateCPU(DgVolume* brush,
                     );
 
                     float sdf = DgBoolean::resampleSDF(brush, invTransform, worldPos);
-                    int index = i + j * dimX + k * dimX * dimY;
+                    int index = i + j * resolution + k * resolution * resolution;
                     result->mData[index] = std::min(result->mData[index], sdf);
                 }
             }
@@ -571,13 +460,6 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     combinedMin -= glm::vec3(radius * maxScaleFactor);
     combinedMax += glm::vec3(radius * maxScaleFactor);
 
-    glm::vec3 range = combinedMax - combinedMin;
-    int dimX, dimY, dimZ; float cellSize;
-    DgVolume::calcIsotropicDim(range, resolution, dimX, dimY, dimZ, cellSize);
-
-    glm::vec3 actualMax = combinedMin + glm::vec3(
-        (dimX - 1) * cellSize, (dimY - 1) * cellSize, (dimZ - 1) * cellSize);
-
     std::vector<glm::mat4> invTransforms(samplingSteps);
     for (int step = 0; step < samplingSteps; ++step)
     {
@@ -600,7 +482,7 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glBindTexture(GL_TEXTURE_3D, resultTexture);
 
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R32F,
-        dimX, dimY, dimZ,
+        resolution, resolution, resolution,
         0, GL_RED, GL_FLOAT, nullptr);
 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -618,26 +500,23 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     glUniform3f(glGetUniformLocation(sComputeShader, "uVolumeMin"),
         combinedMin.x, combinedMin.y, combinedMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uVolumeMax"),
-        actualMax.x, actualMax.y, actualMax.z);
+        combinedMax.x, combinedMax.y, combinedMax.z);
     glUniform3i(glGetUniformLocation(sComputeShader, "uResolution"),
-        dimX, dimY, dimZ);
+        resolution, resolution, resolution);
     glUniform3f(glGetUniformLocation(sComputeShader, "uBrushMin"),
         localMin.x, localMin.y, localMin.z);
     glUniform3f(glGetUniformLocation(sComputeShader, "uBrushMax"),
         localMax.x, localMax.y, localMax.z);
     glUniform1i(glGetUniformLocation(sComputeShader, "uSamplingSteps"), samplingSteps);
 
-    int numGroupsX = (dimX + 7) / 8;
-    int numGroupsY = (dimY + 7) / 8;
-    int numGroupsZ = (dimZ + 7) / 8;
-    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
+    int numGroups = (resolution + 7) / 8;
+    glDispatchCompute(numGroups, numGroups, numGroups);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-    DgVolume* result = DgVolume::createResultVolume(
-        "Swept Volume (GPU)", dimX, dimY, dimZ, cellSize, combinedMin, actualMax);
+    DgVolume* result = DgVolume::createResultVolume("Swept Volume (GPU)", resolution, combinedMin, combinedMax);
 
-    int totalSize = dimX * dimY * dimZ;
+    int totalSize = resolution * resolution * resolution;
     result->mData.resize(totalSize);
     glBindTexture(GL_TEXTURE_3D, resultTexture);
     glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
@@ -657,14 +536,12 @@ bool DgSweep::initializeGPU()
 {
     if (sInitialized) return true;
 
-    // Compute Shader 로드
     sComputeShader = loadComputeShader(".\\shaders\\sweeping.comp");
     if (sComputeShader == 0) {
         std::cerr << "Sweep Compute Shader 초기화 실패" << std::endl;
         return false;
     }
 
-    // SSBO 생성
     glGenBuffers(1, &sTransformSSBO);
 
     sInitialized = true;
@@ -692,7 +569,7 @@ void DgSweep::fastSweeping(DgVolume* vol)
     glm::ivec3 res(vol->mDim[0], vol->mDim[1], vol->mDim[2]);
     float space = (float)vol->mSpacing[0];
     std::vector<float>& grid = vol->mData;
- 
+
     int start[3], end[3], step[3];
     for (int i = 0; i < 8; ++i) {
         step[0] = (i & 1) ? -1 : 1;
@@ -715,14 +592,14 @@ void DgSweep::fastSweeping(DgVolume* vol)
                     float a = (x - step[0] >= 0 && x - step[0] < res.x) ? grid[idx - step[0]] : FLT_MAX;
                     float b = (y - step[1] >= 0 && y - step[1] < res.y) ? grid[idx - (size_t)step[1] * res.x] : FLT_MAX;
                     float c = (z - step[2] >= 0 && z - step[2] < res.z) ? grid[idx - (size_t)step[2] * res.x * res.y] : FLT_MAX;
-                    
+
                     float u_new = grid[idx];
                     float h = space;
-                    
+
                     float v[3] = { a, b, c };
                     std::sort(v, v + 3);
                     float v1 = v[0], v2 = v[1], v3 = v[2];
-                    
+
                     float x_sol = v1 + h;
                     if (x_sol <= v2) {
                         u_new = x_sol;
@@ -743,9 +620,9 @@ void DgSweep::fastSweeping(DgVolume* vol)
             }
         }
     }
- 
+
     vol->createTexture();
- 
+
     std::cout << "[FastSweeping] Done. ("
         << res.x << "x" << res.y << "x" << res.z << ")" << std::endl;
 }

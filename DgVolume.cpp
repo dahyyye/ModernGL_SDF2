@@ -329,24 +329,21 @@ bool DgVolume::saveToVTI(const char* filename)
 }
 
 DgVolume* DgVolume::createResultVolume(const std::string& name,
-	int dimX, int dimY, int dimZ, float cellSize,
-	const glm::vec3& minPos, const glm::vec3& maxPos)
+	int resolution, const glm::vec3& minPos, const glm::vec3& maxPos)
 {
 	DgVolume* vol = new DgVolume();
 	vol->mName = name;
+	vol->mDim[0] = resolution;
+	vol->mDim[1] = resolution;
+	vol->mDim[2] = resolution;
 
 	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
 	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
 
-	// 호출자가 계산한 dim을 그대로 사용 (내부 재계산 없음)
-	vol->mDim[0] = dimX;
-	vol->mDim[1] = dimY;
-	vol->mDim[2] = dimZ;
-
-	// isotropic cellSize 기반 spacing (세 축 동일)
-	vol->mSpacing[0] = cellSize;
-	vol->mSpacing[1] = cellSize;
-	vol->mSpacing[2] = cellSize;
+	glm::vec3 range = maxPos - minPos;
+	vol->mSpacing[0] = range.x / (resolution - 1);
+	vol->mSpacing[1] = range.y / (resolution - 1);
+	vol->mSpacing[2] = range.z / (resolution - 1);
 
 	vol->mMesh = createBoundingBoxMesh(vol->mMin, vol->mMax);
 
