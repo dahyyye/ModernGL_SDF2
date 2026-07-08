@@ -18,7 +18,7 @@ void ShowWindowToolBar(bool* p_open) {
 }
 
 void CreateMesh() {
-	const int NumIcons = 13;
+	const int NumIcons = 14;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\new_scene.png",
@@ -33,7 +33,8 @@ void CreateMesh() {
 		".\\res\\icons\\knots.png",
 		".\\res\\icons\\Paint_roller.png",
 		".\\res\\icons\\floatplane.png",
-		".\\res\\icons\\dog.png"
+		".\\res\\icons\\dog.png",
+		".\\res\\icons\\kitten.png"
 	};
 
 	static GLuint icon_tex_id[NumIcons] = { 0 };
@@ -73,19 +74,19 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cylinder", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\Cylinder_256.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_256.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Capsule", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\Capsule_256.vti", "Capsule");
+		loadVolumeVTI(".\\res\\volume\\(mini)Capsule_256.vti", "Capsule");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("QuadPramid", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti", "QuadPramid");
+		loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_256.vti", "QuadPramid");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\Cone_256.vti", "Cone");
+		loadVolumeVTI(".\\res\\volume\\(mini)Cone_256.vti", "Cone");
 		//loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
 	ImGui::SameLine();
 
@@ -107,5 +108,9 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("dog", DgUtil::toImTextureID(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 		loadVolumeVTI(".\\res\\volume\\dog_2562.vti", "dog");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("kitten", DgUtil::toImTextureID(icon_tex_id[13]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\kitten_128.vti", "kitten");
 	ImGui::SameLine();
 }

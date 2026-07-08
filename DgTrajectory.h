@@ -69,6 +69,41 @@ public:
     }
 
     /*!
+ *  \brief  t-구간 [t0, t1] 안에서 Catmull-Rom 곡선이 chord(직선)로부터
+ *          벗어나는 최대 거리(deviation)를 계산
+ *  \param  t0, t1  전체 트라젝토리 기준 [0,1] 파라미터 구간
+ *  \param  N       구간 내부 샘플 수 (기본 8)
+ *  \return 구간 내 최대 이탈 거리
+ *  \note   GPU의 catmullRomPos(t)와 동일한 seg/lt 계산을 거쳐야
+ *          CPU-GPU 간 위치가 정확히 일치함
+ */
+    float computeSegmentDeviation(float t0, float t1, int N = 8) const
+    {
+        int numSegs = (int)keyframes.size() - 1;
+        if (numSegs <= 0) return 0.0f;
+
+        auto positionAt = [&](float t) -> glm::vec3 {
+            float scaled = glm::clamp(t, 0.0f, 1.0f) * numSegs;
+            int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
+            float lt = scaled - (float)seg;
+            return catmullRomEval(keyframes, seg, lt);
+            };
+
+        glm::vec3 p0 = positionAt(t0);
+        glm::vec3 p1 = positionAt(t1);
+
+        float maxDev = 0.0f;
+        for (int i = 1; i < N; ++i)
+        {
+            float alpha = (float)i / (float)N;
+            glm::vec3 curvePos = positionAt(glm::mix(t0, t1, alpha));
+            glm::vec3 chordPos = glm::mix(p0, p1, alpha);
+            maxDev = std::max(maxDev, glm::length(curvePos - chordPos));
+        }
+        return maxDev;
+    }
+
+    /*!
      *  \brief  t (0~1) 에서의 변환 행렬 반환
      *  \param  t   0~1 범위의 궤적 파라미터
      *  \return t에서의 위치 + 회전을 담은 4x4 변환 행렬

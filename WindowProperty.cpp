@@ -243,12 +243,12 @@ void OpenProperty() {
 			ImGui::Text("Trajectory: %d frames", (int)traj.size());
 
 			// 해상도 설정
-			static int sweepResolution = 128;
+			static int sweepResolution = 256;
 			ImGui::SliderInt("Resolution", &sweepResolution, 64, 512);
 
 			// 타임 스텝 설정
-			static int timeSteps = 100;
-			ImGui::SliderInt("sampling", &timeSteps, 20, 500);
+			static int timeSteps = 10;
+			ImGui::SliderInt("sampling", &timeSteps, 10, 500);
 
 			// Sweep 버튼 (기존 Stamping)
 			if (ImGui::Button("Stamping CPU", ImVec2(-1,0)))

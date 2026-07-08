@@ -11,6 +11,8 @@ bool DgSweep::sInitialized = false;
 
 GLuint DgSweep::sBrentComputeShader = 0;
 GLuint DgSweep::sBrentTransformSSBO = 0;
+GLuint DgSweep::sBrentDevSSBO = 0;
+GLuint DgSweep::sBrentCounterSSBO = 0;
 bool DgSweep::sBrentInitialized = false;
 
 // Brent's method로 선분 위 SDF 최소값 탐색
@@ -265,12 +267,37 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
     }
 
+    const int M = 5;  // 셰이더 main()의 M과 반드시 일치해야 함
+    int numSamplingSegs = samplingSteps - 1;
+    int numSubSegs = numSamplingSegs * M;
+    std::vector<float> devs(numSubSegs);
+
+    for (int seg = 0; seg < numSamplingSegs; ++seg)
+    {
+        float segT0 = (float)seg / (float)numSamplingSegs;
+        float segT1 = (float)(seg + 1) / (float)numSamplingSegs;
+
+        for (int i = 0; i < M; ++i)
+        {
+            float subT0 = glm::mix(segT0, segT1, (float)i / (float)M);
+            float subT1 = glm::mix(segT0, segT1, (float)(i + 1) / (float)M);
+            devs[seg * M + i] = trajectory.computeSegmentDeviation(subT0, subT1);
+        }
+    }
+
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentTransformSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER,
         gpuKFs.size() * sizeof(GPUKeyFrame),
         gpuKFs.data(),
         GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sBrentTransformSSBO);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentDevSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,
+        devs.size() * sizeof(float),
+        devs.data(),
+        GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, sBrentDevSSBO);
 
     glUseProgram(sBrentComputeShader);
 
@@ -309,9 +336,28 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
 
     int numGroups = (resolution + 7) / 8;
+
+    // 수정
+    unsigned int zeros[2] = { 0, 0 };   // [0]=brentCallCount, [1]=outsideBoxCount
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentCounterSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(unsigned int) * 2, zeros, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, sBrentCounterSSBO);
+
     glDispatchCompute(numGroups, numGroups, numGroups);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    unsigned int counters[2] = { 0, 0 };
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentCounterSSBO);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(unsigned int) * 2, counters);
+
+    int totalVoxels = resolution * resolution * resolution;
+    std::cout << "[BRENT CALL COUNT] total=" << counters[0]
+        << ", voxel당 평균=" << (double)counters[0] / totalVoxels << std::endl;
+    std::cout << "[OUTSIDE BOX COUNT] total=" << counters[1]
+        << ", voxel당 평균=" << (double)counters[1] / totalVoxels
+        << " (" << (100.0 * counters[1] / (totalVoxels * (double)samplingSteps)) << "% of all samples)"
+        << std::endl;
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
 
@@ -320,6 +366,37 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         result->mData.resize(totalSize);
         glBindTexture(GL_TEXTURE_3D, resultTexture);
         glGetTexImage(GL_TEXTURE_3D, 0, GL_RED, GL_FLOAT, result->mData.data());
+
+        {
+            int rx = result->mDim[0];
+            int ry = result->mDim[1];
+            int rz = result->mDim[2];
+            float maxJump = 0.0f;
+            int bigJumpCount = 0;
+            auto idx = [rx, ry](int x, int y, int z) { return x + rx * (y + ry * z); };
+
+            for (int z = 1; z < rz - 1; ++z)
+                for (int y = 1; y < ry - 1; ++y)
+                    for (int x = 1; x < rx - 1; ++x)
+                    {
+                        float c = result->mData[idx(x, y, z)];
+                        if (std::abs(c) > 2.0f) continue; // 표면 근처만 체크
+
+                        float dxp = std::abs(result->mData[idx(x + 1, y, z)] - c);
+                        float dxm = std::abs(result->mData[idx(x - 1, y, z)] - c);
+                        float dyp = std::abs(result->mData[idx(x, y + 1, z)] - c);
+                        float dym = std::abs(result->mData[idx(x, y - 1, z)] - c);
+                        float dzp = std::abs(result->mData[idx(x, y, z + 1)] - c);
+                        float dzm = std::abs(result->mData[idx(x, y, z - 1)] - c);
+
+                        float localMax = std::max({ dxp, dxm, dyp, dym, dzp, dzm });
+                        if (localMax > maxJump) maxJump = localMax;
+                        if (localMax > 0.05f) bigJumpCount++;
+                    }
+
+            std::cout << "[JITTER CHECK] maxJump=" << maxJump
+                << ", bigJumpCount(>0.05)=" << bigJumpCount << std::endl;
+        }
     }
 
     result->mTextureID = resultTexture;
@@ -559,6 +636,8 @@ bool DgSweep::initializeBrentGPU()
     }
 
     glGenBuffers(1, &sBrentTransformSSBO);
+    glGenBuffers(1, &sBrentDevSSBO);
+    glGenBuffers(1, &sBrentCounterSSBO);
 
     sBrentInitialized = true;
     return true;
