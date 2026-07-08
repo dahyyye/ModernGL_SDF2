@@ -232,6 +232,78 @@ void main()
         vec3  p1       = evalInvTransformAt(t1, worldPos);
         float sdf1     = sampleLocalSDF(p1);
         float chordLen = length(p1 - p0);
+        float sdfMin   = min(sdf0, sdf1);
+
+        // 1차 컬링: 현(직선) 길이 기준
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > chordLen*1.5)
+        {
+            minSDF = min(minSDF, sdfMin);
+        }
+        else
+        {
+            // 2차 컬링: 4개 직선으로 근사한 arc length 기준
+            vec3 pa = evalInvTransformAt(mix(t0, t1, 0.25), worldPos);
+            vec3 pb = evalInvTransformAt(mix(t0, t1, 0.50), worldPos);
+            vec3 pc = evalInvTransformAt(mix(t0, t1, 0.75), worldPos);
+
+            float arcLen = length(pa - p0) + length(pb - pa)
+                         + length(pc - pb) + length(p1 - pc);
+
+            if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > arcLen*1.5)
+            {
+                minSDF = min(minSDF, sdfMin);
+            }
+            else
+            {
+                // 둘 다 통과 못하면: 8등분해서 각각 Brent
+                const int M = 8;
+                float bestSDF = sdfMin;
+                float tPrev   = t0;
+
+                for (int i = 1; i <= M; ++i)
+                {
+                    float tCurr = mix(t0, t1, float(i) / float(M));
+                    atomicAdd(brentCallCount, 1u);
+                    float val = brentMinimize(tPrev, tCurr, worldPos);
+                    bestSDF = min(bestSDF, val);
+                    tPrev = tCurr;
+                }
+
+                minSDF = min(minSDF, bestSDF);
+            }
+        }
+
+        t0   = t1;
+        p0   = p1;
+        sdf0 = sdf1;
+    }
+
+    imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
+}
+
+/* dev 쓴거
+void main()
+{
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(id, uResolution))) return;
+
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 spacing     = volumeRange / vec3(uResolution - 1);
+    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;
+
+    float minSDF = 1e10;
+
+    float t0   = 0.0;
+    vec3  p0   = evalInvTransformAt(t0, worldPos);
+    float sdf0 = sampleLocalSDF(p0);
+
+    for (int seg = 0; seg < uSamplingSteps - 1; ++seg)
+    {
+        float t1 = float(seg + 1) / float(uSamplingSteps - 1);
+
+        vec3  p1       = evalInvTransformAt(t1, worldPos);
+        float sdf1     = sampleLocalSDF(p1);
+        float chordLen = length(p1 - p0);
         float dev      = devs[seg];
 
         float effSdf0 = sdf0 - dev;
@@ -289,4 +361,4 @@ void main()
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
-}
+} */
