@@ -18,7 +18,7 @@ void ShowWindowToolBar(bool* p_open) {
 }
 
 void CreateMesh() {
-	const int NumIcons = 9;
+	const int NumIcons = 14;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\new_scene.png",
@@ -29,7 +29,12 @@ void CreateMesh() {
 		".\\res\\icons\\capsule.png",
 		".\\res\\icons\\quad_pramid.png",
 		".\\res\\icons\\cone.png",
-		".\\res\\icons\\bunny.png"
+		".\\res\\icons\\bunny.png",
+		".\\res\\icons\\knots.png",
+		".\\res\\icons\\Paint_roller.png",
+		".\\res\\icons\\floatplane.png",
+		".\\res\\icons\\dog.png",
+		".\\res\\icons\\kitten.png"
 	};
 
 	static GLuint icon_tex_id[NumIcons] = { 0 };
@@ -65,30 +70,47 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Torus", DgUtil::toImTextureID(icon_tex_id[3]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Torus_128.vti", "Torus");
+		loadVolumeVTI(".\\res\\volume\\(mini)Torus_256.vti", "Torus");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cylinder", DgUtil::toImTextureID(icon_tex_id[4]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		//loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_128.vti", "Cylinder");
-		loadVolumeVTI(".\\res\\volume\\knots_128.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\(mini)Cylinder_256.vti", "Cylinder");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Capsule", DgUtil::toImTextureID(icon_tex_id[5]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		//loadVolumeVTI(".\\res\\volume\\(mini)Capsule_128.vti", "Capsule");
-		loadVolumeVTI(".\\res\\volume\\Paint_Roller_256.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\(mini)Capsule_256.vti", "Capsule");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("QuadPramid", DgUtil::toImTextureID(icon_tex_id[6]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		//loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_128.vti", "QuadPramid");
-		loadVolumeVTI(".\\res\\volume\\floatplane_256.vti", "Cylinder");
+		loadVolumeVTI(".\\res\\volume\\(mini)QuadPyramid_256.vti", "QuadPramid");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		//loadVolumeVTI(".\\res\\volume\\(mini)Cone_128.vti", "Cone");
-		loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
+		loadVolumeVTI(".\\res\\volume\\(mini)Cone_256.vti", "Cone");
+	//loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Bunny", DgUtil::toImTextureID(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_128.vti", "Bunny");
+		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_256.vti", "Bunny");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("knots", DgUtil::toImTextureID(icon_tex_id[9]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\knots_256.vti", "knots");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("Paint_Roller", DgUtil::toImTextureID(icon_tex_id[10]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\Paint_Roller_2562.vti", "Paint_Roller");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("Floatplane", DgUtil::toImTextureID(icon_tex_id[11]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\floatplane_256.vti", "Floatplane");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("dog", DgUtil::toImTextureID(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\dog_2562.vti", "dog");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("kitten", DgUtil::toImTextureID(icon_tex_id[13]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\kitten_256.vti", "kitten");
 	ImGui::SameLine();
 }

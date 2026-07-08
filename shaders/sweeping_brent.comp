@@ -1,71 +1,71 @@
 #version 430 core
 
-// ì›Œí¬ê·¸ë£¹ í•˜ë‚˜ì˜ í¬ê¸°ëŠ” 8x8x8 = 512 ìŠ¤ë ˆë“œë¡œ ì„¤ì •
+// ¿öÅ©±×·ì ÇÏ³ª´ç Å©±â¸¦ 8x8x8 = 512 ½º·¹µå·Î ¼³Á¤
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
-// ì…ì¶œë ¥ ë°ì´í„° ë°”ì¸ë”©
+// ÀÔÃâ·Â µ¥ÀÌÅÍ ¹ÙÀÎµù
 layout(binding = 0) uniform sampler3D uBrushSDF;
 layout(r32f, binding = 1) uniform writeonly image3D uSweptVolume;
 
-// Catmull-Rom í‚¤í”„ë ˆì„ êµ¬ì¡°ì²´: ìœ„ì¹˜(xyz)ì™€ íšŒì „ ì¿¼í„°ë‹ˆì–¸(xyzw)
+// Catmull-Rom ½ºÇÃ¶óÀÎ¿ë Å°ÇÁ·¹ÀÓ ±¸Á¶Ã¼: À§Ä¡(xyz)¿Í È¸Àü ÄõÅÍ´Ï¾ğ(xyzw)
 struct KeyFrame {
     vec4 position; // xyz = position, w unused
     vec4 rotation; // quaternion (x, y, z, w)
     vec4 scale;    // scale (x, y, z), w unused
 };
 
-// GPUë¡œ ì „ë‹¬ëœ í‚¤í”„ë ˆì„ ë°°ì—´ (í¬ê¸° ê°€ë³€)
+// GPU·Î Àü´ŞÇÒ Å°ÇÁ·¹ÀÓ ¹è¿­ (Å©±â °¡º¯)
 layout(std430, binding = 2) buffer KeyFrameBuffer {
     KeyFrame keyframes[];
 };
 
-uniform vec3 uVolumeMin;    // ê²°ê³¼ ë³¼ë¥¨ì˜ ìµœì†Œ ì¢Œí‘œ
-uniform vec3 uVolumeMax;    // ê²°ê³¼ ë³¼ë¥¨ì˜ ìµœëŒ€ ì¢Œí‘œ
-uniform ivec3 uResolution;  // ê²°ê³¼ ë³¼ë¥¨ì˜ í•´ìƒë„ (x, y, z)
+uniform vec3 uVolumeMin;    // °á°ú º¼·ıÀÇ ÃÖ¼Ò ÁÂÇ¥
+uniform vec3 uVolumeMax;    // °á°ú º¼·ıÀÇ ÃÖ´ë ÁÂÇ¥
+uniform ivec3 uResolution;  // °á°ú º¼·ıÀÇ ÇØ»óµµ (x, y, z)
 
-uniform vec3 uBrushMin;     // ë¸ŒëŸ¬ì‹œì˜ ë¡œì»¬ ê³µê°„ ìµœì†Œ ì¢Œí‘œ
-uniform vec3 uBrushMax;     // ë¸ŒëŸ¬ì‹œì˜ ë¡œì»¬ ê³µê°„ ìµœëŒ€ ì¢Œí‘œ
+uniform vec3 uBrushMin;     // ºê·¯½ÃÀÇ ·ÎÄÃ °ø°£ ÃÖ¼Ò ÁÂÇ¥
+uniform vec3 uBrushMax;     // ºê·¯½ÃÀÇ ·ÎÄÃ °ø°£ ÃÖ´ë ÁÂÇ¥
 
-uniform int uSamplingSteps; // ê¶¤ì ì„ ëª‡ê°œì˜ ì„¸ê·¸ë¨¼íŠ¸ë¡œ ë‚˜ëˆŒì§€
-uniform int uMaxBrentIter;  // ë¸Œë ŒíŠ¸ ìµœì í™”ì˜ ìµœëŒ€ ë°˜ë³µ íšŸìˆ˜
+uniform int uSamplingSteps; // ±ËÀûÀ» ¸î °³ÀÇ ¼¼±×¸ÕÆ®·Î ³ª´­Áö
+uniform int uMaxBrentIter;  // ºê·»Æ® ÃÖÀûÈ­ÀÇ ÃÖ´ë ¹İº¹ È½¼ö
 
-uniform int uNumSegments;   
+uniform int uNumSegments;
 
-// ë¸ŒëŸ¬ì‹œ SDF ìƒ˜í”Œë§ í•¨ìˆ˜: ë¡œì»¬ ê³µê°„ ì¢Œí‘œë¥¼ ë°›ì•„ SDF ê°’ì„ ë°˜í™˜
+// ºê·¯½Ã SDF »ùÇÃ¸µ ÇÔ¼ö: ·ÎÄÃ °ø°£ ÁÂÇ¥¸¦ ¹Ş¾Æ SDF °ªÀ» ¹İÈ¯
 float sampleLocalSDF(vec3 localPos)
 {
-    vec3 brushRange = uBrushMax - uBrushMin;            
-    vec3 uvw = (localPos - uBrushMin) / brushRange;     // ë¡œì»¬ ì¢Œí‘œë¥¼ [0,1] ë²”ìœ„ì˜ UVWë¡œ ë³€í™˜
+    vec3 brushRange = uBrushMax - uBrushMin;
+    vec3 uvw = (localPos - uBrushMin) / brushRange;     // ·ÎÄÃ ÁÂÇ¥¸¦ [0,1] ¹üÀ§ÀÇ UVW·Î º¯È¯
 
     float outsideDist = 0.0;
-    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))  // UVWê°€ [0,1] ë²”ìœ„ë¥¼ ë²—ì–´ë‚˜ë©´ , 
+    if (any(lessThan(uvw, vec3(0.0))) || any(greaterThan(uvw, vec3(1.0))))  // UVW°¡ [0,1] ¹üÀ§¸¦ ¹ş¾î³ª¸é
     {
-        vec3 clamped = clamp(uvw, vec3(0.0), vec3(1.0));        
+        vec3 clamped = clamp(uvw, vec3(0.0), vec3(1.0));
         vec3 diff = (uvw - clamped) * brushRange;
         outsideDist = length(diff);
         uvw = clamped;
     }
 
-    return texture(uBrushSDF, uvw).r + outsideDist;     // ë²—ì–´ë‚œ ë§Œí¼ì˜ ê±°ë¦¬ë¥¼ SDFì— ì¶”ê°€
+    return texture(uBrushSDF, uvw).r + outsideDist;     // ¹ş¾î³­ ¸¸Å­ÀÇ °Å¸®¸¦ SDF¿¡ Ãß°¡
 }
 
-// Catmull-Romì€ keyframesë¥¼ ì§ì ‘ ì¸ë±ì‹±í•˜ë¯€ë¡œ seg ì¸ë±ìŠ¤ë§Œ ë°˜í™˜
+// Catmull-RomÀº keyframes¸¦ Á÷Á¢ ÀÎµ¦½ÌÇÏ¹Ç·Î seg ÀÎµ¦½º¸¸ ¹İÈ¯
 int getSegIdx(float t, out float lt)
 {
     float scaled = clamp(t, 0.0, 1.0) * float(uNumSegments);
     int seg      = clamp(int(scaled), 0, uNumSegments - 1);
-    lt           = scaled - float(seg); // ì„¸ê·¸ë¨¼íŠ¸ ë‚´ ë¡œì»¬ t [0,1]
+    lt           = scaled - float(seg); // ¼¼±×¸ÕÆ® ³» ·ÎÄÃ t [0,1]
     return seg;
 }
 
-// Catmull-Rom ê³¡ì„ ì—ì„œ tì— í•´ë‹¹í•˜ëŠ” ìœ„ì¹˜ ê³„ì‚°
-// ê²½ê³„ì—ì„œëŠ” phantom point(ë°˜ì‚¬ì )ë¥¼ ì‚¬ìš©í•´ ìì—°ìŠ¤ëŸ¬ìš´ ê³¡ì„  ìœ ì§€
+// Catmull-Rom °î¼±¿¡¼­ t¿¡ ÇØ´çÇÏ´Â À§Ä¡ °è»ê
+// °æ°è¿¡¼­´Â phantom point(¹İ»çÁ¡)¸¦ »ç¿ëÇØ ÀÚ¿¬½º·¯¿î °î¼± À¯Áö
 vec3 catmullRomPos(float t)
 {
     float lt;
     int seg = getSegIdx(t, lt);
 
-    // ì–‘ ë ê²½ê³„: ì¡´ì¬í•˜ì§€ ì•ŠëŠ” ì´ì›ƒ í‚¤í”„ë ˆì„ì„ ë°˜ì‚¬ì ìœ¼ë¡œ ëŒ€ì²´
+    // ½ÃÀÛ °æ°è: Á¸ÀçÇÏÁö ¾Ê´Â ÀÌÀü Å°ÇÁ·¹ÀÓÀ» ¹İ»çÁ¡À¸·Î ´ëÃ¼
     vec3 k00 = (seg == 0)
         ? (2.0 * keyframes[0].position.xyz - keyframes[1].position.xyz)
         : keyframes[seg - 1].position.xyz;
@@ -77,7 +77,7 @@ vec3 catmullRomPos(float t)
         ? keyframes[seg + 2].position.xyz
         : (2.0 * keyframes[uNumSegments].position.xyz - keyframes[uNumSegments - 1].position.xyz);
 
-    // Catmull-Rom ê³µì‹ (Cubic Hermite í˜•íƒœ)
+    // Catmull-Rom °ø½Ä (Cubic Hermite ÇüÅÂ)
     float lt2 = lt * lt;
     float lt3 = lt2 * lt;
 
@@ -87,50 +87,50 @@ vec3 catmullRomPos(float t)
         + (-k00 + 3.0*k0 - 3.0*k1 + k2)     * lt3);
 }
 
-// êµ¬ë©´ ì„ í˜• ë³´ê°„ (Slerp) í•¨ìˆ˜: ë‘ ì¿¼í„°ë‹ˆì–¸ê³¼ të¥¼ ë°›ì•„ ë³´ê°„ëœ ì¿¼í„°ë‹ˆì–¸ì„ ë°˜í™˜
+// ±¸¸é ¼±Çü º¸°£(Slerp) ÇÔ¼ö: µÎ ÄõÅÍ´Ï¾ğ°ú t¸¦ ¹Ş¾Æ º¸°£µÈ ÄõÅÍ´Ï¾ğÀ» ¹İÈ¯
 vec4 quatSlerp(vec4 q1, vec4 q2, float t)
 {
-    float cosA = clamp(dot(q1, q2), -1.0, 1.0);     // ë‘ ë‹¨ìœ„ ì¿¼í„°ë‹ˆì–¸ì˜ ë‚´ì  = 4D ì´ˆêµ¬ ìœ„ì—ì„œ ë‘ ì  ì‚¬ì´ ê°ë„ì˜ ì½”ì‚¬ì¸. 
-    if (cosA < 0.0) { q2 = -q2; cosA = -cosA; }         // clampëŠ” ë¶€ë™ì†Œìˆ˜ì  ì˜¤ì°¨ë¡œ Â±1 ë²”ìœ„ë¥¼ ì‚´ì§ ë²—ì–´ë‚˜ëŠ” ê²½ìš°ë¥¼ ë§‰ì•„ì¤Œ
+    float cosA = clamp(dot(q1, q2), -1.0, 1.0);     // µÎ ´ÜÀ§ ÄõÅÍ´Ï¾ğÀÇ ³»Àû = 4D ÃÊ±¸ À§¿¡¼­ µÎ Á¡ »çÀÌ °¢µµÀÇ ÄÚ»çÀÎ
+    if (cosA < 0.0) { q2 = -q2; cosA = -cosA; }     // ³»ÀûÀÌ À½¼ö¸é ¹İ´ëÆí ÄõÅÍ´Ï¾ğÀ» »ç¿ëÇØ ÃÖ´Ü °æ·Î·Î º¸°£(¸Õ °æ·Î È¸Àü ¹æÁö)
     if (cosA > 0.9995) return normalize(mix(q1, q2, t));
-    
-    // í‘œì¤€ Slerp ê³µì‹
+
+    // Ç¥ÁØ Slerp °ø½Ä
     float angle = acos(cosA);
     float sinA = sin(angle);
     return (sin((1.0 - t) * angle) / sinA) * q1
          + (sin(t * angle)          / sinA) * q2;
 }
 
-// ì¿¼í„°ë‹ˆì–¸ìœ¼ë¡œ ë²¡í„° íšŒì „: v' = q * v * q^{-1} (qëŠ” ë‹¨ìœ„ ì¿¼í„°ë‹ˆì–¸ì´ë¼ê³  ê°€ì •)
+// ÄõÅÍ´Ï¾ğÀ¸·Î º¤ÅÍ È¸Àü: v' = q * v * q^{-1} (q´Â ´ÜÀ§ ÄõÅÍ´Ï¾ğÀÌ¶ó°í °¡Á¤)
 vec3 quatRotate(vec4 q, vec3 v)
 {
     vec3 qv = q.xyz;
     return v + 2.0 * cross(qv, cross(qv, v) + q.w * v);
 }
 
-// ì—­ë³€í™˜ í‰ê°€: tì— í•´ë‹¹í•˜ëŠ” ìœ„ì¹˜(Catmull-Rom)ì™€ íšŒì „(Slerp)ì„ ê³„ì‚°í•˜ì—¬
-// worldPosë¥¼ ë¸ŒëŸ¬ì‹œ ë¡œì»¬ ê³µê°„ìœ¼ë¡œ ì—­ë³€í™˜
+// ¿ªº¯È¯ Æò°¡: t¿¡ ÇØ´çÇÏ´Â À§Ä¡(Catmull-Rom)¿Í È¸Àü(Slerp)À» °è»êÇÏ¿©
+// worldPos¸¦ ºê·¯½Ã ·ÎÄÃ °ø°£À¸·Î µÇµ¹¸²
 vec3 evalInvTransformAt(float t, vec3 worldPos)
 {
     float lt;
     int seg = getSegIdx(t, lt);
 
     vec3 pos    = catmullRomPos(t);
-    
-    vec4 rot    = quatSlerp(keyframes[seg].rotation,                // íšŒì „ì€ ì¸ì ‘ í‚¤í”„ë ˆì„ ì‚¬ì´ë¥¼ Slerpìœ¼ë¡œ ë³´ê°„
-                            keyframes[seg + 1].rotation, lt);
-    vec4 invRot = vec4(-rot.xyz, rot.w);                            // ë‹¨ìœ„ ì¿¼í„°ë‹ˆì–¸ì˜ ì—­ = ì¼¤ë ˆ
 
-    vec3 scl = mix(keyframes[seg].scale.xyz, keyframes[seg + 1].scale.xyz, lt); // ìŠ¤ì¼€ì¼ì€ ì„ í˜• ë³´ê°„
+    vec4 rot    = quatSlerp(keyframes[seg].rotation,                // È¸ÀüÀº ÀÎÁ¢ Å°ÇÁ·¹ÀÓ »çÀÌ¸¦ Slerp·Î º¸°£
+                            keyframes[seg + 1].rotation, lt);
+    vec4 invRot = vec4(-rot.xyz, rot.w);                            // ´ÜÀ§ ÄõÅÍ´Ï¾ğÀÇ ¿ª = ÄÓ·¹
+
+    vec3 scl = mix(keyframes[seg].scale.xyz, keyframes[seg + 1].scale.xyz, lt); // ½ºÄÉÀÏÀº ¼±Çü º¸°£
 
     return quatRotate(invRot, (worldPos - pos) / scl);
 }
 
-// Arc length of p(Î±)=evalInvTransformAt(mix(t0,t1,Î±), worldPos) on Î±âˆˆ[0,1]
-// p0, p1ì€ í˜¸ì¶œìê°€ ì´ë¯¸ ê³„ì‚°í•œ ëì  â€” ì¬ì‚¬ìš©í•´ì„œ evalInvTransformAt 2íšŒ ì ˆì•½
+// p(alpha) = evalInvTransformAt(mix(t0,t1,alpha), worldPos), alpha in [0,1] ±¸°£ÀÇ arc length ±Ù»ç
+// p0, p1Àº È£ÃâÀÚ°¡ ÀÌ¹Ì °è»êÇÑ ¾ç ³¡Á¡ °ªÀÌ¶ó Àç»ç¿ëÇØ¼­ evalInvTransformAt È£Ãâ 2¹øÀ» Àı¾à
 float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 {
-    const int N = 4;   // subdivision ìˆ˜, ë‚´ë¶€ ì  N-1ê°œ
+    const int N = 4;   // ºĞÇÒ °³¼ö, ³»ºÎ »ùÇÃÁ¡Àº N-1°³
     float len = 0.0;
     vec3 prev = p0;
     for (int i = 1; i < N; ++i)
@@ -144,27 +144,27 @@ float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
     return len;
 }
 
-// Brent's method: f(alpha) = SDF(T^{-1}(mix(t0,t1,alpha)) * worldPos)
+// Brent's method: f(alpha) = SDF(T^{-1}(mix(t0,t1,alpha)) * worldPos) ¸¦ ÃÖ¼ÒÈ­
 float brentMinimize(float t0, float t1, vec3 worldPos)
 {
-    const float golden = 0.381966;      // (3 - sqrt(5)) / 2, í™©ê¸ˆë¹„ì˜ ì—­ìˆ˜
-    const float tol = 1e-4;             // í—ˆìš© ì˜¤ì°¨
+    const float golden = 0.381966;      // (3 - sqrt(5)) / 2, È²±İºñÀÇ º¸¼ö
+    const float tol = 1e-4;             // Çã¿ë ¿ÀÂ÷
 
-    float a = 0.0, b = 1.0;             // alphaì˜ ë²”ìœ„ [t0,t1]
+    float a = 0.0, b = 1.0;             // alphaÀÇ Å½»ö ¹üÀ§ [0,1] (½ÇÁ¦ [t0,t1] ±¸°£¿¡ ´ëÀÀ)
 
-    float x = a + golden * (b - a);     // í˜„ì¬ê¹Œì§€ ë°œê²¬ëœ ìµœì†Œê°’ì˜ ìœ„ì¹˜
-    float w = x, v = x;                 // ë‘ ë²ˆì§¸ë¡œ ì‘ì€ ê°’ì˜ ìœ„ì¹˜, ì„¸ ë²ˆì§¸ë¡œ ì‘ì€ ê°’ì˜ ìœ„ì¹˜
+    float x = a + golden * (b - a);     // ÇöÀç±îÁö ¹ß°ßµÈ ÃÖ¼Ò°ªÀÇ À§Ä¡
+    float w = x, v = x;                 // µÎ ¹øÂ°·Î ÀÛÀº °ªÀÇ À§Ä¡, ¼¼ ¹øÂ°·Î ÀÛÀº °ªÀÇ À§Ä¡
 
     float fx = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, x), worldPos));
     float fw = fx, fv = fx;
 
-    float d = 0.0, e = 0.0;             // d: í˜„ì¬ ë‹¨ê³„ì—ì„œ ì´ë™í•  ê±°ë¦¬, e: ì´ì „ ë‹¨ê³„ì—ì„œ ì´ë™í•œ ê±°ë¦¬
+    float d = 0.0, e = 0.0;             // d: ÇöÀç ´Ü°è¿¡¼­ ÀÌµ¿ÇÑ °Å¸®, e: ÀÌÀü ´Ü°è¿¡¼­ ÀÌµ¿ÇÑ °Å¸®
 
     for (int iter = 0; iter < uMaxBrentIter; ++iter)
     {
         float mid  = 0.5 * (a + b);
-        float tol1 = tol * abs(x) + 1e-10;      // ì ˆëŒ€ í—ˆìš© ì˜¤ì°¨ + ìƒëŒ€ í—ˆìš© ì˜¤ì°¨
-        float tol2 = 2.0 * tol1;                
+        float tol1 = tol * abs(x) + 1e-10;      // »ó´ë Çã¿ë ¿ÀÂ÷ + Àı´ë Çã¿ë ¿ÀÂ÷
+        float tol2 = 2.0 * tol1;
 
         if (abs(x - mid) <= (tol2 - 0.5 * (b - a)))
             break;
@@ -172,7 +172,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
         bool useParabolic = false;
         float u = 0.0;
 
-        // í¬ë¬¼ëŸ¬ ë³´ê°„ ì‹œë„: eê°€ ì¶©ë¶„íˆ í¬ê³ , fx, fw, fvê°€ ì„œë¡œ ë‹¤ë¥¼ ë•Œë§Œ ì‹œë„
+        // Æ÷¹°¼± º¸°£ ½Ãµµ: e°¡ ÃæºĞÈ÷ Å©°í, fx, fw, fv°¡ ¼­·Î ´Ù¸¦ ¶§¸¸ ½Ãµµ
         if (abs(e) > tol1)
         {
             float r = (x - w) * (fx - fv);
@@ -190,41 +190,41 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
             {
                 d = p / q;
                 u = x + d;
-                if ((u - a) < tol2 || (b - u) < tol2)   // uê°€ êµ¬ê°„ ëì— ë„ˆë¬´ ê°€ê¹Œì´ ê°€ì§€ ì•Šë„ë¡ ì¡°ì •
+                if ((u - a) < tol2 || (b - u) < tol2)   // u°¡ ±¸°£ ³¡¿¡ ³Ê¹« °¡±îÀÌ °¡Áö ¾Êµµ·Ï Á¶Á¤
                     d = (x < mid) ? tol1 : -tol1;
                 useParabolic = true;
             }
         }
 
-        // í¬ë¬¼ëŸ¬ ë³´ê°„ì´ ì‹¤íŒ¨í–ˆì„ ë•ŒëŠ” í™©ê¸ˆ ë¶„í•  ë°©ì‹ìœ¼ë¡œ ì´ë™
+        // Æ÷¹°¼± º¸°£ÀÌ ½ÇÆĞÇßÀ» ¶§´Â È²±İ ºĞÇÒ ¹æ½ÄÀ¸·Î ÀÌµ¿
         if (!useParabolic)
         {
             e = (x < mid) ? (b - x) : (a - x);
             d = golden * e;
         }
 
-        // ìƒˆ í‰ê°€ ì  uë¥¼ ê²°ì •, dê°€ tol1ë³´ë‹¤ í¬ë©´ dë§Œí¼ ì´ë™, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ tol1ë§Œí¼ ì´ë™ (xì—ì„œ ë©€ì–´ì§€ëŠ” ë°©í–¥ìœ¼ë¡œ)
+        // »õ Æò°¡Á¡ u¸¦ °áÁ¤: d°¡ tol1º¸´Ù Å©¸é d¸¸Å­, ¾Æ´Ï¸é tol1¸¸Å­ ÀÌµ¿ (x¿¡¼­ ¸Ö¾îÁö´Â ¹æÇâÀ¸·Î)
         u = (abs(d) >= tol1) ? x + d : x + ((d > 0.0) ? tol1 : -tol1);
 
-        // ìƒˆë¡œìš´ ì  uì—ì„œ í•¨ìˆ˜ê°’ í‰ê°€
+        // »õ·Î¿î Á¡ u¿¡¼­ ÇÔ¼ö°ª Æò°¡
         float fu = sampleLocalSDF(evalInvTransformAt(mix(t0, t1, u), worldPos));
 
-        if (fu <= fx)       // uê°€ í˜„ì¬ ìµœì†Œê°’ë³´ë‹¤ ì¢‹ìœ¼ë©´, êµ¬ê°„ì„ ì¢íˆê³  í¬ë¬¼ëŸ¬ ë³´ê°„ ê²°ê³¼ë¥¼ ì—…ë°ì´íŠ¸
+        if (fu <= fx)       // u°¡ ÇöÀç ÃÖ¼Ò°ªº¸´Ù ÁÁÀ¸¸é, ±¸°£À» Á¼È÷°í ÃÖ¼Ò°ª Á¤º¸¸¦ °»½Å
         {
-            if (u < x) b = x; else a = x; 	 // uê°€ xë³´ë‹¤ ì‘ìœ¼ë©´ bë¥¼ xë¡œ, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ aë¥¼ xë¡œ ì—…ë°ì´íŠ¸í•˜ì—¬ êµ¬ê°„ì„ ì¢í˜
-            v = w; fv = fw;                  
+            if (u < x) b = x; else a = x;    // u°¡ xº¸´Ù ÀÛÀ¸¸é b¸¦ x·Î, ¾Æ´Ï¸é a¸¦ x·Î °»½ÅÇÏ¿© ±¸°£À» Á¼Èû
+            v = w; fv = fw;
             w = x; fw = fx;
             x = u; fx = fu;
         }
-        else                // uê°€ í˜„ì¬ ìµœì†Œê°’ë³´ë‹¤ ì¢‹ì§€ ì•Šìœ¼ë©´, êµ¬ê°„ì„ ì¢íˆê³  í¬ë¬¼ëŸ¬ ë³´ê°„ ê²°ê³¼ë¥¼ ì—…ë°ì´íŠ¸
+        else                // u°¡ ÇöÀç ÃÖ¼Ò°ªº¸´Ù ÁÁÁö ¾ÊÀ¸¸é, ±¸°£¸¸ Á¼È÷°í º¸Á¶°ªµé¸¸ °»½Å
         {
-            if (u < x) a = u; else b = u;       // uê°€ xë³´ë‹¤ ì‘ìœ¼ë©´ aë¥¼ uë¡œ, ê·¸ë ‡ì§€ ì•Šìœ¼ë©´ bë¥¼ uë¡œ ì—…ë°ì´íŠ¸í•˜ì—¬ êµ¬ê°„ì„ ì¢í˜
+            if (u < x) a = u; else b = u;       // u°¡ xº¸´Ù ÀÛÀ¸¸é a¸¦ u·Î, ¾Æ´Ï¸é b¸¦ u·Î °»½ÅÇÏ¿© ±¸°£À» Á¼Èû
             if (fu <= fw || w == x)      { v = w; fv = fw; w = u; fw = fu; }
             else if (fu <= fv || v == x || v == w) { v = u; fv = fu; }
         }
     }
 
-    return fx;  // ìµœì¢…ì ìœ¼ë¡œ ë°œê²¬ëœ ìµœì†Œê°’ ë°˜í™˜
+    return fx;  // ÃÖÁ¾ÀûÀ¸·Î ¹ß°ßÇÑ ÃÖ¼Ò°ª ¹İÈ¯
 }
 
 
@@ -251,12 +251,14 @@ void main()
         float sdf1 = sampleLocalSDF(p1);
         float chordLen = length(p1 - p0);
 
+        // 1Â÷ ÄÃ¸µ: Á÷¼±(Çö) ±æÀÌ ±âÁØ
         if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > chordLen * 1.5)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
         else
         {
+            // 2Â÷ ÄÃ¸µ: 4°³ Á÷¼±À¸·Î ±Ù»çÇÑ arc length ±âÁØ
             float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
             if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * 1.5)
             {
@@ -264,6 +266,7 @@ void main()
             }
             else
             {
+                // µÑ ´Ù Åë°ú ¸øÇÏ¸é: 8µîºĞÇØ¼­ ¼­ºê¼¼±×¸ÕÆ®¸¶´Ù ´Ù½Ã ÄÃ¸µ °Ë»ç ÈÄ Brent
                 const int M = 8;
                 float bestSDF = min(sdf0, sdf1);
 
