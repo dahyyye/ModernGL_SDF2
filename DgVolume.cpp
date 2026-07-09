@@ -333,17 +333,25 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 {
 	DgVolume* vol = new DgVolume();
 	vol->mName = name;
-	vol->mDim[0] = resolution;
-	vol->mDim[1] = resolution;
-	vol->mDim[2] = resolution;
 
 	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
 	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
 
 	glm::vec3 range = maxPos - minPos;
-	vol->mSpacing[0] = range.x / (resolution - 1);
-	vol->mSpacing[1] = range.y / (resolution - 1);
-	vol->mSpacing[2] = range.z / (resolution - 1);
+
+	// 가장 긴 축 기준으로 정육면체 voxel 크기(cellSize) 결정
+	float maxRange = std::max({ range.x, range.y, range.z });
+	float cellSize = maxRange / (float)(resolution - 1);
+
+	// 나머지 축의 voxel 개수는 (해당 축 길이 / cellSize) + 1
+	vol->mDim[0] = std::max(1, (int)std::round(range.x / cellSize) + 1);
+	vol->mDim[1] = std::max(1, (int)std::round(range.y / cellSize) + 1);
+	vol->mDim[2] = std::max(1, (int)std::round(range.z / cellSize) + 1);
+
+	// 세 축 모두 같은 spacing → 정육면체 voxel 보장
+	vol->mSpacing[0] = cellSize;
+	vol->mSpacing[1] = cellSize;
+	vol->mSpacing[2] = cellSize;
 
 	vol->mMesh = createBoundingBoxMesh(vol->mMin, vol->mMax);
 

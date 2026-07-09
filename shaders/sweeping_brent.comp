@@ -22,6 +22,7 @@ layout(std430, binding = 2) buffer KeyFrameBuffer {
 uniform vec3 uVolumeMin;    // 결과 볼륨의 최소 좌표
 uniform vec3 uVolumeMax;    // 결과 볼륨의 최대 좌표
 uniform ivec3 uResolution;  // 결과 볼륨의 해상도 (x, y, z)
+uniform vec3 uSpacing;      // 결과 볼륨의 각 축에 대한 스페이싱 (x, y, z)
 
 uniform vec3 uBrushMin;     // 브러시의 로컬 공간 최소 좌표
 uniform vec3 uBrushMax;     // 브러시의 로컬 공간 최대 좌표
@@ -253,9 +254,7 @@ void main()
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
 
-    vec3 volumeRange = uVolumeMax - uVolumeMin;
-    vec3 spacing     = volumeRange / vec3(uResolution - 1);
-    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;
+    vec3 worldPos = uVolumeMin + vec3(id) * uSpacing;
 
     float minSDF = 1e10;
 

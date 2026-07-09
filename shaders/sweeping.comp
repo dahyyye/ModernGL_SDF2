@@ -22,7 +22,7 @@ uniform ivec3 uResolution;
 uniform vec3 uBrushMin;
 uniform vec3 uBrushMax;
 uniform int uSamplingSteps;
-
+uniform vec3 uSpacing;
 
 
 
@@ -53,22 +53,16 @@ float sampleBrushSDF(vec3 worldPos, mat4 invTransform)
 
 
 
-// 메인
 void main()
 {
-    // 현재 voxel ID
     ivec3 id = ivec3(gl_GlobalInvocationID);
 
-    // 범위 체크
     if (any(greaterThanEqual(id, uResolution)))
         return;
 
-    // 복셀의 월드 좌표 계산
-    vec3 volumeRange = uVolumeMax - uVolumeMin;
-    vec3 spacing = volumeRange / vec3(uResolution - 1);
-    vec3 worldPos = uVolumeMin + vec3(id) * spacing;
+    // 셰이더 안에서 재계산하지 않고 CPU에서 넘어온 spacing을 그대로 사용
+    vec3 worldPos = uVolumeMin + vec3(id) * uSpacing;
 
-    // 모든 시간에서 최소 SDF
     float minSDF = 1e10;
 
     for (int t = 0; t < uSamplingSteps; t++)
@@ -77,6 +71,5 @@ void main()
         minSDF = min(minSDF, sdf);
     }
 
-    // 결과 저장
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
 }
