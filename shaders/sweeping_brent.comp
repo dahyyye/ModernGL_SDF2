@@ -128,7 +128,7 @@ vec3 evalInvTransformAt(float t, vec3 worldPos)
 }
 
 // p(alpha) = evalInvTransformAt(mix(t0,t1,alpha), worldPos), alpha in [0,1] 구간의 arc length 근사
-/*float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
+float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 {
     const int N = 4;   // 분할 개수, 내부 샘플점은 N-1개
     float len = 0.0;
@@ -142,7 +142,7 @@ vec3 evalInvTransformAt(float t, vec3 worldPos)
     }
     len += length(p1 - prev);
     return len;
-}*/
+}
 
 // chord(p0-p1 직선)와 실제 곡선 사이의 최대 편차(deviation)를 근사.
 float maxChordDeviation(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
@@ -249,7 +249,8 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
     return fx;  // 최종적으로 발견한 최소값 반환
 }
 
-void main()
+// dev 구하는거
+/* void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
@@ -272,7 +273,7 @@ void main()
 
         // 1차 컬링
         float maxDev = maxChordDeviation(t0, t1, worldPos, p0, p1);
-        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen)
+        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen*1.5)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
@@ -295,7 +296,79 @@ void main()
                 float subDev = maxChordDeviation(tPrev, tCurr, worldPos, pPrev, pCurr);
 
                 // 2차 컬링
-                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen)
+                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen*1.5)
+                {
+                    bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
+                }
+                else
+                {
+                    float val = brentMinimize(tPrev, tCurr, worldPos);
+                    bestSDF = min(bestSDF, val);
+                }
+
+                tPrev = tCurr;
+                pPrev = pCurr;
+                sdfPrev = sdfCurr;
+            }
+
+            minSDF = min(minSDF, bestSDF);
+        }
+
+        t0   = t1;
+        p0   = p1;
+        sdf0 = sdf1;
+    }
+
+    imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
+} */
+
+// 기존
+void main()
+{
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(id, uResolution))) return;
+
+    vec3 volumeRange = uVolumeMax - uVolumeMin;
+    vec3 spacing     = volumeRange / vec3(uResolution - 1);
+    vec3 worldPos    = uVolumeMin + vec3(id) * spacing;
+
+    float minSDF = 1e10;
+
+    float t0   = 0.0;
+    vec3  p0   = evalInvTransformAt(t0, worldPos);
+    float sdf0 = sampleLocalSDF(p0);
+
+    for (int seg = 0; seg < uSamplingSteps - 1; ++seg)
+    {
+        float t1 = float(seg + 1) / float(uSamplingSteps - 1);
+
+        vec3 p1 = evalInvTransformAt(t1, worldPos);
+        float sdf1 = sampleLocalSDF(p1);
+
+        // 1차 컬링: 4개 직선으로 근사한 arc length 기준
+        float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * 1.5)
+        {
+            minSDF = min(minSDF, min(sdf0, sdf1));
+        }
+        else
+        {
+            // 1차 실패 시: 8등분해서 서브세그먼트마다 다시 컬링 검사 후 Brent
+            const int M = 8;
+            float bestSDF = min(sdf0, sdf1);
+
+            float tPrev = t0;
+            vec3  pPrev = p0;
+            float sdfPrev = sdf0;
+
+            for (int i = 1; i <= M; ++i)
+            {
+                float tCurr = mix(t0, t1, float(i) / float(M));
+                vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
+                float sdfCurr = sampleLocalSDF(pCurr);
+
+                float subLen = length(pCurr - pPrev);
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }
