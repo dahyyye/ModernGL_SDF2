@@ -148,10 +148,6 @@
     <ClCompile Include="DgCollision.cpp" />
     <ClCompile Include="DgMC.cpp" />
     <ClCompile Include="DgSweep.cpp" />
-    <ClCompile Include="DgSweepVia.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="DgViewer.cpp" />
     <ClCompile Include="DgMesh.cpp" />
     <ClCompile Include="DgVolume.cpp" />
@@ -177,10 +173,6 @@
     <ClInclude Include="DgMC.h" />
     <ClInclude Include="DgMesh.h" />
     <ClInclude Include="DgSweep.h" />
-    <ClInclude Include="DgSweepVia.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </ClInclude>
     <ClInclude Include="DgTrajectory.h" />
     <ClInclude Include="DgUtil.h" />
     <ClInclude Include="DgViewer.h" />

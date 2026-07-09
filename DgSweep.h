@@ -10,8 +10,8 @@ public:
     static DgVolume* generateSweptVolume(
         DgVolume* brush,
         const DgTrajectory& trajectory,
-        int resolution = 128,
-        int samplingSteps = 100,
+        int resolution,
+        int samplingSteps,
 		bool useGPU = false
     );
 
