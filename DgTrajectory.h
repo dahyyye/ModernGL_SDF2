@@ -77,6 +77,7 @@ public:
  *  \note   GPU의 catmullRomPos(t)와 동일한 seg/lt 계산을 거쳐야
  *          CPU-GPU 간 위치가 정확히 일치함
  */
+ // 수정
     float computeSegmentDeviation(float t0, float t1, int N = 8) const
     {
         int numSegs = (int)keyframes.size() - 1;
@@ -89,8 +90,18 @@ public:
             return catmullRomEval(keyframes, seg, lt);
             };
 
+        // [t0, t1] 구간에서 scale이 가장 작아지는 값 (로컬 공간에서 deviation이 가장 커지는 지점)
+        auto minScaleAt = [&](float t) -> float {
+            float scaled = glm::clamp(t, 0.0f, 1.0f) * numSegs;
+            int   seg = glm::clamp((int)scaled, 0, numSegs - 1);
+            float lt = scaled - (float)seg;
+            glm::vec3 scl = glm::mix(keyframes[seg].scale, keyframes[seg + 1].scale, lt);
+            return std::min({ scl.x, scl.y, scl.z });
+            };
+
         glm::vec3 p0 = positionAt(t0);
         glm::vec3 p1 = positionAt(t1);
+        float worstScale = std::min(minScaleAt(t0), minScaleAt(t1));
 
         float maxDev = 0.0f;
         for (int i = 1; i < N; ++i)
@@ -99,8 +110,10 @@ public:
             glm::vec3 curvePos = positionAt(glm::mix(t0, t1, alpha));
             glm::vec3 chordPos = glm::mix(p0, p1, alpha);
             maxDev = std::max(maxDev, glm::length(curvePos - chordPos));
+            worstScale = std::min(worstScale, minScaleAt(glm::mix(t0, t1, alpha)));
         }
-        return maxDev;
+        worstScale = std::max(worstScale, 1e-4f); // 0으로 나누기 방지
+        return maxDev / worstScale;               // 로컬 공간 기준으로 정규화
     }
 
     /*!

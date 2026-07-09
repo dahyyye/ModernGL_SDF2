@@ -12,7 +12,6 @@ bool DgSweep::sInitialized = false;
 GLuint DgSweep::sBrentComputeShader = 0;
 GLuint DgSweep::sBrentTransformSSBO = 0;
 GLuint DgSweep::sBrentDevSSBO = 0;
-GLuint DgSweep::sBrentCounterSSBO = 0;
 bool DgSweep::sBrentInitialized = false;
 
 // Brent's method로 선분 위 SDF 최소값 탐색
@@ -267,21 +266,25 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
         gpuKFs[i].scale = glm::vec4(trajectory.keyframes[i].scale, 0.0f);
     }
 
-    const int M = 5;  // 셰이더 main()의 M과 반드시 일치해야 함
+    const int M = 5;
     int numSamplingSegs = samplingSteps - 1;
     int numSubSegs = numSamplingSegs * M;
-    std::vector<float> devs(numSubSegs);
+    // [0 .. numSamplingSegs-1]           : 세그먼트(최상위 chord) 레벨
+    // [numSamplingSegs .. numSamplingSegs+numSubSegs-1] : 서브세그먼트 레벨
+    std::vector<float> devs(numSamplingSegs + numSubSegs);
 
     for (int seg = 0; seg < numSamplingSegs; ++seg)
     {
         float segT0 = (float)seg / (float)numSamplingSegs;
         float segT1 = (float)(seg + 1) / (float)numSamplingSegs;
 
+        devs[seg] = trajectory.computeSegmentDeviation(segT0, segT1); // ← 최상위 deviation 추가
+
         for (int i = 0; i < M; ++i)
         {
             float subT0 = glm::mix(segT0, segT1, (float)i / (float)M);
             float subT1 = glm::mix(segT0, segT1, (float)(i + 1) / (float)M);
-            devs[seg * M + i] = trajectory.computeSegmentDeviation(subT0, subT1);
+            devs[numSamplingSegs + seg * M + i] = trajectory.computeSegmentDeviation(subT0, subT1);
         }
     }
 
@@ -334,30 +337,13 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uSamplingSteps"), samplingSteps);
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
+    glUniform1i(glGetUniformLocation(sBrentComputeShader, "uCountBrent"), skipReadback ? 0 : 1);
 
     int numGroups = (resolution + 7) / 8;
-
-    // 수정
-    unsigned int zeros[2] = { 0, 0 };   // [0]=brentCallCount, [1]=outsideBoxCount
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentCounterSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(unsigned int) * 2, zeros, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, sBrentCounterSSBO);
 
     glDispatchCompute(numGroups, numGroups, numGroups);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    unsigned int counters[2] = { 0, 0 };
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, sBrentCounterSSBO);
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(unsigned int) * 2, counters);
-
-    int totalVoxels = resolution * resolution * resolution;
-    std::cout << "[BRENT CALL COUNT] total=" << counters[0]
-        << ", voxel당 평균=" << (double)counters[0] / totalVoxels << std::endl;
-    std::cout << "[OUTSIDE BOX COUNT] total=" << counters[1]
-        << ", voxel당 평균=" << (double)counters[1] / totalVoxels
-        << " (" << (100.0 * counters[1] / (totalVoxels * (double)samplingSteps)) << "% of all samples)"
-        << std::endl;
 
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
 
@@ -637,7 +623,6 @@ bool DgSweep::initializeBrentGPU()
 
     glGenBuffers(1, &sBrentTransformSSBO);
     glGenBuffers(1, &sBrentDevSSBO);
-    glGenBuffers(1, &sBrentCounterSSBO);
 
     sBrentInitialized = true;
     return true;

@@ -30,7 +30,6 @@ private:
     static GLuint sBrentComputeShader;
     static GLuint sBrentTransformSSBO;
     static GLuint sBrentDevSSBO;
-	static GLuint sBrentCounterSSBO;
     static bool sBrentInitialized;
 
     static bool initializeGPU();
