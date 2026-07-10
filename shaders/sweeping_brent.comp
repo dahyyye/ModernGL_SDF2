@@ -147,7 +147,7 @@ float curveArcLength(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 // chord(p0-p1 직선)와 실제 곡선 사이의 최대 편차(deviation)를 근사.
 float maxChordDeviation(float t0, float t1, vec3 worldPos, vec3 p0, vec3 p1)
 {
-    const int N = 3;
+    const int N = 10;
     vec3 chordDir  = p1 - p0;
     float chordLenSq = dot(chordDir, chordDir);
 
@@ -250,7 +250,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 }
 
 // dev 구하는거
-/* void main()
+void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
@@ -273,13 +273,13 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 
         // 1차 컬링
         float maxDev = maxChordDeviation(t0, t1, worldPos, p0, p1);
-        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen*1.5)
+        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
         else
         {
-            const int M = 5;
+            const int M = 10;
             float bestSDF = min(sdf0, sdf1);
 
             float tPrev = t0;
@@ -296,7 +296,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
                 float subDev = maxChordDeviation(tPrev, tCurr, worldPos, pPrev, pCurr);
 
                 // 2차 컬링
-                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen*1.5)
+                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }
@@ -320,10 +320,10 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
-} */
+}
 
 // 기존
-void main()
+/*void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
@@ -392,4 +392,4 @@ void main()
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
-}
+}*/
