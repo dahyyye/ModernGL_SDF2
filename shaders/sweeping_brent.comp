@@ -356,7 +356,7 @@ void main()
         else
         {
             // 1차 실패 시: L등분해서 서브세그먼트마다 다시 컬링 검사 후 Brent
-            const int L = 5;
+            const int L = 10;
             float bestSDF = min(sdf0, sdf1);
 
             float tPrev = t0;
@@ -371,7 +371,7 @@ void main()
 
                 //float subLen = length(pCurr - pPrev);
                 float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
-                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen)
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen*1.5)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }
