@@ -304,6 +304,10 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (Brent GPU)", resolution, combinedMin, combinedMax);
     int dimX = result->mDim[0], dimY = result->mDim[1], dimZ = result->mDim[2];
 
+    // createResultVolume 내부에서 8의 배수 정렬을 위해 mMin/mMax가 패딩되었으므로
+    // 이후 uniform 전달에는 반드시 패딩된 값을 사용해야 함
+    combinedMin = glm::vec3((float)result->mMin[0], (float)result->mMin[1], (float)result->mMin[2]);
+    combinedMax = glm::vec3((float)result->mMax[0], (float)result->mMax[1], (float)result->mMax[2]);
     // Compute Shader 실행
     glUseProgram(sBrentComputeShader);
 
@@ -534,6 +538,11 @@ DgVolume* DgSweep::generateGPU(DgVolume* brush,
     // 결과 볼륨 메타데이터 먼저 생성 (정육면체 voxel dims/spacing 계산)
     DgVolume* result = DgVolume::createResultVolume("Swept Volume (GPU)", resolution, combinedMin, combinedMax);
     int dimX = result->mDim[0], dimY = result->mDim[1], dimZ = result->mDim[2];
+
+    // createResultVolume 내부에서 8의 배수 정렬을 위해 mMin/mMax가 패딩되었으므로
+    // 이후 uniform 전달에는 반드시 패딩된 값을 사용해야 함
+    combinedMin = glm::vec3((float)result->mMin[0], (float)result->mMin[1], (float)result->mMin[2]);
+    combinedMax = glm::vec3((float)result->mMax[0], (float)result->mMax[1], (float)result->mMax[2]);
 
     // Compute Shader 실행
     glUseProgram(sComputeShader);

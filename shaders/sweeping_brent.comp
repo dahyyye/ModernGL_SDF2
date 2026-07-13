@@ -273,7 +273,7 @@ void main()
 
         // 1차 컬링
         float maxDev = maxChordDeviation(t0, t1, worldPos, p0, p1);
-        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen)
+        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen*1.5)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
@@ -353,17 +353,17 @@ void main()
         }
         else
         {
-            // 1차 실패 시: 8등분해서 서브세그먼트마다 다시 컬링 검사 후 Brent
-            const int M = 8;
+            // 1차 실패 시: L등분해서 서브세그먼트마다 다시 컬링 검사 후 Brent
+            const int L = 10;
             float bestSDF = min(sdf0, sdf1);
 
             float tPrev = t0;
             vec3  pPrev = p0;
             float sdfPrev = sdf0;
 
-            for (int i = 1; i <= M; ++i)
+            for (int i = 1; i <= L; ++i)
             {
-                float tCurr = mix(t0, t1, float(i) / float(M));
+                float tCurr = mix(t0, t1, float(i) / float(L));
                 vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
                 float sdfCurr = sampleLocalSDF(pCurr);
 

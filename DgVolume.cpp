@@ -334,21 +334,38 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 	DgVolume* vol = new DgVolume();
 	vol->mName = name;
 
-	vol->mMin = DgPos(minPos.x, minPos.y, minPos.z);
-	vol->mMax = DgPos(maxPos.x, maxPos.y, maxPos.z);
-
 	glm::vec3 range = maxPos - minPos;
 
 	// 가장 긴 축 기준으로 정육면체 voxel 크기(cellSize) 결정
 	float maxRange = std::max({ range.x, range.y, range.z });
 	float cellSize = maxRange / (float)(resolution - 1);
 
-	// 나머지 축의 voxel 개수는 (해당 축 길이 / cellSize) + 1
-	vol->mDim[0] = std::max(1, (int)std::round(range.x / cellSize) + 1);
-	vol->mDim[1] = std::max(1, (int)std::round(range.y / cellSize) + 1);
-	vol->mDim[2] = std::max(1, (int)std::round(range.z / cellSize) + 1);
+	// 각 축의 원본 voxel 개수 (해당 축 길이 / cellSize) + 1
+	int rawDimX = std::max(1, (int)std::round(range.x / cellSize) + 1);
+	int rawDimY = std::max(1, (int)std::round(range.y / cellSize) + 1);
+	int rawDimZ = std::max(1, (int)std::round(range.z / cellSize) + 1);
 
-	// 세 축 모두 같은 spacing → 정육면체 voxel 보장
+	// GPU workgroup(8x8x8) 정렬을 위해 8의 배수로 올림
+	const int kAlign = 8;
+	vol->mDim[0] = ((rawDimX + kAlign - 1) / kAlign) * kAlign;
+	vol->mDim[1] = ((rawDimY + kAlign - 1) / kAlign) * kAlign;
+	vol->mDim[2] = ((rawDimZ + kAlign - 1) / kAlign) * kAlign;
+
+	// 올림으로 늘어난 voxel 수만큼 world-space padding을 양쪽에 절반씩 분배
+	glm::vec3 extraDim(
+		(float)(vol->mDim[0] - rawDimX),
+		(float)(vol->mDim[1] - rawDimY),
+		(float)(vol->mDim[2] - rawDimZ)
+	);
+	glm::vec3 extraWorld = extraDim * cellSize * 0.5f;
+
+	glm::vec3 paddedMin = minPos - extraWorld;
+	glm::vec3 paddedMax = maxPos + extraWorld;
+
+	vol->mMin = DgPos(paddedMin.x, paddedMin.y, paddedMin.z);
+	vol->mMax = DgPos(paddedMax.x, paddedMax.y, paddedMax.z);
+
+	// 세 축 모두 같은 cellSize 사용 (정육면체 voxel)
 	vol->mSpacing[0] = cellSize;
 	vol->mSpacing[1] = cellSize;
 	vol->mSpacing[2] = cellSize;
