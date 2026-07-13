@@ -88,6 +88,37 @@ vec3 catmullRomPos(float t)
         + (-k00 + 3.0*k0 - 3.0*k1 + k2)     * lt3);
 }
 
+// Catmull-Rom 보간을 스케일에 적용 (position과 동일한 구조, phantom point 포함)
+vec3 catmullRomScale(float t)
+{
+    float lt;
+    int seg = getSegIdx(t, lt);
+
+    // 양 끝 phantom point: 존재하지 않는 이웃을 반사점으로 대체
+    vec3 k00 = (seg == 0)
+        ? (2.0 * keyframes[0].scale.xyz - keyframes[1].scale.xyz)
+        : keyframes[seg - 1].scale.xyz;
+
+    vec3 k0 = keyframes[seg].scale.xyz;
+    vec3 k1 = keyframes[seg + 1].scale.xyz;
+
+    vec3 k2 = (seg + 2 <= uNumSegments)
+        ? keyframes[seg + 2].scale.xyz
+        : (2.0 * keyframes[uNumSegments].scale.xyz - keyframes[uNumSegments - 1].scale.xyz);
+
+    // Catmull-Rom 보간 (Cubic Hermite 형태)
+    float lt2 = lt * lt;
+    float lt3 = lt2 * lt;
+
+    vec3 result = 0.5 * ((2.0 * k0)
+        + (-k00 + k1)                        * lt
+        + (2.0*k00 - 5.0*k0 + 4.0*k1 - k2)  * lt2
+        + (-k00 + 3.0*k0 - 3.0*k1 + k2)     * lt3);
+
+    // 오버슈트로 인해 스케일이 0 이하가 되는 것을 방지 (division-by-zero / 거울반전 방지)
+    return max(result, vec3(1e-4));
+}
+
 // 구면 선형 보간(Slerp) 함수: 두 쿼터니언과 t를 받아 보간된 쿼터니언을 반환
 vec4 quatSlerp(vec4 q1, vec4 q2, float t)
 {
@@ -122,7 +153,7 @@ vec3 evalInvTransformAt(float t, vec3 worldPos)
                             keyframes[seg + 1].rotation, lt);
     vec4 invRot = vec4(-rot.xyz, rot.w);                            // 단위 쿼터니언의 역 = 켤레
 
-    vec3 scl = mix(keyframes[seg].scale.xyz, keyframes[seg + 1].scale.xyz, lt); // 스케일은 선형 보간
+    vec3 scl = catmullRomScale(t);
 
     // 회전을 먼저 풀고, 그 다음에 스케일을 푼다 (Eq.2: S^-1 * R^T * (x-p) 순서)
     vec3 unrotated = quatRotate(invRot, worldPos - pos);
