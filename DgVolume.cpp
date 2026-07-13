@@ -345,8 +345,8 @@ DgVolume* DgVolume::createResultVolume(const std::string& name,
 	int rawDimY = std::max(1, (int)std::round(range.y / cellSize) + 1);
 	int rawDimZ = std::max(1, (int)std::round(range.z / cellSize) + 1);
 
-	// GPU workgroup(8x8x8) 정렬을 위해 8의 배수로 올림
-	const int kAlign = 8;
+	// GPU workgroup(8x8x8) 정렬을 위해 32의 배수로 올림
+	const int kAlign = 32;
 	vol->mDim[0] = ((rawDimX + kAlign - 1) / kAlign) * kAlign;
 	vol->mDim[1] = ((rawDimY + kAlign - 1) / kAlign) * kAlign;
 	vol->mDim[2] = ((rawDimZ + kAlign - 1) / kAlign) * kAlign;

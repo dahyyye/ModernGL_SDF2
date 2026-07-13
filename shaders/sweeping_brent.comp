@@ -124,7 +124,9 @@ vec3 evalInvTransformAt(float t, vec3 worldPos)
 
     vec3 scl = mix(keyframes[seg].scale.xyz, keyframes[seg + 1].scale.xyz, lt); // 스케일은 선형 보간
 
-    return quatRotate(invRot, (worldPos - pos) / scl);
+    // 회전을 먼저 풀고, 그 다음에 스케일을 푼다 (Eq.2: S^-1 * R^T * (x-p) 순서)
+    vec3 unrotated = quatRotate(invRot, worldPos - pos);
+    return unrotated / scl;
 }
 
 // p(alpha) = evalInvTransformAt(mix(t0,t1,alpha), worldPos), alpha in [0,1] 구간의 arc length 근사
@@ -250,7 +252,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 }
 
 // dev 구하는거
-void main()
+/*void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
@@ -320,10 +322,10 @@ void main()
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
-}
+}*/
 
 // 기존
-/*void main()
+void main()
 {
     ivec3 id = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(id, uResolution))) return;
@@ -347,14 +349,14 @@ void main()
 
         // 1차 컬링: 4개 직선으로 근사한 arc length 기준
         float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
-        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * 1.5)
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength*1.5)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
         else
         {
             // 1차 실패 시: L등분해서 서브세그먼트마다 다시 컬링 검사 후 Brent
-            const int L = 10;
+            const int L = 5;
             float bestSDF = min(sdf0, sdf1);
 
             float tPrev = t0;
@@ -367,8 +369,9 @@ void main()
                 vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
                 float sdfCurr = sampleLocalSDF(pCurr);
 
-                float subLen = length(pCurr - pPrev);
-                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * 1.5)
+                //float subLen = length(pCurr - pPrev);
+                float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }
@@ -392,4 +395,4 @@ void main()
     }
 
     imageStore(uSweptVolume, id, vec4(minSDF, 0.0, 0.0, 0.0));
-}*/
+}
