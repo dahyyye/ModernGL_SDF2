@@ -401,8 +401,8 @@ void main()
                 vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
                 float sdfCurr = sampleLocalSDF(pCurr);
 
-                float subLen = length(pCurr - pPrev);
-                //float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
+                //float subLen = length(pCurr - pPrev);
+                float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
                 if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen*1.5)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));

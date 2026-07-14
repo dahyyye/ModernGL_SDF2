@@ -18,7 +18,7 @@ void ShowWindowToolBar(bool* p_open) {
 }
 
 void CreateMesh() {
-	const int NumIcons = 14;
+	const int NumIcons = 15;
 
 	const char* icon_files[NumIcons] = {
 		".\\res\\icons\\new_scene.png",
@@ -34,7 +34,8 @@ void CreateMesh() {
 		".\\res\\icons\\Paint_roller.png",
 		".\\res\\icons\\floatplane.png",
 		".\\res\\icons\\dog.png",
-		".\\res\\icons\\kitten.png"
+		".\\res\\icons\\kitten.png",
+		".\\res\\icons\\rocker.png"
 	};
 
 	static GLuint icon_tex_id[NumIcons] = { 0 };
@@ -112,5 +113,9 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("kitten", DgUtil::toImTextureID(icon_tex_id[13]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 		loadVolumeVTI(".\\res\\volume\\kitten_256.vti", "kitten");
+	ImGui::SameLine();
+
+	if (ImGui::ImageButton("rocker", DgUtil::toImTextureID(icon_tex_id[14]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
+		loadVolumeVTI(".\\res\\volume\\rocker_256.vti", "rocker");
 	ImGui::SameLine();
 }
