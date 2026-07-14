@@ -379,6 +379,7 @@ void main()
         float sdf1 = sampleLocalSDF(p1);
 
         // 1차 컬링: 4개 직선으로 근사한 arc length 기준
+        // float chordLen = length(p1 - p0);
         float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
         if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength*1.5)
         {
@@ -400,8 +401,8 @@ void main()
                 vec3  pCurr = evalInvTransformAt(tCurr, worldPos);
                 float sdfCurr = sampleLocalSDF(pCurr);
 
-                //float subLen = length(pCurr - pPrev);
-                float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
+                float subLen = length(pCurr - pPrev);
+                //float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
                 if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen*1.5)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));

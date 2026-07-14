@@ -75,7 +75,7 @@ void OpenProperty() {
 		{
 			if (selected.size() >= 2)
 			{
-				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 128);
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Union, 256);
 				if (result)
 				{
 					DgScene::instance().addSDFVolume(result);
@@ -90,7 +90,7 @@ void OpenProperty() {
 		{
 			if (selected.size() >= 2)
 			{
-				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Intersection, 64);
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Intersection, 256);
 				if (result)
 				{
 					DgScene::instance().addSDFVolume(result);
@@ -104,7 +104,7 @@ void OpenProperty() {
 		{
 			if (selected.size() >= 2)
 			{
-				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Difference, 64);
+				DgVolume* result = DgBoolean::Boolean(selected, BooleanMode::Difference, 256);
 				if (result)
 				{
 					DgScene::instance().addSDFVolume(result);
