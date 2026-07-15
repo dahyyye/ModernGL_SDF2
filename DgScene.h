@@ -201,10 +201,10 @@ public:
 
 	void renderTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
 	void renderSweptVolumeTrajectory(const glm::mat4& viewMat, const glm::mat4& projMat);
-	void resweepVolume(DgVolume* vol, bool preview = false);
+	void resweepVolume(DgVolume* vol, bool preview = false, int previewResOverride = -1, int previewStepsOverride = -1);
 
 	// 충돌 데모 관련 함수
 	void startCollisionDemo(DgVolume* sv);
-	void runCollisionOptimization(DgVolume* sv, float safetyFactor = 1.5f, int maxIter = 50);
+	void runCollisionOptimization(DgVolume* sv, float stepScale = 1.5f, int maxIter = 50);
 	void clearCollisionDemo();
 };

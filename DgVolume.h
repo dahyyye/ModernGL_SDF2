@@ -64,6 +64,7 @@ public:
 	int mSweepResolution;
 	int mSweepTimeSteps;
 	int mSweepMethod;
+	float mSweepSafetyFactor = 1.5f;   // Brent GPU 컬링 안전계수
 
 	/*! \brief VTI 저장 함수 */ 
 	bool saveToVTI(const char* filename);

@@ -244,7 +244,8 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     const DgTrajectory& trajectory,
     int resolution,
     int samplingSteps,
-    bool skipReadback)
+    bool skipReadback,
+    float safetyFactor)
 {
     if (!initializeBrentGPU()) return nullptr;
 
@@ -355,6 +356,8 @@ DgVolume* DgSweep::generateBrentGPU(DgVolume* brush,
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uNumSegments"), numSegs);
     // 셰이더의 uMaxBrentIter에 최대 브렌트 반복 횟수 전달 (skipReadback이 true면 6, 아니면 10)
     glUniform1i(glGetUniformLocation(sBrentComputeShader, "uMaxBrentIter"), skipReadback ? 6 : 10);
+    // 셰이더의 uSafetyFactor에 Lipschitz 컬링 안전계수 전달
+    glUniform1f(glGetUniformLocation(sBrentComputeShader, "uSafetyFactor"), safetyFactor);
 
     // Dispatch (축별 그룹 수 분리)
     int groupsX = (dimX + 7) / 8;

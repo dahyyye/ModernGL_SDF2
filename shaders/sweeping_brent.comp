@@ -31,6 +31,7 @@ uniform int uSamplingSteps; // 궤적을 몇 개의 세그먼트로 나눌지
 uniform int uMaxBrentIter;  // 브렌트 최적화의 최대 반복 횟수
 
 uniform int uNumSegments;
+uniform float uSafetyFactor;   // Lipschitz 컬링 안전계수
 
 // 브러시 SDF 샘플링 함수: 로컬 공간 좌표를 받아 SDF 값을 반환
 float sampleLocalSDF(vec3 localPos)
@@ -306,7 +307,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
 
         // 1차 컬링
         float maxDev = maxChordDeviation(t0, t1, worldPos, p0, p1);
-        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen*1.5)
+        if (sdf0 > maxDev && sdf1 > maxDev && ((sdf0 - maxDev) + (sdf1 - maxDev)) > chordLen* uSafetyFactor)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
@@ -329,7 +330,7 @@ float brentMinimize(float t0, float t1, vec3 worldPos)
                 float subDev = maxChordDeviation(tPrev, tCurr, worldPos, pPrev, pCurr);
 
                 // 2차 컬링
-                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen)
+                if (sdfPrev > subDev && sdfCurr > subDev && ((sdfPrev - subDev) + (sdfCurr - subDev)) > subLen* uSafetyFactor)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }
@@ -381,7 +382,7 @@ void main()
         // 1차 컬링: 4개 직선으로 근사한 arc length 기준
         // float chordLen = length(p1 - p0);
         float segLength = curveArcLength(t0, t1, worldPos, p0, p1);
-        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength*1.5)
+        if (sdf0 > 0.0 && sdf1 > 0.0 && (sdf0 + sdf1) > segLength * uSafetyFactor)
         {
             minSDF = min(minSDF, min(sdf0, sdf1));
         }
@@ -403,7 +404,7 @@ void main()
 
                 //float subLen = length(pCurr - pPrev);
                 float subLen = curveArcLength(tPrev, tCurr, worldPos, pPrev, pCurr);
-                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen*1.5)
+                if (sdfPrev > 0.0 && sdfCurr > 0.0 && (sdfPrev + sdfCurr) > subLen * uSafetyFactor)
                 {
                     bestSDF = min(bestSDF, min(sdfPrev, sdfCurr));
                 }

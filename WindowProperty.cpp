@@ -400,6 +400,31 @@ void OpenProperty() {
 		}
 	}
 
+	if (ImGui::CollapsingHeader("Swept Volume Properties"))
+	{
+		DgVolume* selectedSV = nullptr;
+		for (DgVolume* vol : DgScene::instance().getSDFList())
+		{
+			if (vol && vol->mSelected && vol->mIsSweptVolume) {
+				selectedSV = vol;
+				break;
+			}
+		}
+
+		if (selectedSV && selectedSV->mSweepMethod == 3)
+		{
+			ImGui::SliderFloat("Safety Factor", &selectedSV->mSweepSafetyFactor, 1.0f, 2.0f);
+			if (ImGui::IsItemActive())
+				DgScene::instance().resweepVolume(selectedSV, true, selectedSV->mSweepResolution, selectedSV->mSweepTimeSteps);
+			if (ImGui::IsItemDeactivatedAfterEdit())
+				DgScene::instance().resweepVolume(selectedSV, false);
+		}
+		else
+		{
+			ImGui::TextDisabled("Select a Brent GPU Swept Volume");
+		}
+	}
+
 	if (ImGui::CollapsingHeader("Collision Demo"))
 	{
 		DgVolume* selectedSV = nullptr;
@@ -423,13 +448,13 @@ void OpenProperty() {
 			}
 			else
 			{
-				static float safetyFactor = 1.5f;
+				static float stepScale = 1.5f;
 				static int   maxIter = 50;
-				ImGui::SliderFloat("Safety Factor", &safetyFactor, 1.0f, 3.0f);
+				ImGui::SliderFloat("Step Scale", &stepScale, 1.0f, 3.0f);
 				ImGui::SliderInt("Max Iterations", &maxIter, 5, 200);
 
 				if (ImGui::Button("Start", ImVec2(-1, 0)))
-					scene.runCollisionOptimization(selectedSV, safetyFactor, maxIter);
+					scene.runCollisionOptimization(selectedSV, stepScale, maxIter);
 
 				ImGui::Separator();
 				if (ImGui::Button("Clear Demo", ImVec2(-1, 0)))

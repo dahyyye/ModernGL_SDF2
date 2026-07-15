@@ -1341,15 +1341,15 @@ void DgScene::renderSweptVolumeTrajectory(const glm::mat4& viewMat,
 	glPointSize(1.0f);
 }
 
-void DgScene::resweepVolume(DgVolume* vol, bool preview)
+void DgScene::resweepVolume(DgVolume* vol, bool preview, int previewResOverride, int previewStepsOverride)
 {
 	if (!vol || !vol->mIsSweptVolume || !vol->mSourceTrajectory || !vol->mBrushVolume) return;
 
 	const DgTrajectory& traj = *vol->mSourceTrajectory;
 
 	int numKF = (int)traj.keyframes.size();
-	int res = preview ? 128 : vol->mSweepResolution;
-	int steps = preview ? std::max(numKF * 4, 10) : vol->mSweepTimeSteps;
+	int res = preview ? (previewResOverride > 0 ? previewResOverride : 128) : vol->mSweepResolution;
+	int steps = preview ? (previewStepsOverride > 0 ? previewStepsOverride : std::max(numKF * 4, 10)) : vol->mSweepTimeSteps;
 	int method = preview ? 3 : vol->mSweepMethod;
 
 	DgVolume* newVol = nullptr;
@@ -1357,7 +1357,7 @@ void DgScene::resweepVolume(DgVolume* vol, bool preview)
 	case 0: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, false); break;
 	case 1: newVol = DgSweep::generateSweptVolume(vol->mBrushVolume, traj, res, steps, true); break;
 	case 2: newVol = DgSweep::generateBrentCPU(vol->mBrushVolume, traj, res, steps); break;
-	default:newVol = DgSweep::generateBrentGPU(vol->mBrushVolume, traj, res, steps, preview); break;
+	default:newVol = DgSweep::generateBrentGPU(vol->mBrushVolume, traj, res, steps, preview, vol->mSweepSafetyFactor); break;
 	}
 	if (!newVol) return;
 
@@ -1508,7 +1508,7 @@ void DgScene::startCollisionDemo(DgVolume* sv)
 //	std::cout << "충돌 데모: 장애물 " << mObstacleMeshes.size() << "개 배치" << std::endl;
 //}
 
-void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int maxIter)
+void DgScene::runCollisionOptimization(DgVolume* sv, float stepScale, int maxIter)
 {
 	if (!sv || !sv->mIsSweptVolume || !sv->mSourceTrajectory) return;
 	if (mObstacleMeshes.empty()) return;
@@ -1556,7 +1556,7 @@ void DgScene::runCollisionOptimization(DgVolume* sv, float safetyFactor, int max
 		// 법선 방향으로 키프레임 이동
 		glm::vec3 normalLocal = glm::normalize(
 			glm::vec3(invModel * glm::vec4(worst.normal, 0.0f)));
-		glm::vec3 displacement = normalLocal * (-worst.deepestSDF) * safetyFactor;
+		glm::vec3 displacement = normalLocal * (-worst.deepestSDF) * stepScale;
 		kfs[nearestKF].position += displacement;
 
 		std::cout << "Iter " << iter

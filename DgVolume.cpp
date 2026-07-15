@@ -46,6 +46,7 @@ DgVolume::DgVolume(DgVolume& cpy)
 	mSweepResolution = cpy.mSweepResolution;
 	mSweepTimeSteps = cpy.mSweepTimeSteps;
 	mSweepMethod = cpy.mSweepMethod;
+	mSweepSafetyFactor = cpy.mSweepSafetyFactor;
 	mOffset = cpy.mOffset;
 }
 

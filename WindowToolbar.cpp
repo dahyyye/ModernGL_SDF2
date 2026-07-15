@@ -88,11 +88,11 @@ void CreateMesh() {
 
 	if (ImGui::ImageButton("Cone", DgUtil::toImTextureID(icon_tex_id[7]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
 		loadVolumeVTI(".\\res\\volume\\(mini)Cone_256.vti", "Cone");
-	//loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
+		//loadVolumeVTI(".\\res\\volume\\Wheel_256.vti", "Cone");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("Bunny", DgUtil::toImTextureID(icon_tex_id[8]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\(mini)Bunny_256.vti", "Bunny");
+		loadVolumeVTI(".\\res\\volume\\test(mini)Bunny_256.vti", "Bunny");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("knots", DgUtil::toImTextureID(icon_tex_id[9]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
@@ -108,7 +108,7 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("dog", DgUtil::toImTextureID(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\dog_2562.vti", "dog");
+		loadVolumeVTI(".\\res\\volume\\test)dog_256.vti", "dog");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("kitten", DgUtil::toImTextureID(icon_tex_id[13]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
