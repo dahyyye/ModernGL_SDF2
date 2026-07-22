@@ -108,7 +108,7 @@ void CreateMesh() {
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("dog", DgUtil::toImTextureID(icon_tex_id[12]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))
-		loadVolumeVTI(".\\res\\volume\\test)dog_256.vti", "dog");
+		loadVolumeVTI(".\\res\\volume\\pad2_dog_256.vti", "dog");
 	ImGui::SameLine();
 
 	if (ImGui::ImageButton("kitten", DgUtil::toImTextureID(icon_tex_id[13]), ImVec2(30, 30), ImVec2(0, 1), ImVec2(1, 0)))

@@ -42,6 +42,9 @@ public:
 	/* 볼륨의 텍스쳐 id */
 	GLuint mTextureID = 0;
 
+	/*! SDF 텍스처의 min-mipmap 레벨 개수 (256^3 기준 9) */
+	int mMipLevelCount = 0;
+
 	/* 오프셋 */
 	float mOffset = 0.0f;
 
@@ -92,6 +95,9 @@ public:
 
 	/*! \brief 텍스쳐 생성 함수 */
 	void createTexture();
+
+	/*! \brief 밉맵 레벨들을 실제로 채우는 함수 */
+	void generateMinMipChain();
 
 	/*! \brief 볼륨의 중심점 반환 (위치 포함) */
 	glm::vec3 getCenter() const {

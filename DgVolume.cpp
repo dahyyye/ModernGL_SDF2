@@ -278,23 +278,27 @@ void DgVolume::createTexture()
 		glDeleteTextures(1, &mTextureID);
 	}
 
-	// 새 텍스처 생성
+	// 레벨 개수 계산: 256^3이면 log2(256)+1 = 9개 (256,128,64,...,1)
+	int maxDim = std::max({ mDim[0], mDim[1], mDim[2] });
+	mMipLevelCount = 1 + (int)std::floor(std::log2((float)std::max(maxDim, 1)));
+
+	// 새 텍스처 생성 (glTexStorage3D로 immutable 스토리지에 레벨 전체를 미리 할당)
 	glGenTextures(1, &mTextureID);
 	glBindTexture(GL_TEXTURE_3D, mTextureID);
+	glTexStorage3D(GL_TEXTURE_3D, mMipLevelCount, GL_R32F, mDim[0], mDim[1], mDim[2]);
 
-	// 데이터 업로드
-	glTexImage3D(
+	// 레벨 0(원본)에 실제 SDF 데이터 업로드
+	glTexSubImage3D(
 		GL_TEXTURE_3D,
 		0,
-		GL_R32F,
+		0, 0, 0,
 		mDim[0], mDim[1], mDim[2],
-		0,
 		GL_RED,
 		GL_FLOAT,
 		mData.data()
 	);
 
-	// 텍스처 파라미터 설정
+	// 텍스처 파라미터 설정 (level 0 trilinear 샘플링은 기존 그대로 사용)
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -303,7 +307,56 @@ void DgVolume::createTexture()
 
 	glBindTexture(GL_TEXTURE_3D, 0);
 
-	std::cout << "볼륨 텍스처 생성 완료 ID: " << mTextureID << std::endl;
+	// 레벨 1 ~ (mMipLevelCount-1)을 min 채움
+	generateMinMipChain();
+
+	std::cout << "볼륨 텍스처 생성 완료 ID: " << mTextureID
+		<< " (mip levels: " << mMipLevelCount << ")" << std::endl;
+}
+
+void DgVolume::generateMinMipChain()
+{
+	// mipmap셰이더 프로그램은 프로그램 전체에서 한 번만 컴파일해서 재사용
+	static GLuint sMinMipComputeShader = 0;
+	if (sMinMipComputeShader == 0) {
+		sMinMipComputeShader = loadComputeShader(".\\shaders\\mipmap.comp");
+	}
+
+	glUseProgram(sMinMipComputeShader);
+
+	int srcDim[3] = { mDim[0], mDim[1], mDim[2] };
+
+	for (int level = 0; level < mMipLevelCount - 1; ++level)
+	{
+		int dstDim[3] = {
+			std::max(srcDim[0] / 2, 1),
+			std::max(srcDim[1] / 2, 1),
+			std::max(srcDim[2] / 2, 1)
+		};
+
+		// 이전 레벨(읽기)과 다음 레벨(쓰기)을 같은 텍스처의 서로 다른 level로 바인딩
+		glBindImageTexture(0, mTextureID, level, GL_FALSE, 0, GL_READ_ONLY, GL_R32F);
+		glBindImageTexture(1, mTextureID, level + 1, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+		glUniform3i(glGetUniformLocation(sMinMipComputeShader, "uSrcDim"),
+			srcDim[0], srcDim[1], srcDim[2]);
+		glUniform3i(glGetUniformLocation(sMinMipComputeShader, "uDstDim"),
+			dstDim[0], dstDim[1], dstDim[2]);
+
+		int groupsX = (dstDim[0] + 3) / 4;
+		int groupsY = (dstDim[1] + 3) / 4;
+		int groupsZ = (dstDim[2] + 3) / 4;
+		glDispatchCompute(groupsX, groupsY, groupsZ);
+
+		// 다음 레벨을 읽기 전에 이전 디스패치 결과가 다 쓰였는지 대기
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		srcDim[0] = dstDim[0];
+		srcDim[1] = dstDim[1];
+		srcDim[2] = dstDim[2];
+	}
+
+	glUseProgram(0);
 }
 
 bool DgVolume::saveToVTI(const char* filename)

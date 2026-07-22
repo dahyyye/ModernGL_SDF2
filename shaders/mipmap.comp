@@ -1,0 +1,29 @@
+#version 430
+
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
+
+layout(binding = 0, r32f) uniform readonly  image3D uSrcLevel; // ?¥Ï†Ñ ?àÎ≤® (?¥ÏÉÅ?? uSrcDim)
+layout(binding = 1, r32f) uniform writeonly image3D uDstLevel; // ?§Ïùå ?àÎ≤® (?¥ÏÉÅ?? uDstDim)
+
+uniform ivec3 uSrcDim;
+uniform ivec3 uDstDim;
+
+void main()
+{
+    ivec3 dstCoord = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(dstCoord, uDstDim))) return;
+
+    ivec3 srcBase = dstCoord * 2;
+
+    float m = 1e10;
+    for (int dz = 0; dz < 2; ++dz)
+    for (int dy = 0; dy < 2; ++dy)
+    for (int dx = 0; dx < 2; ++dx)
+    {
+        ivec3 srcCoord = min(srcBase + ivec3(dx, dy, dz), uSrcDim - ivec3(1));
+        float v = imageLoad(uSrcLevel, srcCoord).r;
+        m = min(m, v);
+    }
+
+    imageStore(uDstLevel, dstCoord, vec4(m, 0.0, 0.0, 0.0));
+}
